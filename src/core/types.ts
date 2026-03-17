@@ -1,4 +1,6 @@
 export type OwnershipStatus = "wishlist" | "owned" | "subscription" | "borrowed" | "emulated";
+export type GoalType = "finished" | "started" | "playtime" | "backlog_reduction";
+export type Period = "monthly" | "yearly" | "total";
 
 export type ProgressStatus =
   | "not_started"
@@ -98,10 +100,10 @@ export interface GameTag {
 
 export interface Goal {
   id?: number;
-  type: string;
+  type: GoalType;
   target: number;
   current: number;
-  period: string;
+  period: Period;
 }
 
 export interface Setting {

@@ -1,6 +1,5 @@
 import type { ChangeEvent, FormEvent, MutableRefObject } from "react";
 import { Download, Upload } from "lucide-react";
-import type { ImportSource } from "../importExport";
 import {
   cx,
   gamePriorities,
@@ -13,6 +12,7 @@ import {
   type RestoreMode,
   type RestorePreview,
   type SessionFormState,
+  type ImportSource,
 } from "../backlog/shared";
 import { Modal, NotchButton, Pill } from "./cyberpunk-ui";
 
@@ -122,34 +122,32 @@ export function GameModal({
 
 export function ImportModal({
   open,
-  importSource,
-  importText,
-  importFileName,
-  importPreview,
-  importPreviewSummary,
-  importFileInputRef,
+  source,
+  text,
+  fileName,
+  preview,
+  summary,
+  fileInputRef,
   onSourceChange,
   onTextChange,
   onFileChange,
-  onPreviewActionChange,
+  onActionChange,
   onSubmit,
   onClose,
-  onBack,
 }: {
   open: boolean;
-  importSource: ImportSource;
-  importText: string;
-  importFileName: string;
-  importPreview: ImportPreviewEntry[] | null;
-  importPreviewSummary: ImportPreviewSummary;
-  importFileInputRef: MutableRefObject<HTMLInputElement | null>;
+  source: ImportSource;
+  text: string;
+  fileName: string;
+  preview: ImportPreviewEntry[] | null;
+  summary: ImportPreviewSummary;
+  fileInputRef: MutableRefObject<HTMLInputElement | null>;
   onSourceChange: (value: ImportSource) => void;
   onTextChange: (value: string) => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
-  onPreviewActionChange: (entryId: string, action: ImportPreviewAction) => void;
+  onActionChange: (entryId: string, action: ImportPreviewAction) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onClose: () => void;
-  onBack: () => void;
 }) {
   if (!open) return null;
 
@@ -160,68 +158,68 @@ export function ImportModal({
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={onSubmit}>
-        <div className={cx("form-grid", importPreview && "flow-hidden")}>
+        <div className={cx("form-grid", preview && "flow-hidden")}>
           <label className="field">
             <span>Origem</span>
-            <select value={importSource} onChange={(event) => onSourceChange(event.target.value as ImportSource)}>
-              {importSources.map((source) => <option key={source} value={source}>{source.toUpperCase()}</option>)}
+            <select value={source} onChange={(event) => onSourceChange(event.target.value as ImportSource)}>
+              {importSources.map((s) => <option key={s} value={s}>{s.toUpperCase()}</option>)}
             </select>
           </label>
           <div className="field">
             <span>Arquivo</span>
             <input
-              ref={importFileInputRef}
+              ref={fileInputRef}
               type="file"
               accept=".csv,.json,.txt"
               className="sr-only"
               onChange={onFileChange}
             />
             <div className="field__aux">
-              <NotchButton type="button" variant="secondary" onClick={() => importFileInputRef.current?.click()}>
+              <NotchButton type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>
                 <Download size={14} />
                 Carregar arquivo
               </NotchButton>
-              <small>{importFileName || "CSV, JSON ou TXT"}</small>
+              <small>{fileName || "CSV, JSON ou TXT"}</small>
             </div>
           </div>
           <label className="field field--wide">
             <span>Conteúdo</span>
             <textarea
               rows={10}
-              value={importText}
+              value={text}
               placeholder="Cole aqui o CSV ou JSON exportado..."
               onChange={(event) => onTextChange(event.target.value)}
             />
           </label>
         </div>
 
-        {importPreview ? (
+        {preview ? (
           <>
             <div className="preview-summary-grid">
               <article className="preview-summary-card">
                 <span>Novos itens</span>
-                <strong>{importPreviewSummary.fresh}</strong>
+                <strong>{summary.fresh}</strong>
                 <small>Entradas sem match local</small>
               </article>
               <article className="preview-summary-card">
                 <span>Duplicados locais</span>
-                <strong>{importPreviewSummary.existing}</strong>
+                <strong>{summary.existing}</strong>
                 <small>Itens que podem atualizar</small>
               </article>
               <article className="preview-summary-card">
                 <span>Repetições no arquivo</span>
-                <strong>{importPreviewSummary.duplicates}</strong>
+                <strong>{summary.duplicates}</strong>
                 <small>Linhas consolidadas no preview</small>
               </article>
               <article className="preview-summary-card">
                 <span>Aplicação atual</span>
-                <strong>{importPreviewSummary.create + importPreviewSummary.update}</strong>
-                <small>{importPreviewSummary.ignore} ignorados</small>
+                <strong>{summary.create + summary.update}</strong>
+                <small>{summary.ignore} ignorados</small>
               </article>
             </div>
 
             <div className="preview-list">
-              {importPreview.map((entry) => (
+              {preview.map((entry) => (
                 <article className="preview-card" key={entry.id}>
                   <div className="preview-card__head">
                     <div>
@@ -232,7 +230,7 @@ export function ImportModal({
                       <span>Ação</span>
                       <select
                         value={entry.action}
-                        onChange={(event) => onPreviewActionChange(entry.id, event.target.value as ImportPreviewAction)}
+                        onChange={(event) => onActionChange(entry.id, event.target.value as ImportPreviewAction)}
                       >
                         {entry.status === "new" ? (
                           <>
@@ -269,11 +267,11 @@ export function ImportModal({
         ) : null}
 
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={importPreview ? onBack : onClose}>
-            {importPreview ? "Voltar" : "Cancelar"}
+          <NotchButton variant="ghost" type="button" onClick={onClose}>
+            Cancelar
           </NotchButton>
           <NotchButton variant="primary" type="submit">
-            {importPreview ? "Aplicar importação" : "Gerar preview"}
+            {preview ? "Aplicar importação" : "Gerar preview"}
           </NotchButton>
         </div>
       </form>
@@ -283,32 +281,30 @@ export function ImportModal({
 
 export function RestoreModal({
   open,
-  restoreMode,
-  restoreText,
-  restoreFileName,
-  restorePreview,
-  restorePreviewTotals,
-  restoreFileInputRef,
+  mode,
+  text,
+  fileName,
+  preview,
+  totals,
+  fileInputRef,
   onModeChange,
   onTextChange,
   onFileChange,
   onSubmit,
   onClose,
-  onBack,
 }: {
   open: boolean;
-  restoreMode: RestoreMode;
-  restoreText: string;
-  restoreFileName: string;
-  restorePreview: RestorePreview | null;
-  restorePreviewTotals: RestorePreviewTotals;
-  restoreFileInputRef: MutableRefObject<HTMLInputElement | null>;
+  mode: RestoreMode;
+  text: string;
+  fileName: string;
+  preview: RestorePreview | null;
+  totals: RestorePreviewTotals;
+  fileInputRef: MutableRefObject<HTMLInputElement | null>;
   onModeChange: (value: RestoreMode) => void;
   onTextChange: (value: string) => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onClose: () => void;
-  onBack: () => void;
 }) {
   if (!open) return null;
 
@@ -319,10 +315,10 @@ export function RestoreModal({
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={onSubmit}>
-        <div className={cx("form-grid", restorePreview && "flow-hidden")}>
+        <div className={cx("form-grid", preview && "flow-hidden")}>
           <label className="field">
             <span>Modo</span>
-            <select value={restoreMode} onChange={(event) => onModeChange(event.target.value as RestoreMode)}>
+            <select value={mode} onChange={(event) => onModeChange(event.target.value as RestoreMode)}>
               <option value="merge">Mesclar com a base atual</option>
               <option value="replace">Substituir toda a base local</option>
             </select>
@@ -330,58 +326,58 @@ export function RestoreModal({
           <div className="field">
             <span>Arquivo</span>
             <input
-              ref={restoreFileInputRef}
+              ref={fileInputRef}
               type="file"
               accept=".json,.txt"
               className="sr-only"
               onChange={onFileChange}
             />
             <div className="field__aux">
-              <NotchButton type="button" variant="secondary" onClick={() => restoreFileInputRef.current?.click()}>
+              <NotchButton type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>
                 <Upload size={14} />
                 Carregar backup
               </NotchButton>
-              <small>{restoreFileName || "JSON exportado pelo app"}</small>
+              <small>{fileName || "JSON exportado pelo app"}</small>
             </div>
           </div>
           <label className="field field--wide">
             <span>Backup JSON</span>
             <textarea
               rows={10}
-              value={restoreText}
+              value={text}
               placeholder="Cole aqui o JSON de backup..."
               onChange={(event) => onTextChange(event.target.value)}
             />
           </label>
         </div>
 
-        {restorePreview ? (
+        {preview ? (
           <>
             <div className="preview-summary-grid">
               <article className="preview-summary-card">
                 <span>Modo</span>
-                <strong>{restorePreview.mode === "replace" ? "Replace" : "Merge"}</strong>
-                <small>{new Date(restorePreview.exportedAt).toLocaleString("pt-BR")}</small>
+                <strong>{preview.mode === "replace" ? "Replace" : "Merge"}</strong>
+                <small>{new Date(preview.exportedAt).toLocaleString("pt-BR")}</small>
               </article>
               <article className="preview-summary-card">
                 <span>Novos registros</span>
-                <strong>{restorePreviewTotals.create}</strong>
+                <strong>{totals.create}</strong>
                 <small>Itens que serão criados</small>
               </article>
               <article className="preview-summary-card">
                 <span>Atualizações</span>
-                <strong>{restorePreviewTotals.update}</strong>
+                <strong>{totals.update}</strong>
                 <small>Itens existentes reaproveitados</small>
               </article>
               <article className="preview-summary-card">
                 <span>Ignorados</span>
-                <strong>{restorePreviewTotals.skip}</strong>
+                <strong>{totals.skip}</strong>
                 <small>Duplicados ou sem relação válida</small>
               </article>
             </div>
 
             <div className="preview-list preview-list--compact">
-              {restorePreview.items.map((item) => (
+              {preview.items.map((item) => (
                 <article className="preview-card preview-card--compact" key={item.label}>
                   <div className="preview-card__head">
                     <strong>{item.label}</strong>
@@ -398,18 +394,18 @@ export function RestoreModal({
           </>
         ) : (
           <div className="preview-hint">
-            {restoreMode === "replace"
+            {mode === "replace"
               ? "Replace limpa a base local antes de restaurar tudo do arquivo."
               : "Merge reaproveita jogos existentes por título + plataforma e evita duplicar sessões."}
           </div>
         )}
 
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={restorePreview ? onBack : onClose}>
-            {restorePreview ? "Voltar" : "Cancelar"}
+          <NotchButton variant="ghost" type="button" onClick={onClose}>
+            Cancelar
           </NotchButton>
           <NotchButton variant="primary" type="submit">
-            {restorePreview ? (restorePreview.mode === "replace" ? "Substituir base local" : "Aplicar restore") : "Gerar preview"}
+            {preview ? (preview.mode === "replace" ? "Substituir base local" : "Aplicar restore") : "Gerar preview"}
           </NotchButton>
         </div>
       </form>
@@ -419,15 +415,15 @@ export function RestoreModal({
 
 export function SessionModal({
   open,
-  sessionForm,
-  games,
+  form,
+  libraryGames,
   onChange,
   onSubmit,
   onClose,
 }: {
   open: boolean;
-  sessionForm: SessionFormState;
-  games: Game[];
+  form: SessionFormState;
+  libraryGames: Game[];
   onChange: <K extends keyof SessionFormState>(field: K, value: SessionFormState[K]) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onClose: () => void;
@@ -444,30 +440,30 @@ export function SessionModal({
         <div className="form-grid">
           <label className="field field--wide">
             <span>Jogo</span>
-            <select value={sessionForm.gameId} onChange={(event) => onChange("gameId", event.target.value)}>
+            <select value={form.gameId} onChange={(event) => onChange("gameId", event.target.value)}>
               <option value="">Selecione...</option>
-              {games.map((game) => <option key={game.id} value={game.id}>{game.title}</option>)}
+              {libraryGames.map((game) => <option key={game.id} value={game.id}>{game.title}</option>)}
             </select>
           </label>
           <label className="field">
             <span>Data</span>
-            <input type="date" value={sessionForm.date} onChange={(event) => onChange("date", event.target.value)} />
+            <input type="date" value={form.date} onChange={(event) => onChange("date", event.target.value)} />
           </label>
           <label className="field">
             <span>Duração (min)</span>
-            <input type="number" min="1" value={sessionForm.durationMinutes} onChange={(event) => onChange("durationMinutes", event.target.value)} />
+            <input type="number" min="1" value={form.durationMinutes} onChange={(event) => onChange("durationMinutes", event.target.value)} />
           </label>
           <label className="field">
             <span>Progresso após sessão</span>
-            <input type="number" min="0" max="100" value={sessionForm.completionPercent} onChange={(event) => onChange("completionPercent", event.target.value)} />
+            <input type="number" min="0" max="100" value={form.completionPercent} onChange={(event) => onChange("completionPercent", event.target.value)} />
           </label>
           <label className="field">
             <span>Mood</span>
-            <input value={sessionForm.mood} onChange={(event) => onChange("mood", event.target.value)} />
+            <input value={form.mood} onChange={(event) => onChange("mood", event.target.value)} />
           </label>
           <label className="field field--wide">
             <span>Nota rápida</span>
-            <textarea rows={4} value={sessionForm.note} onChange={(event) => onChange("note", event.target.value)} />
+            <textarea rows={4} value={form.note} onChange={(event) => onChange("note", event.target.value)} />
           </label>
         </div>
         <div className="modal-actions">

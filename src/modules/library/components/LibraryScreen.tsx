@@ -1,13 +1,13 @@
 import { ArrowUpRight, Download, FolderKanban, Gamepad2, Heart, Library, Plus, Upload } from "lucide-react";
 import {
-  type Game,
-  type StatusFilter,
+  cx,
   filterOptions,
   priorityTone,
   statusTone,
-} from "../backlog/shared";
-import { cx } from "../backlog/shared";
-import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from "../components/cyberpunk-ui";
+  type Game,
+  type StatusFilter,
+} from "../../../backlog/shared";
+import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type LibraryScreenProps = {
   libraryGames: Game[];

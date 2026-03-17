@@ -1,12 +1,11 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { gamesToCsv, parseImportText, type ImportSource } from "../importExport";
-import { db } from "../db";
+import { db } from "../core/db";
 import type {
   Game as DbGameMetadata,
   LibraryEntry as DbLibraryEntry,
   PlaySession as DbPlaySession,
-} from "../types";
+} from "../core/types";
 import {
   backlogByDuration,
   buildImportPreview,
@@ -39,6 +38,7 @@ import {
   systemRules,
   tacticalGoals,
   yearlyEvolution,
+  mergePlatformList,
   type Achievement,
   type BackupPayload,
   type BackupTables,
@@ -53,20 +53,13 @@ import {
   type ScreenKey,
   type SessionFormState,
   type StatusFilter,
+  type ImportSource,
+  gamesToCsv,
+  parseImportText,
 } from "../backlog/shared";
 
 function normalizeTitle(title: string): string {
   return title.trim().toLowerCase();
-}
-
-function mergePlatformList(current: string | undefined, platform: string): string {
-  const values = new Set(
-    [current, platform]
-      .flatMap((value) => String(value || "").split(","))
-      .map((value) => value.trim())
-      .filter(Boolean),
-  );
-  return Array.from(values).join(", ");
 }
 
 function sortByUpdatedAtDesc<T extends { updatedAt: string }>(rows: T[]): T[] {
@@ -535,7 +528,8 @@ export function useBacklogApp() {
           return;
         }
         const preview = buildRestorePreview(payload, restoreMode, await readBackupTables());
-        setRestorePreview(preview);
+        
+        setRestorePreview(preview as any);
         setNotice(`Preview de restore pronto para ${payload.libraryEntries.length} itens da biblioteca.`);
         return;
       }

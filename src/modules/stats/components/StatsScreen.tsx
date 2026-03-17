@@ -1,8 +1,8 @@
 import { BarChart3, CalendarDays, Clock3, Trophy } from "lucide-react";
-import { VerticalBarChart } from "../charts";
-import { formatDuration, type BarPoint, type Game } from "../backlog/shared";
-import type { PlaySession } from "../types";
-import { ChartFrame, EmptyState, Panel, Pill, SectionHeader } from "../components/cyberpunk-ui";
+import { VerticalBarChart } from "../../../charts";
+import { formatDuration, type BarPoint, type Game } from "../../../backlog/shared";
+import type { PlaySession } from "../../../core/types";
+import { ChartFrame, EmptyState, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type StatsScreenProps = {
   durationBuckets: BarPoint[];

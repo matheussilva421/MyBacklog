@@ -1,13 +1,13 @@
 import { CalendarDays, Cpu, Download, Orbit, Plus, Search, Upload, Zap } from "lucide-react";
 import { navigationItems } from "./backlog/shared";
 import { GameModal, ImportModal, RestoreModal, SessionModal } from "./components/backlog-modals";
-import { NotchButton, Panel, SectionHeader, SidebarItem, Tag } from "./components/cyberpunk-ui";
+import { Panel, SidebarItem } from "./components/cyberpunk-ui";
 import { useBacklogApp } from "./hooks/useBacklogApp";
-import { DashboardScreen } from "./screens/DashboardScreen";
-import { LibraryScreen } from "./screens/LibraryScreen";
-import { PlannerScreen } from "./screens/PlannerScreen";
-import { ProfileScreen } from "./screens/ProfileScreen";
-import { StatsScreen } from "./screens/StatsScreen";
+import { DashboardScreen } from "./modules/dashboard/components/DashboardScreen";
+import { LibraryScreen } from "./modules/library/components/LibraryScreen";
+import { PlannerScreen } from "./modules/planner/components/PlannerScreen";
+import { ProfileScreen } from "./modules/settings/components/ProfileScreen";
+import { StatsScreen } from "./modules/stats/components/StatsScreen";
 
 export default function App() {
   const app = useBacklogApp();
@@ -102,93 +102,9 @@ export default function App() {
               ))}
             </nav>
           </Panel>
-
-          <Panel>
-            <SectionHeader icon={Zap} title="Quick actions" description="Atalhos do sistema" />
-            <div className="quick-actions">
-              <NotchButton variant="primary" onClick={app.openCreateGameModal}>
-                <Plus size={15} />
-                Novo jogo
-              </NotchButton>
-              <NotchButton variant="secondary" onClick={app.openImportFlow}>
-                <Download size={15} />
-                Importar biblioteca
-              </NotchButton>
-              <NotchButton variant="secondary" onClick={app.openRestoreFlow}>
-                <Upload size={15} />
-                Restaurar backup
-              </NotchButton>
-              <NotchButton variant="ghost" onClick={() => app.openSessionModal(app.selectedGame.id)}>
-                <CalendarDays size={15} />
-                Registrar sessão
-              </NotchButton>
-            </div>
-          </Panel>
         </aside>
 
         <main className="main-column">
-          {app.loading || app.notice ? (
-            <div className="system-banner">
-              <span>{app.loading ? "Sincronizando biblioteca local..." : app.notice}</span>
-            </div>
-          ) : null}
-
-          <Panel className="hero-panel">
-            <div className="hero-panel__layout">
-              <div className="hero-panel__copy">
-                <div className="hero-panel__badges">
-                  <Tag>Backlog OS</Tag>
-                  <Tag tone="cyan">Night City Mode</Tag>
-                  <Tag tone="magenta">Aggressive Premium UI</Tag>
-                </div>
-
-                <div className="hero-panel__headline">
-                  <div className="hero-panel__icon">
-                    <Cpu size={25} />
-                  </div>
-                  <div>
-                    <span className="hero-panel__eyebrow">Neural interface</span>
-                    <h2>
-                      {app.heroCopy.before} <span>{app.heroCopy.accent}</span>
-                    </h2>
-                    <p>
-                      Catálogo, backlog, planner e estatísticas em uma interface cyberpunk com leitura
-                      rápida, foco em decisão e sensação de produto premium.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="hero-panel__actions">
-                <label className="search-box" htmlFor="global-search">
-                  <Search size={16} />
-                  <input
-                    id="global-search"
-                    type="text"
-                    value={app.query}
-                    onChange={(event) => app.setQuery(event.target.value)}
-                    placeholder="Busca global..."
-                  />
-                </label>
-                <div className="hero-panel__action-grid">
-                  <NotchButton variant="primary" onClick={app.openCreateGameModal}>
-                    <Zap size={15} />
-                    Adicionar
-                  </NotchButton>
-                  <NotchButton variant="secondary" onClick={app.openImportFlow}>
-                    Importar
-                  </NotchButton>
-                  <NotchButton variant="secondary" onClick={() => app.setScreen("planner")}>
-                    Planner
-                  </NotchButton>
-                  <NotchButton variant="ghost" onClick={() => app.openLibraryGame()}>
-                    Catálogo
-                  </NotchButton>
-                </div>
-              </div>
-            </div>
-          </Panel>
-
           {screenContent}
         </main>
       </div>
@@ -196,52 +112,57 @@ export default function App() {
       <GameModal
         mode={app.gameModalMode}
         form={app.gameForm}
+        onClose={app.closeGameModal}
         onChange={app.handleGameFormChange}
         onSubmit={app.handleGameSubmit}
-        onClose={app.closeGameModal}
-      />
-
-      <ImportModal
-        open={app.importModalOpen}
-        importSource={app.importSource}
-        importText={app.importText}
-        importFileName={app.importFileName}
-        importPreview={app.importPreview}
-        importPreviewSummary={app.importPreviewSummary}
-        importFileInputRef={app.importFileInputRef}
-        onSourceChange={app.handleImportSourceChange}
-        onTextChange={app.handleImportTextChange}
-        onFileChange={app.handleImportFileChange}
-        onPreviewActionChange={app.handleImportPreviewActionChange}
-        onSubmit={app.handleImportSubmit}
-        onClose={app.closeImportFlow}
-        onBack={app.resetImportPreview}
-      />
-
-      <RestoreModal
-        open={app.restoreModalOpen}
-        restoreMode={app.restoreMode}
-        restoreText={app.restoreText}
-        restoreFileName={app.restoreFileName}
-        restorePreview={app.restorePreview}
-        restorePreviewTotals={app.restorePreviewTotals}
-        restoreFileInputRef={app.restoreFileInputRef}
-        onModeChange={app.handleRestoreModeChange}
-        onTextChange={app.handleRestoreTextChange}
-        onFileChange={app.handleRestoreFileChange}
-        onSubmit={app.handleRestoreSubmit}
-        onClose={app.closeRestoreFlow}
-        onBack={app.resetRestorePreview}
       />
 
       <SessionModal
         open={app.sessionModalOpen}
-        sessionForm={app.sessionForm}
-        games={app.games}
+        form={app.sessionForm}
+        libraryGames={app.games}
+        onClose={app.closeSessionModal}
         onChange={app.handleSessionFormChange}
         onSubmit={app.handleSessionSubmit}
-        onClose={app.closeSessionModal}
       />
+
+      <ImportModal
+        open={app.importModalOpen}
+        source={app.importSource}
+        text={app.importText}
+        fileName={app.importFileName}
+        preview={app.importPreview}
+        summary={app.importPreviewSummary}
+        fileInputRef={app.importFileInputRef}
+        onClose={app.closeImportFlow}
+        onSourceChange={app.handleImportSourceChange}
+        onTextChange={app.handleImportTextChange}
+        onFileChange={app.handleImportFileChange}
+        onActionChange={app.handleImportPreviewActionChange}
+        onSubmit={app.handleImportSubmit}
+      />
+
+      <RestoreModal
+        open={app.restoreModalOpen}
+        mode={app.restoreMode}
+        text={app.restoreText}
+        fileName={app.restoreFileName}
+        preview={app.restorePreview}
+        totals={app.restorePreviewTotals}
+        fileInputRef={app.restoreFileInputRef}
+        onClose={app.closeRestoreFlow}
+        onModeChange={app.handleRestoreModeChange}
+        onTextChange={app.handleRestoreTextChange}
+        onFileChange={app.handleRestoreFileChange}
+        onSubmit={app.handleRestoreSubmit}
+      />
+
+      {app.notice && (
+        <div className="toast-notice">
+          <Zap size={16} />
+          <span>{app.notice}</span>
+        </div>
+      )}
     </div>
   );
 }

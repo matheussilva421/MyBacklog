@@ -1,7 +1,7 @@
 import { Binary, ChevronRight, FolderKanban, Target } from "lucide-react";
-import type { Game, Goal, PlannerEntry, Rule } from "../backlog/shared";
-import { cx } from "../backlog/shared";
-import { EmptyState, Panel, Pill, ProgressBar, SectionHeader } from "../components/cyberpunk-ui";
+import type { Game, Goal, PlannerEntry, Rule } from "../../../backlog/shared";
+import { cx } from "../../../backlog/shared";
+import { EmptyState, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type PlannerScreenProps = {
   visiblePlannerQueue: PlannerEntry[];

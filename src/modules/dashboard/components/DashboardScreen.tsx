@@ -1,7 +1,7 @@
 import { Activity, Clock3, Flame, Gamepad2, ListTodo, Monitor, Target, Trophy } from "lucide-react";
-import { DonutChart, TrendLineChart } from "../charts";
-import type { Game, PiePoint, PlannerEntry } from "../backlog/shared";
-import { pieColors } from "../backlog/shared";
+import { DonutChart, TrendLineChart } from "../../../charts";
+import type { Game, PiePoint, PlannerEntry } from "../../../backlog/shared";
+import { pieColors } from "../../../backlog/shared";
 import {
   ChartFrame,
   EmptyState,
@@ -11,7 +11,7 @@ import {
   Pill,
   ProgressBar,
   SectionHeader,
-} from "../components/cyberpunk-ui";
+} from "../../../components/cyberpunk-ui";
 
 type Stats = {
   total: number;

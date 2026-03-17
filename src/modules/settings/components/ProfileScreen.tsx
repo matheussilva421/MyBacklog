@@ -1,7 +1,7 @@
 import { CheckCircle2, User } from "lucide-react";
-import type { Achievement } from "../backlog/shared";
-import { cx } from "../backlog/shared";
-import { Panel, SectionHeader } from "../components/cyberpunk-ui";
+import type { Achievement } from "../../../backlog/shared";
+import { cx } from "../../../backlog/shared";
+import { Panel, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type ProfileScreenProps = {
   achievementCards: Achievement[];
