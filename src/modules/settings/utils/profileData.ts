@@ -1,5 +1,5 @@
-import { Cpu, Zap, Library, Radar, type LucideIcon } from "lucide-react";
-import { type Achievement } from "../../../backlog/shared";
+import { Cpu, Library, Radar, Zap } from "lucide-react";
+import type { Achievement } from "../../../backlog/shared";
 
 export const profileAchievements: Achievement[] = [
   { icon: Cpu, title: "Hardware Junkie", description: "Cadastrou mais de 5 plataformas diferentes.", tone: "cyan" },

@@ -1,7 +1,13 @@
-import { dbPriorityToPriority, dbStatusToStatus, mergePlatformList, normalizeGameTitle, priorityToDbPriority, statusToDbStatus } from "../../../backlog/shared";
-import type { Game, LibraryRecord } from "../../../backlog/shared";
-import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../../../core/types";
-import type { GameFormState } from "../../../backlog/shared";
+import {
+  dbPriorityToPriority,
+  dbStatusToStatus,
+  mergePlatformList,
+  normalizeGameTitle,
+  priorityToDbPriority,
+  statusToDbStatus,
+} from "../../backlog/shared";
+import type { Game, GameFormState, LibraryRecord } from "../../backlog/shared";
+import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../../core/types";
 
 export function composeLibraryRecords(games: DbGameMetadata[], libraryEntries: DbLibraryEntry[]): LibraryRecord[] {
   const gameMap = new Map(games.map((game) => [game.id, game]));
@@ -16,7 +22,7 @@ export function composeLibraryRecords(games: DbGameMetadata[], libraryEntries: D
 
 export function dbGameToUiGame(record: LibraryRecord): Game {
   const { game, libraryEntry } = record;
-  const genre = game.genres?.split(",")[0]?.trim() || game.genres || "Catalogo tatico";
+  const genre = game.genres?.split(",")[0]?.trim() || game.genres || "Catálogo tático";
   return {
     id: libraryEntry.id ?? Date.now(),
     title: game.title,
@@ -27,11 +33,11 @@ export function dbGameToUiGame(record: LibraryRecord): Game {
     hours: Math.max(0, Math.round((libraryEntry.playtimeMinutes || 0) / 60)),
     eta: game.estimatedTime || "Sem dado",
     priority: dbPriorityToPriority(libraryEntry.priority),
-    mood: libraryEntry.mood || "Tatico",
+    mood: libraryEntry.mood || "Tático",
     score: typeof libraryEntry.personalRating === "number" ? Number(libraryEntry.personalRating) : 0,
     year: game.releaseYear || new Date(game.createdAt || Date.now()).getFullYear(),
     notes: libraryEntry.notes || "Sem leitura registrada no sistema.",
-    difficulty: game.difficulty || "Media",
+    difficulty: game.difficulty || "Média",
   };
 }
 

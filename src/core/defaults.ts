@@ -31,9 +31,9 @@ export function defaultGameToDbLibraryEntry(game: Partial<DbGameMetadata>): DbLi
 }
 
 export const defaultGames: Partial<DbGameMetadata>[] = [
-  { title: "Cyberpunk 2077", genres: "RPG, Action", platforms: "PC, PS5", estimatedTime: "60h", difficulty: "Media" },
+  { title: "Cyberpunk 2077", genres: "RPG, Action", platforms: "PC, PS5", estimatedTime: "60h", difficulty: "Média" },
   { title: "Hades", genres: "Roguelike, Action", platforms: "PC, Switch", estimatedTime: "25h", difficulty: "Alta" },
-  { title: "Final Fantasy VII Rebirth", genres: "RPG", platforms: "PS5", estimatedTime: "100h", difficulty: "Media" },
+  { title: "Final Fantasy VII Rebirth", genres: "RPG", platforms: "PS5", estimatedTime: "100h", difficulty: "Média" },
 ];
 
 export const defaultSessions: Partial<DbPlaySession>[] = [];

@@ -182,7 +182,7 @@ export function useBacklogApp() {
 
   const durationBuckets = useMemo(() => {
     if (games.length === 0) return backlogByDuration;
-    const buckets = [{ name: "Ate 10h", total: 0 }, { name: "10-25h", total: 0 }, { name: "25-50h", total: 0 }, { name: "50h+", total: 0 }];
+    const buckets = [{ name: "Até 10h", total: 0 }, { name: "10-25h", total: 0 }, { name: "25-50h", total: 0 }, { name: "50h+", total: 0 }];
     for (const game of games) {
       if (game.status === "Terminado" || game.status === "Wishlist") continue;
       const etaHours = parseEtaHours(game.eta);
@@ -210,19 +210,19 @@ export function useBacklogApp() {
     const backlogCount = games.filter((game) => game.status === "Backlog").length;
     return [
       { label: "Finalizar 1 jogo curto", value: Math.min(100, shortTarget * 100), tone: "sunset" },
-      { label: "Registrar 5 sessoes", value: Math.min(100, Math.round((sessionsThisWeek / 5) * 100)), tone: "violet" },
+      { label: "Registrar 5 sessões", value: Math.min(100, Math.round((sessionsThisWeek / 5) * 100)), tone: "violet" },
       { label: "Reduzir backlog em 2 jogos", value: Math.max(0, Math.min(100, 100 - Math.round((backlogCount / Math.max(2, games.length || 1)) * 100))), tone: "yellow" },
     ];
   }, [games, sessionRows]);
 
   const achievementCards = useMemo<Achievement[]>(() => {
     if (games.length === 0) return profileAchievements;
-    const largestBucket = durationBuckets.reduce((current, entry) => (entry.total > current.total ? entry : current), durationBuckets[0] || { name: "Ate 10h", total: 0 });
+    const largestBucket = durationBuckets.reduce((current, entry) => (entry.total > current.total ? entry : current), durationBuckets[0] || { name: "Até 10h", total: 0 });
     return [
-      { icon: profileAchievements[0].icon, tone: "emerald", title: `${games.filter((game) => game.status === "Terminado").length} jogos finalizados`, description: "Historico solido e biblioteca viva." },
-      { icon: profileAchievements[1].icon, tone: "cyan", title: "Radar de progresso ativo", description: `${games.filter((game) => game.status === "Jogando").length} jogos com acompanhamento continuo.` },
-      { icon: profileAchievements[2].icon, tone: "magenta", title: `${games.filter((game) => game.status === "Pausado").length} jogos pausados`, description: "Baixo atrito para retomar e gerar avanco real." },
-      { icon: profileAchievements[3].icon, tone: "yellow", title: "Gargalo de duracao", description: `${largestBucket?.name || "Ate 10h"} segue como principal bloco do backlog.` },
+      { icon: profileAchievements[0].icon, tone: "emerald", title: `${games.filter((game) => game.status === "Terminado").length} jogos finalizados`, description: "Histórico sólido e biblioteca viva." },
+      { icon: profileAchievements[1].icon, tone: "cyan", title: "Radar de progresso ativo", description: `${games.filter((game) => game.status === "Jogando").length} jogos com acompanhamento contínuo.` },
+      { icon: profileAchievements[2].icon, tone: "magenta", title: `${games.filter((game) => game.status === "Pausado").length} jogos pausados`, description: "Baixo atrito para retomar e gerar avanço real." },
+      { icon: profileAchievements[3].icon, tone: "yellow", title: "Gargalo de médio porte", description: `${largestBucket?.name || "Até 10h"} segue como principal bloco do backlog.` },
     ];
   }, [durationBuckets, games]);
 
@@ -365,9 +365,9 @@ export function useBacklogApp() {
       setImportPreview(null);
       setImportText(nextText);
       setImportFileName(file.name);
-      setNotice(`Arquivo ${file.name} carregado. Revise os dados e confirme a importacao.`);
+      setNotice(`Arquivo ${file.name} carregado. Revise os dados e confirme a importação.`);
     } catch {
-      setNotice("Falha ao ler o arquivo de importacao.");
+      setNotice("Falha ao ler o arquivo de importação.");
     }
   };
 
@@ -430,7 +430,7 @@ export function useBacklogApp() {
       if (!importPreview) {
         const parsed = parseImportText(importSource, importText);
         if (parsed.length === 0) {
-          setNotice("Nenhum item valido foi encontrado na importacao.");
+          setNotice("Nenhum item válido foi encontrado na importação.");
           return;
         }
         const preview = buildImportPreview(parsed, records);
@@ -491,9 +491,9 @@ export function useBacklogApp() {
       await refreshData();
       closeImportFlow();
       setScreen("library");
-      setNotice(`${created} criados, ${updated} atualizados e ${ignored} ignorados na importacao.`);
+      setNotice(`${created} criados, ${updated} atualizados e ${ignored} ignorados na importação.`);
     } catch {
-      setNotice("Falha ao processar o arquivo de importacao.");
+      setNotice("Falha ao processar o arquivo de importação.");
     }
   };
 
@@ -676,7 +676,7 @@ export function useBacklogApp() {
       await refreshData();
       closeRestoreFlow();
       setScreen("library");
-      setNotice(restorePreview.mode === "replace" ? "Backup restaurado com substituicao total da base local." : "Backup mesclado com a base local.");
+      setNotice(restorePreview.mode === "replace" ? "Backup restaurado com substituição total da base local." : "Backup mesclado com a base local.");
     } catch {
       setNotice("Falha ao restaurar o backup.");
     }
@@ -688,7 +688,7 @@ export function useBacklogApp() {
     const durationMinutes = Math.max(1, Number(sessionForm.durationMinutes) || 0);
     const currentEntry = libraryEntryRows.find((row) => row.id === libraryEntryId);
     if (!libraryEntryId || !currentEntry || durationMinutes <= 0) {
-      setNotice("Preencha um jogo e uma duracao valida para a sessao.");
+    setNotice("Preencha um jogo e uma duração válida para a sessão.");
       return;
     }
     const nextCompletion = sessionForm.completionPercent ? Math.max(0, Math.min(100, Number(sessionForm.completionPercent))) : undefined;
@@ -707,7 +707,7 @@ export function useBacklogApp() {
     await refreshData();
     setSessionModalOpen(false);
     setSelectedGameId(libraryEntryId);
-    setNotice("Sessao registrada com sucesso.");
+    setNotice("Sessão registrada com sucesso.");
   };
 
   const handleDeleteSelectedGame = async () => {

@@ -1,7 +1,7 @@
 import {
   LayoutDashboard,
   Library,
-  Radar,
+  FolderKanban,
   BarChart3,
   User,
   type LucideIcon
@@ -10,7 +10,6 @@ import type {
   Game as DbGameMetadata,
   GameTag as DbGameTag,
   Goal as DbGoal,
-  LegacyGameRecord,
   LibraryEntry as DbLibraryEntry,
   List as DbList,
   PlaySession as DbPlaySession,
@@ -20,20 +19,19 @@ import type {
   Tag as DbTag,
 } from "../core/types";
 import type { ImportPayload, ImportSource } from "../modules/import-export/utils/importExport";
-import { createImportKey } from "../modules/import-export/utils/importExport";
 
 export type ScreenKey = "dashboard" | "library" | "planner" | "stats" | "profile";
 
-export const navigationItems: { key: ScreenKey; label: string; icon: any }[] = [
+export const navigationItems: Array<{ key: ScreenKey; label: string; icon: LucideIcon }> = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "library", label: "Catalogo", icon: Library },
-  { key: "planner", label: "Planner", icon: Radar },
-  { key: "stats", label: "Stats", icon: BarChart3 },
+  { key: "library", label: "Biblioteca", icon: Library },
+  { key: "planner", label: "Planner", icon: FolderKanban },
+  { key: "stats", label: "Estatísticas", icon: BarChart3 },
   { key: "profile", label: "Perfil", icon: User },
 ];
 
 export type Status = "Backlog" | "Jogando" | "Terminado" | "Pausado" | "Wishlist";
-export type Priority = "Alta" | "Media" | "Baixa";
+export type Priority = "Alta" | "Média" | "Baixa";
 export type StatusFilter = "Todos" | Status;
 
 export type Game = {
@@ -191,13 +189,13 @@ export const statusTone: Record<Status, string> = {
 
 export const priorityTone: Record<Priority, string> = {
   Alta: "magenta",
-  Media: "cyan",
+  Média: "cyan",
   Baixa: "neutral",
 };
 
 export const filterOptions: StatusFilter[] = ["Todos", "Backlog", "Jogando", "Pausado", "Terminado", "Wishlist"];
 export const gameStatuses: Status[] = ["Backlog", "Jogando", "Pausado", "Terminado", "Wishlist"];
-export const gamePriorities: Priority[] = ["Alta", "Media", "Baixa"];
+export const gamePriorities: Priority[] = ["Alta", "Média", "Baixa"];
 export const importSources: ImportSource[] = ["csv", "steam", "playnite"];
 
 export { cx, downloadText, formatDuration, formatMonthLabel, mergePlatformList, normalizeGameTitle, parseEtaHours } from "../core/utils";
@@ -226,7 +224,7 @@ export function dbStatusToStatus(entry: DbLibraryEntry): Status {
 export function dbPriorityToPriority(priority: DbPriority): Priority {
   if (priority === "high") return "Alta";
   if (priority === "low") return "Baixa";
-  return "Media";
+  return "Média";
 }
 
 export { composeLibraryRecords, dbGameToUiGame } from "../modules/library/utils";

@@ -8,7 +8,7 @@ export function computePlannerScore(game: Game): number {
   if (game.status === "Jogando") score += 28;
   if (game.status === "Backlog") score += 12;
   if (game.priority === "Alta") score += 26;
-  if (game.priority === "Media") score += 14;
+  if (game.priority === "Média") score += 14;
   if (game.progress > 0) score += Math.min(22, Math.round(game.progress / 4));
   if (etaHours <= 5) score += 18;
   else if (etaHours <= 12) score += 14;
@@ -25,9 +25,9 @@ export function computePlannerScore(game: Game): number {
 export function buildPlannerReason(game: Game): string {
   const reasons: string[] = [];
   const etaHours = parseEtaHours(game.eta);
-  if (game.progress > 0) reasons.push("Ja existe progresso e o atrito de retorno e baixo.");
-  if (etaHours <= 12) reasons.push("Cabe em bloco curto e ajuda a limpar backlog rapido.");
-  if (game.priority === "Alta") reasons.push("Prioridade manual alta mantem o jogo no topo.");
+  if (game.progress > 0) reasons.push("Já existe progresso e o atrito de retorno é baixo.");
+  if (etaHours <= 12) reasons.push("Cabe em bloco curto e ajuda a limpar backlog rápido.");
+  if (game.priority === "Alta") reasons.push("Prioridade manual alta mantém o jogo no topo.");
   if (reasons.length === 0) reasons.push("Bom encaixe para manter o backlog em movimento.");
   return reasons.join(" ");
 }
@@ -35,8 +35,8 @@ export function buildPlannerReason(game: Game): string {
 export function buildPlannerFit(game: Game): string {
   const etaHours = parseEtaHours(game.eta);
   if (etaHours <= 3) return "Fim de semana curto";
-  if (etaHours <= 12) return "Bloco medio";
+  if (etaHours <= 12) return "Bloco médio";
   if (game.status === "Pausado") return "Retorno imediato";
   if (game.mood.toLowerCase().includes("energia")) return "Noites com energia";
-  return "Sessoes longas";
+  return "Sessões longas";
 }

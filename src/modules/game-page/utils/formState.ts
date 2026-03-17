@@ -8,14 +8,14 @@ export function createGameFormState(game?: Game): GameFormState {
     platform: game?.platform ?? "PC",
     genre: game?.genre ?? "",
     status: game?.status ?? "Backlog",
-    priority: game?.priority ?? "Media",
+    priority: game?.priority ?? "Média",
     progress: game ? String(game.progress) : "0",
     hours: game ? String(game.hours) : "0",
     eta: game?.eta ?? "12h",
     score: game ? String(game.score) : "",
     year: game ? String(game.year) : String(new Date().getFullYear()),
     mood: game?.mood ?? "",
-    difficulty: game?.difficulty ?? "Media",
+    difficulty: game?.difficulty ?? "Média",
     notes: game?.notes ?? "",
   };
 }

@@ -1,7 +1,7 @@
 import { CalendarDays, Cpu, Download, Orbit, Plus, Search, Upload, Zap } from "lucide-react";
 import { navigationItems } from "./backlog/shared";
 import { GameModal, ImportModal, RestoreModal, SessionModal } from "./components/backlog-modals";
-import { Panel, SidebarItem } from "./components/cyberpunk-ui";
+import { NotchButton, Panel, SectionHeader, SidebarItem, Tag } from "./components/cyberpunk-ui";
 import { useBacklogApp } from "./hooks/useBacklogApp";
 import { DashboardScreen } from "./modules/dashboard/components/DashboardScreen";
 import { LibraryScreen } from "./modules/library/components/LibraryScreen";
@@ -102,9 +102,93 @@ export default function App() {
               ))}
             </nav>
           </Panel>
+
+          <Panel>
+            <SectionHeader icon={Zap} title="Quick actions" description="Atalhos do sistema" />
+            <div className="quick-actions">
+              <NotchButton variant="primary" onClick={app.openCreateGameModal}>
+                <Plus size={15} />
+                Novo jogo
+              </NotchButton>
+              <NotchButton variant="secondary" onClick={app.openImportFlow}>
+                <Download size={15} />
+                Importar biblioteca
+              </NotchButton>
+              <NotchButton variant="secondary" onClick={app.openRestoreFlow}>
+                <Upload size={15} />
+                Restaurar backup
+              </NotchButton>
+              <NotchButton variant="ghost" onClick={() => app.openSessionModal(app.selectedGame.id)}>
+                <CalendarDays size={15} />
+                Registrar sessão
+              </NotchButton>
+            </div>
+          </Panel>
         </aside>
 
         <main className="main-column">
+          {app.loading || app.notice ? (
+            <div className="system-banner">
+              <span>{app.loading ? "Sincronizando biblioteca local..." : app.notice}</span>
+            </div>
+          ) : null}
+
+          <Panel className="hero-panel">
+            <div className="hero-panel__layout">
+              <div className="hero-panel__copy">
+                <div className="hero-panel__badges">
+                  <Tag>Backlog OS</Tag>
+                  <Tag tone="cyan">Night City Mode</Tag>
+                  <Tag tone="magenta">Aggressive Premium UI</Tag>
+                </div>
+
+                <div className="hero-panel__headline">
+                  <div className="hero-panel__icon">
+                    <Cpu size={25} />
+                  </div>
+                  <div>
+                    <span className="hero-panel__eyebrow">Neural interface</span>
+                    <h2>
+                      {app.heroCopy.before} <span>{app.heroCopy.accent}</span>
+                    </h2>
+                    <p>
+                      Catálogo, backlog, planner e estatísticas em uma interface cyberpunk com leitura
+                      rápida, foco em decisão e sensação de produto premium.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="hero-panel__actions">
+                <label className="search-box" htmlFor="global-search">
+                  <Search size={16} />
+                  <input
+                    id="global-search"
+                    type="text"
+                    value={app.query}
+                    onChange={(event) => app.setQuery(event.target.value)}
+                    placeholder="Busca global..."
+                  />
+                </label>
+                <div className="hero-panel__action-grid">
+                  <NotchButton variant="primary" onClick={app.openCreateGameModal}>
+                    <Zap size={15} />
+                    Adicionar
+                  </NotchButton>
+                  <NotchButton variant="secondary" onClick={app.openImportFlow}>
+                    Importar
+                  </NotchButton>
+                  <NotchButton variant="secondary" onClick={() => app.setScreen("planner")}>
+                    Planner
+                  </NotchButton>
+                  <NotchButton variant="ghost" onClick={() => app.openLibraryGame()}>
+                    Catálogo
+                  </NotchButton>
+                </div>
+              </div>
+            </div>
+          </Panel>
+
           {screenContent}
         </main>
       </div>
@@ -156,13 +240,6 @@ export default function App() {
         onFileChange={app.handleRestoreFileChange}
         onSubmit={app.handleRestoreSubmit}
       />
-
-      {app.notice && (
-        <div className="toast-notice">
-          <Zap size={16} />
-          <span>{app.notice}</span>
-        </div>
-      )}
     </div>
   );
 }

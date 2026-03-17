@@ -15,7 +15,7 @@ export const defaultGames: Game[] = [
     score: 9.0,
     year: 2020,
     notes: "Imersao total no Night City, foco em Side Quests.",
-    difficulty: "Media",
+    difficulty: "Média",
   },
   {
     id: 2,
@@ -26,7 +26,7 @@ export const defaultGames: Game[] = [
     progress: 30,
     hours: 25,
     eta: "60h",
-    priority: "Media",
+    priority: "Média",
     mood: "Foco",
     score: 9.5,
     year: 2022,
@@ -47,7 +47,7 @@ export const defaultGames: Game[] = [
     score: 10,
     year: 2024,
     notes: "Apenas mais uma run...",
-    difficulty: "Media",
+    difficulty: "Média",
   },
 ];
 
@@ -56,13 +56,13 @@ export const defaultGameForm: GameFormState = {
   platform: "PC",
   genre: "",
   status: "Backlog",
-  priority: "Media",
+  priority: "Média",
   progress: "0",
   hours: "0",
   eta: "12h",
   score: "",
   year: String(new Date().getFullYear()),
   mood: "",
-  difficulty: "Media",
+  difficulty: "Média",
   notes: "",
 };

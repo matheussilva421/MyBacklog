@@ -404,7 +404,7 @@ export function createDbGameFromImport(item: ImportPayload, currentGame?: DbGame
       rawgId: item.rawgId ?? currentGame?.rawgId,
       genres: item.genres || currentGame?.genres,
       estimatedTime: item.estimatedTime || currentGame?.estimatedTime || (item.playtimeMinutes ? `${Math.max(1, Math.round(item.playtimeMinutes / 60))}h` : "Sem dado"),
-      difficulty: item.difficulty || currentGame?.difficulty || "Media",
+      difficulty: item.difficulty || currentGame?.difficulty || "Média",
       releaseYear: item.releaseYear ?? currentGame?.releaseYear,
       platforms: mergePlatformList(currentGame?.platforms, item.platform),
       developer: item.developer || currentGame?.developer,
@@ -634,7 +634,7 @@ export function buildRestorePreview(
     items: [
       { label: "Jogos", create: gameCreate, update: gameUpdate, skip: gameSkip },
       { label: "Biblioteca", create: entryCreate, update: entryUpdate, skip: entrySkip },
-      { label: "Sessoes", create: sessionCreate, update: 0, skip: sessionSkip },
+      { label: "Sessões", create: sessionCreate, update: 0, skip: sessionSkip },
       { label: "Reviews", create: reviewCreate, update: reviewUpdate, skip: reviewSkip },
       { label: "Listas", create: listCreate, update: listUpdate, skip: listSkip },
       { label: "Tags", create: tagCreate, update: tagUpdate, skip: tagSkip },

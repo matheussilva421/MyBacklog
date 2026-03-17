@@ -1,10 +1,10 @@
-import { type BarPoint, type PiePoint, type LinePoint } from "../../../backlog/shared";
+import type { BarPoint, LinePoint, PiePoint } from "../../../backlog/shared";
 
 export const backlogByDuration: BarPoint[] = [
-  { name: "Curto (<10h)", total: 0 },
-  { name: "Médio (10-30h)", total: 0 },
-  { name: "Longo (30-60h)", total: 0 },
-  { name: "Épico (60h+)", total: 0 },
+  { name: "Até 10h", total: 0 },
+  { name: "10-25h", total: 0 },
+  { name: "25-50h", total: 0 },
+  { name: "50h+", total: 0 },
 ];
 
 export const platformDistribution: PiePoint[] = [];

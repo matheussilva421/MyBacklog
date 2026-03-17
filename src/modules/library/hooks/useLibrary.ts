@@ -1,9 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { db } from "../../../core/db";
 import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../../../core/types";
 import { composeLibraryRecords, dbGameToUiGame } from "../utils";
-import { sortByUpdatedAtDesc } from "../../../hooks/useBacklogApp"; // Temporary until moved to core/utils
-import type { Game, LibraryRecord, StatusFilter } from "../../../backlog/shared";
+
+function sortByUpdatedAtDesc<T extends { updatedAt: string }>(rows: T[]): T[] {
+  return [...rows].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
 
 export function useLibrary() {
   const [gameRows, setGameRows] = useState<DbGameMetadata[]>([]);
@@ -15,11 +17,12 @@ export function useLibrary() {
     try {
       const [storedGames, storedEntries] = await Promise.all([
         db.games.toArray(),
-        db.libraryEntries.orderBy("updatedAt").reverse().toArray()
+        db.libraryEntries.orderBy("updatedAt").reverse().toArray(),
       ]);
       setGameRows(sortByUpdatedAtDesc(storedGames));
       setLibraryEntryRows(storedEntries);
-    } catch (e) {
+      setError(null);
+    } catch {
       setError("Falha ao carregar a biblioteca local.");
     } finally {
       setLoading(false);
@@ -27,14 +30,13 @@ export function useLibrary() {
   };
 
   useEffect(() => {
-    refreshLibrary();
+    void refreshLibrary();
   }, []);
 
   const records = useMemo(() => composeLibraryRecords(gameRows, libraryEntryRows), [gameRows, libraryEntryRows]);
-  
   const games = useMemo(() => records.map(dbGameToUiGame), [records]);
 
-  const findRecord = (entryId: number) => records.find(r => r.libraryEntry.id === entryId);
+  const findRecord = (entryId: number) => records.find((record) => record.libraryEntry.id === entryId);
   const findGame = (id: number) => games.find((game) => game.id === id);
 
   return {
