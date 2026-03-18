@@ -5,9 +5,13 @@ import type {
   Game as DbGameMetadata,
   GameTag as DbGameTag,
   Goal as DbGoal,
+  GoalType,
   LibraryEntry as DbLibraryEntry,
+  List as DbList,
+  Period,
   PlaySession as DbPlaySession,
   Review as DbReview,
+  Setting as DbSetting,
   Tag as DbTag,
 } from "../core/types";
 import { buildGamePageData } from "../modules/game-page/utils/gamePageData";
@@ -49,6 +53,7 @@ import {
   type BackupTables,
   type GameFormState,
   type Goal,
+  type GoalFormState,
   type ImportPreviewAction,
   type ImportPreviewEntry,
   type PiePoint,
@@ -91,6 +96,8 @@ export function useBacklogApp() {
   const [tagRows, setTagRows] = useState<DbTag[]>([]);
   const [gameTagRows, setGameTagRows] = useState<DbGameTag[]>([]);
   const [goalRows, setGoalRows] = useState<DbGoal[]>([]);
+  const [listRows, setListRows] = useState<DbList[]>([]);
+  const [settingRows, setSettingRows] = useState<DbSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -98,6 +105,10 @@ export function useBacklogApp() {
   const [gameForm, setGameForm] = useState<GameFormState>(() => createGameFormState());
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
   const [sessionForm, setSessionForm] = useState<SessionFormState>(() => createSessionFormState());
+  const [sessionEditId, setSessionEditId] = useState<number | null>(null);
+  const [goalModalMode, setGoalModalMode] = useState<"create" | "edit" | null>(null);
+  const [goalForm, setGoalForm] = useState<GoalFormState>({ type: "finished", target: "", period: "monthly" });
+  const [editingGoalId, setEditingGoalId] = useState<number | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importSource, setImportSource] = useState<ImportSource>("csv");
   const [importText, setImportText] = useState("");
@@ -126,13 +137,15 @@ export function useBacklogApp() {
       storedEntries = await db.libraryEntries.orderBy("updatedAt").reverse().toArray();
     }
 
-    const [storedGames, storedSessions, storedReviews, storedTags, storedGameTags, storedGoals] = await Promise.all([
+    const [storedGames, storedSessions, storedReviews, storedTags, storedGameTags, storedGoals, storedLists, storedSettings] = await Promise.all([
       db.games.toArray(),
       db.playSessions.orderBy("date").reverse().toArray(),
       db.reviews.toArray(),
       db.tags.toArray(),
       db.gameTags.toArray(),
       db.goals.toArray(),
+      db.lists.toArray(),
+      db.settings.toArray(),
     ]);
     setGameRows(sortByUpdatedAtDesc(storedGames));
     setLibraryEntryRows(storedEntries);
@@ -141,6 +154,8 @@ export function useBacklogApp() {
     setTagRows(storedTags);
     setGameTagRows(storedGameTags);
     setGoalRows(storedGoals);
+    setListRows(storedLists);
+    setSettingRows(storedSettings);
   };
 
   useEffect(() => {
@@ -176,6 +191,11 @@ export function useBacklogApp() {
   );
   const tagById = useMemo(() => new Map(tagRows.map((tag) => [tag.id, tag] as const)), [tagRows]);
   const games = useMemo(() => records.map(dbGameToUiGame), [records]);
+  const displayName = useMemo(() => {
+    const setting = settingRows.find((s) => s.key === "displayName");
+    return setting?.value || "Backlog OS";
+  }, [settingRows]);
+
   const findRecord = (entryId: number) => recordsByEntryId.get(entryId);
   const findGame = (id: number) => games.find((game) => game.id === id);
 
@@ -392,9 +412,26 @@ export function useBacklogApp() {
     setGameForm(createGameFormState(selectedGame));
     setGameModalMode("edit");
   };
-  const closeSessionModal = () => setSessionModalOpen(false);
+  const closeSessionModal = () => {
+    setSessionModalOpen(false);
+    setSessionEditId(null);
+  };
   const openSessionModal = (gameId?: number) => {
+    setSessionEditId(null);
     setSessionForm(createSessionFormState(gameId));
+    setSessionModalOpen(true);
+  };
+  const openEditSessionModal = (session: DbPlaySession) => {
+    if (!session.id) return;
+    setSessionEditId(session.id);
+    setSessionForm({
+      gameId: String(session.libraryEntryId),
+      date: session.date,
+      durationMinutes: String(session.durationMinutes),
+      completionPercent: session.completionPercent != null ? String(session.completionPercent) : "",
+      mood: session.mood ?? "",
+      note: session.note ?? "",
+    });
     setSessionModalOpen(true);
   };
   const openGamePage = (gameId?: number) => {
@@ -835,28 +872,56 @@ export function useBacklogApp() {
     }
     const durationMinutes = Math.max(1, Math.round(rawDuration));
     const nextCompletion = sessionForm.completionPercent ? Math.max(0, Math.min(100, Number(sessionForm.completionPercent))) : undefined;
-    const nextProgressStatus = nextCompletion === 100
-      ? "finished"
-      : currentEntry.progressStatus === "not_started" || currentEntry.progressStatus === "paused"
-        ? "playing"
-        : currentEntry.progressStatus;
-    await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
-      await db.playSessions.add({ libraryEntryId, date: sessionForm.date, platform: currentEntry.platform, durationMinutes, completionPercent: nextCompletion, mood: sessionForm.mood || currentEntry.mood, note: sessionForm.note.trim() || undefined });
-      await db.libraryEntries.update(libraryEntryId, {
-        ownershipStatus: currentEntry.ownershipStatus === "wishlist" ? "owned" : currentEntry.ownershipStatus,
-        progressStatus: nextProgressStatus,
-        completionPercent: nextCompletion ?? currentEntry.completionPercent,
-        playtimeMinutes: currentEntry.playtimeMinutes + durationMinutes,
-        mood: sessionForm.mood.trim() || currentEntry.mood,
-        lastSessionAt: sessionForm.date,
-        updatedAt: new Date().toISOString(),
-      });
-    });
-    setSubmitting(false);
-    await refreshData();
-    setSessionModalOpen(false);
-    setSelectedGameId(libraryEntryId);
-    setNotice("Sessão registrada com sucesso.");
+    setSubmitting(true);
+    try {
+      if (sessionEditId != null) {
+        const oldSession = await db.playSessions.get(sessionEditId);
+        await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
+          await db.playSessions.update(sessionEditId, {
+            date: sessionForm.date,
+            durationMinutes,
+            completionPercent: nextCompletion,
+            mood: sessionForm.mood.trim() || undefined,
+            note: sessionForm.note.trim() || undefined,
+          });
+          if (oldSession && currentEntry.id) {
+            const timeDiff = durationMinutes - oldSession.durationMinutes;
+            await db.libraryEntries.update(currentEntry.id, {
+              playtimeMinutes: Math.max(0, currentEntry.playtimeMinutes + timeDiff),
+              completionPercent: nextCompletion ?? currentEntry.completionPercent,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        });
+      } else {
+        const nextProgressStatus = nextCompletion === 100
+          ? "finished"
+          : currentEntry.progressStatus === "not_started" || currentEntry.progressStatus === "paused"
+            ? "playing"
+            : currentEntry.progressStatus;
+        await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
+          await db.playSessions.add({ libraryEntryId, date: sessionForm.date, platform: currentEntry.platform, durationMinutes, completionPercent: nextCompletion, mood: sessionForm.mood || currentEntry.mood, note: sessionForm.note.trim() || undefined });
+          await db.libraryEntries.update(libraryEntryId, {
+            ownershipStatus: currentEntry.ownershipStatus === "wishlist" ? "owned" : currentEntry.ownershipStatus,
+            progressStatus: nextProgressStatus,
+            completionPercent: nextCompletion ?? currentEntry.completionPercent,
+            playtimeMinutes: currentEntry.playtimeMinutes + durationMinutes,
+            mood: sessionForm.mood.trim() || currentEntry.mood,
+            lastSessionAt: sessionForm.date,
+            updatedAt: new Date().toISOString(),
+          });
+        });
+      }
+      await refreshData();
+      setSessionModalOpen(false);
+      setSessionEditId(null);
+      setSelectedGameId(libraryEntryId);
+      setNotice(sessionEditId != null ? "Sessão atualizada." : "Sessão registrada com sucesso.");
+    } catch (error) {
+      setNotice(`Falha ao salvar sessão: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleGameReviewSave = async (payload: {
@@ -1007,6 +1072,104 @@ export function useBacklogApp() {
     setNotice(`${selectedGame.title} recebeu prioridade alta no planner.`);
   };
 
+  // ── Goal CRUD ──
+  const closeGoalModal = () => setGoalModalMode(null);
+  const openCreateGoalModal = () => {
+    setGoalForm({ type: "finished", target: "", period: "monthly" });
+    setEditingGoalId(null);
+    setGoalModalMode("create");
+  };
+  const openEditGoalModal = (goal: DbGoal) => {
+    setGoalForm({ type: goal.type, target: String(goal.target), period: goal.period });
+    setEditingGoalId(goal.id ?? null);
+    setGoalModalMode("edit");
+  };
+  const handleGoalFormChange = <K extends keyof GoalFormState>(field: K, value: GoalFormState[K]) => {
+    setGoalForm((current) => ({ ...current, [field]: value }));
+  };
+  const handleGoalSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submitting) return;
+    const target = Number(goalForm.target);
+    if (!target || target <= 0) {
+      setNotice("Informe um valor alvo maior que zero.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const goalData = { type: goalForm.type as GoalType, target, current: 0, period: goalForm.period as Period };
+      if (editingGoalId != null) {
+        await db.goals.update(editingGoalId, { type: goalData.type, target: goalData.target, period: goalData.period });
+      } else {
+        await db.goals.add(goalData);
+      }
+      await refreshData();
+      setGoalModalMode(null);
+      setNotice(editingGoalId != null ? "Meta atualizada." : "Meta criada com sucesso.");
+    } catch (error) {
+      setNotice(`Falha ao salvar meta: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  const handleGoalDelete = async (goalId: number) => {
+    const confirmed = window.confirm("Excluir esta meta?");
+    if (!confirmed) return;
+    await db.goals.delete(goalId);
+    await refreshData();
+    setNotice("Meta removida.");
+  };
+
+  // ── List CRUD ──
+  const handleListCreate = async (name: string) => {
+    if (!name.trim()) {
+      setNotice("Informe um nome para a lista.");
+      return;
+    }
+    await db.lists.add({ name: name.trim(), createdAt: new Date().toISOString() });
+    await refreshData();
+    setNotice("Lista criada com sucesso.");
+  };
+  const handleListDelete = async (listId: number) => {
+    const confirmed = window.confirm("Excluir esta lista?");
+    if (!confirmed) return;
+    await db.lists.delete(listId);
+    await refreshData();
+    setNotice("Lista removida.");
+  };
+
+  // ── Settings ──
+  const handleSettingSave = async (key: string, value: string) => {
+    const existing = await db.settings.where("key").equals(key).first();
+    if (existing?.id != null) {
+      await db.settings.update(existing.id, { value, updatedAt: new Date().toISOString() });
+    } else {
+      await db.settings.add({ key, value, updatedAt: new Date().toISOString() });
+    }
+    await refreshData();
+    setNotice("Configuração salva.");
+  };
+
+  // ── Session delete ──
+  const handleSessionDelete = async (sessionId: number) => {
+    const confirmed = window.confirm("Excluir esta sessão?");
+    if (!confirmed) return;
+    const session = await db.playSessions.get(sessionId);
+    if (!session) return;
+    await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
+      await db.playSessions.delete(sessionId);
+      const entry = await db.libraryEntries.get(session.libraryEntryId);
+      if (entry?.id) {
+        await db.libraryEntries.update(entry.id, {
+          playtimeMinutes: Math.max(0, entry.playtimeMinutes - session.durationMinutes),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+    await refreshData();
+    setNotice("Sessão excluída.");
+  };
+
   const openLibraryGame = (gameId?: number) => {
     if (typeof gameId === "number" && gameId > 0) setSelectedGameId(gameId);
     setScreen("library");
@@ -1017,15 +1180,20 @@ export function useBacklogApp() {
     loading, notice, submitting, heroCopy, games, libraryGames, selectedGame, selectedGamePage, monthlyProgress, platformData,
     durationBuckets, visibleSessions, visiblePlannerQueue, continuePlayingGames, stats, goalProgress,
     achievementCards, systemRules, findGame, gameModalMode, gameForm, sessionModalOpen, sessionForm,
+    sessionEditId, goalRows, listRows, displayName,
+    goalModalMode, goalForm,
     importModalOpen, importSource, importText, importFileName, importPreview, importPreviewSummary,
     importFileInputRef, restoreModalOpen, restoreMode, restoreText, restoreFileName, restorePreview,
     restorePreviewTotals, restoreFileInputRef, openCreateGameModal, openEditGameModal, closeGameModal,
-    openSessionModal, closeSessionModal, openImportFlow, closeImportFlow, resetImportPreview,
+    openSessionModal, closeSessionModal, openEditSessionModal, openImportFlow, closeImportFlow, resetImportPreview,
     openRestoreFlow, closeRestoreFlow, resetRestorePreview, handleGameFormChange, handleSessionFormChange,
     handleImportSourceChange, handleImportTextChange, handleRestoreModeChange, handleRestoreTextChange,
     handleImportPreviewActionChange, handleImportFileChange, handleRestoreFileChange, handleGameSubmit,
     handleImportSubmit, handleExport, handleBackupExport, handleRestoreSubmit, handleSessionSubmit,
     handleDeleteSelectedGame, handleResumeSelectedGame, handleFavoriteSelectedGame, handleGameReviewSave,
     handleGameTagsSave, handleSendSelectedToPlanner, openLibraryGame, openGamePage,
+    handleSessionDelete,
+    openCreateGoalModal, openEditGoalModal, closeGoalModal, handleGoalFormChange, handleGoalSubmit, handleGoalDelete,
+    handleListCreate, handleListDelete, handleSettingSave,
   };
 }

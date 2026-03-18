@@ -1,16 +1,18 @@
-import { BarChart3, CalendarDays, Clock3, Trophy } from "lucide-react";
+import { BarChart3, CalendarDays, Clock3, Pencil, Trash2, Trophy } from "lucide-react";
 import { VerticalBarChart } from "../../../charts";
 import { formatDuration, type BarPoint, type Game } from "../../../backlog/shared";
 import type { PlaySession } from "../../../core/types";
-import { ChartFrame, EmptyState, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
+import { ChartFrame, EmptyState, NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type StatsScreenProps = {
   durationBuckets: BarPoint[];
   visibleSessions: PlaySession[];
   findGame: (id: number) => Game | undefined;
+  onEditSession: (session: PlaySession) => void;
+  onDeleteSession: (sessionId: number) => Promise<void>;
 };
 
-export function StatsScreen({ durationBuckets, visibleSessions, findGame }: StatsScreenProps) {
+export function StatsScreen({ durationBuckets, visibleSessions, findGame, onEditSession, onDeleteSession }: StatsScreenProps) {
   return (
     <div className="stats-layout">
       <Panel>
@@ -36,6 +38,14 @@ export function StatsScreen({ durationBuckets, visibleSessions, findGame }: Stat
                     <div className="session-card__title">
                       <h3>{game.title}</h3>
                       <Pill tone="neutral">{game.platform}</Pill>
+                      <div className="session-card__actions">
+                        <NotchButton variant="ghost" onClick={() => onEditSession(entry)}>
+                          <Pencil size={12} />
+                        </NotchButton>
+                        <NotchButton variant="ghost" onClick={() => entry.id != null && onDeleteSession(entry.id)}>
+                          <Trash2 size={12} />
+                        </NotchButton>
+                      </div>
                     </div>
                     <p>{entry.note || "Sessão registrada no diário do sistema."}</p>
                   </div>

@@ -11,15 +11,20 @@ import type {
   GameFormat,
   GameTag as DbGameTag,
   Goal as DbGoal,
+  GoalType,
   LibraryEntry as DbLibraryEntry,
   List as DbList,
   OwnershipStatus,
+  Period,
   PlaySession as DbPlaySession,
   Priority as DbPriority,
   ProgressStatus as DbProgressStatus,
   Review as DbReview,
+  Setting as DbSetting,
   Tag as DbTag,
 } from "../core/types";
+
+export type { GoalType, Period, DbGoal, DbList, DbSetting };
 
 export type ImportSource = "csv" | "steam" | "playnite";
 
@@ -161,6 +166,25 @@ export type SessionFormState = {
   note: string;
   mood: string;
 };
+
+export type GoalFormState = {
+  type: string;
+  target: string;
+  period: string;
+};
+
+export const goalTypeOptions: Array<{ value: GoalType; label: string }> = [
+  { value: "finished", label: "Jogos concluídos" },
+  { value: "started", label: "Jogos iniciados" },
+  { value: "playtime", label: "Horas jogadas" },
+  { value: "backlog_reduction", label: "Redução de backlog" },
+];
+
+export const goalPeriodOptions: Array<{ value: Period; label: string }> = [
+  { value: "monthly", label: "Mensal" },
+  { value: "yearly", label: "Anual" },
+  { value: "total", label: "Total" },
+];
 
 export type ImportPreviewAction = "create" | "update" | "ignore";
 

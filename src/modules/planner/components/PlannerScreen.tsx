@@ -1,23 +1,58 @@
-import { Binary, ChevronRight, FolderKanban, Target } from "lucide-react";
-import type { Game, Goal, PlannerEntry, Rule } from "../../../backlog/shared";
+import { Binary, ChevronRight, FolderKanban, Pencil, Plus, Target, Trash2 } from "lucide-react";
+import type { DbGoal, Game, Goal, PlannerEntry, Rule } from "../../../backlog/shared";
 import { cx } from "../../../backlog/shared";
-import { EmptyState, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
+import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type PlannerScreenProps = {
   visiblePlannerQueue: PlannerEntry[];
   goalProgress: Goal[];
+  goalRows: DbGoal[];
   systemRules: Rule[];
   findGame: (id: number) => Game | undefined;
   onOpenGamePage: (gameId?: number) => void;
+  onCreateGoal: () => void;
+  onEditGoal: (goal: DbGoal) => void;
+  onDeleteGoal: (goalId: number) => void;
 };
+
+const goalLabelMap: Record<string, string> = {
+  finished: "Jogos concluídos",
+  started: "Jogos iniciados",
+  playtime: "Horas jogadas",
+  backlog_reduction: "Redução de backlog",
+};
+
+const goalToneMap: Record<string, "sunset" | "cyan" | "violet" | "yellow"> = {
+  finished: "sunset",
+  started: "cyan",
+  playtime: "violet",
+  backlog_reduction: "yellow",
+};
+
+const periodLabelMap: Record<string, string> = {
+  monthly: "Mensal",
+  yearly: "Anual",
+  total: "Total",
+};
+
+function formatGoalCurrent(goal: DbGoal): string {
+  if (goal.type === "playtime") return `${goal.current}h / ${goal.target}h`;
+  return `${goal.current} / ${goal.target}`;
+}
 
 export function PlannerScreen({
   visiblePlannerQueue,
   goalProgress,
+  goalRows,
   systemRules,
   findGame,
   onOpenGamePage,
+  onCreateGoal,
+  onEditGoal,
+  onDeleteGoal,
 }: PlannerScreenProps) {
+  const hasDbGoals = goalRows.length > 0;
+
   return (
     <div className="planner-layout">
       <Panel>
@@ -56,17 +91,51 @@ export function PlannerScreen({
 
       <div className="planner-side">
         <Panel>
-          <SectionHeader icon={Target} title="Metas táticas" description="Pequenas vitórias para reduzir o acúmulo" />
+          <SectionHeader
+            icon={Target}
+            title="Metas táticas"
+            description={hasDbGoals ? "Metas persistidas na base local" : "Pequenas vitórias para reduzir o acúmulo"}
+            action={
+              <NotchButton variant="secondary" onClick={onCreateGoal}>
+                <Plus size={14} />
+                Nova meta
+              </NotchButton>
+            }
+          />
           <div className="goal-stack">
-            {goalProgress.map((goal) => (
-              <div className="goal-row" key={goal.label}>
-                <div className="goal-row__head">
-                  <span>{goal.label}</span>
-                  <strong>{goal.value}%</strong>
+            {hasDbGoals ? (
+              goalRows.map((goal) => {
+                const pct = Math.max(0, Math.min(100, Math.round((goal.current / Math.max(1, goal.target)) * 100)));
+                return (
+                  <div className="goal-row" key={goal.id}>
+                    <div className="goal-row__head">
+                      <span>{goalLabelMap[goal.type] ?? goal.type}</span>
+                      <div className="goal-row__actions">
+                        <Pill tone="neutral">{periodLabelMap[goal.period] ?? goal.period}</Pill>
+                        <strong>{formatGoalCurrent(goal)}</strong>
+                        <NotchButton variant="ghost" onClick={() => onEditGoal(goal)}>
+                          <Pencil size={12} />
+                        </NotchButton>
+                        <NotchButton variant="ghost" onClick={() => goal.id != null && onDeleteGoal(goal.id)}>
+                          <Trash2 size={12} />
+                        </NotchButton>
+                      </div>
+                    </div>
+                    <ProgressBar value={pct} tone={goalToneMap[goal.type] ?? "yellow"} thin />
+                  </div>
+                );
+              })
+            ) : (
+              goalProgress.map((goal) => (
+                <div className="goal-row" key={goal.label}>
+                  <div className="goal-row__head">
+                    <span>{goal.label}</span>
+                    <strong>{goal.value}%</strong>
+                  </div>
+                  <ProgressBar value={goal.value} tone={goal.tone} thin />
                 </div>
-                <ProgressBar value={goal.value} tone={goal.tone} thin />
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </Panel>
 
