@@ -472,9 +472,15 @@ export function useBacklogApp() {
     setImportPreview((current) => current?.map((entry) => (entry.id === entryId ? { ...entry, action } : entry)) ?? null);
   };
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
   const handleImportFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      setNotice("Arquivo muito grande. O limite é 10MB.");
+      return;
+    }
     try {
       const nextText = await file.text();
       setImportPreview(null);
@@ -489,6 +495,10 @@ export function useBacklogApp() {
   const handleRestoreFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      setNotice("Arquivo muito grande. O limite é 10MB.");
+      return;
+    }
     try {
       const nextText = await file.text();
       setRestorePreview(null);

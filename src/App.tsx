@@ -69,7 +69,7 @@ export default function App() {
       />
     );
   } else if (app.screen === "profile") {
-    screenContent = <ProfileScreen achievementCards={app.achievementCards} />;
+    screenContent = <ProfileScreen achievementCards={app.achievementCards} totalGames={app.stats.total} totalHours={app.stats.hours} />;
   } else if (app.screen === "game") {
     screenContent = app.selectedGamePage ? (
       <GamePageScreen

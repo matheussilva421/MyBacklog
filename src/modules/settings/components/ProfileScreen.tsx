@@ -5,9 +5,11 @@ import { Panel, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type ProfileScreenProps = {
   achievementCards: Achievement[];
+  totalGames: number;
+  totalHours: number;
 };
 
-export function ProfileScreen({ achievementCards }: ProfileScreenProps) {
+export function ProfileScreen({ achievementCards, totalGames, totalHours }: ProfileScreenProps) {
   return (
     <div className="profile-layout">
       <Panel>
@@ -15,12 +17,12 @@ export function ProfileScreen({ achievementCards }: ProfileScreenProps) {
         <div className="profile-card">
           <div className="profile-card__main">
             <span>Operador</span>
-            <h3>Matheus</h3>
+            <h3>Backlog OS</h3>
             <p>Curadoria agressiva de backlog, foco em catálogo, progresso e estatística pessoal.</p>
           </div>
           <div className="profile-card__meta">
-            <div className="detail-stat"><span>Plataforma principal</span><strong>PC</strong></div>
-            <div className="detail-stat"><span>Estilo</span><strong>Backlog Planner</strong></div>
+            <div className="detail-stat"><span>Total de jogos</span><strong>{totalGames}</strong></div>
+            <div className="detail-stat"><span>Horas registradas</span><strong>{totalHours}h</strong></div>
           </div>
         </div>
       </Panel>
