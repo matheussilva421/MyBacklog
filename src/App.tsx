@@ -4,6 +4,7 @@ import { GameModal, ImportModal, RestoreModal, SessionModal } from "./components
 import { NotchButton, Panel, SectionHeader, SidebarItem, Tag } from "./components/cyberpunk-ui";
 import { useBacklogApp } from "./hooks/useBacklogApp";
 import { DashboardScreen } from "./modules/dashboard/components/DashboardScreen";
+import { GamePageScreen } from "./modules/game-page/components/GamePageScreen";
 import { LibraryScreen } from "./modules/library/components/LibraryScreen";
 import { PlannerScreen } from "./modules/planner/components/PlannerScreen";
 import { ProfileScreen } from "./modules/settings/components/ProfileScreen";
@@ -24,6 +25,7 @@ export default function App() {
         visiblePlannerQueue={app.visiblePlannerQueue}
         findGame={app.findGame}
         onOpenLibrary={app.openLibraryGame}
+        onOpenGamePage={app.openGamePage}
         onOpenPlanner={() => app.setScreen("planner")}
       />
     );
@@ -44,6 +46,7 @@ export default function App() {
         onResumeSelected={app.handleResumeSelectedGame}
         onFavoriteSelected={app.handleFavoriteSelectedGame}
         onOpenSession={app.openSessionModal}
+        onOpenGamePage={app.openGamePage}
         onSendSelectedToPlanner={app.handleSendSelectedToPlanner}
       />
     );
@@ -54,7 +57,7 @@ export default function App() {
         goalProgress={app.goalProgress}
         systemRules={app.systemRules}
         findGame={app.findGame}
-        onOpenLibrary={app.openLibraryGame}
+        onOpenGamePage={app.openGamePage}
       />
     );
   } else if (app.screen === "stats") {
@@ -67,6 +70,33 @@ export default function App() {
     );
   } else if (app.screen === "profile") {
     screenContent = <ProfileScreen achievementCards={app.achievementCards} />;
+  } else if (app.screen === "game") {
+    screenContent = app.selectedGamePage ? (
+      <GamePageScreen
+        data={app.selectedGamePage}
+        onBack={() => app.openLibraryGame(app.selectedGamePage?.game.id)}
+        onOpenEdit={app.openEditGameModal}
+        onOpenSession={app.openSessionModal}
+        onToggleFavorite={app.handleFavoriteSelectedGame}
+        onSendToPlanner={app.handleSendSelectedToPlanner}
+        onDelete={app.handleDeleteSelectedGame}
+        onSaveReview={app.handleGameReviewSave}
+        onSaveTags={app.handleGameTagsSave}
+      />
+    ) : (
+      <Panel>
+        <SectionHeader
+          icon={Cpu}
+          title="Página do jogo"
+          description="Selecione um item da biblioteca, dashboard ou planner para abrir a ficha dedicada."
+          action={
+            <NotchButton variant="secondary" onClick={() => app.openLibraryGame()}>
+              Catálogo
+            </NotchButton>
+          }
+        />
+      </Panel>
+    );
   }
 
   return (
@@ -96,7 +126,7 @@ export default function App() {
                   key={item.key}
                   label={item.label}
                   icon={item.icon}
-                  active={app.screen === item.key}
+                  active={app.screen === item.key || (app.screen === "game" && item.key === "library")}
                   onClick={() => app.setScreen(item.key)}
                 />
               ))}
@@ -118,7 +148,7 @@ export default function App() {
                 <Upload size={15} />
                 Restaurar backup
               </NotchButton>
-              <NotchButton variant="ghost" onClick={() => app.openSessionModal(app.selectedGame.id)}>
+              <NotchButton variant="ghost" onClick={() => app.openSessionModal(app.selectedGame?.id)}>
                 <CalendarDays size={15} />
                 Registrar sessão
               </NotchButton>

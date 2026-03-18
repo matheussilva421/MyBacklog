@@ -139,6 +139,18 @@ button {
   gap: 20px;
 }
 
+.game-page-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.42fr) minmax(320px, 0.88fr);
+  gap: 20px;
+}
+
+.game-page-column,
+.game-page-side {
+  display: grid;
+  gap: 20px;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
@@ -827,7 +839,8 @@ button {
 .library-card__chips,
 .planner-card__tags,
 .detail-panel__badges,
-.detail-actions {
+.detail-actions,
+.game-page-tag-list {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -967,12 +980,19 @@ button {
 .library-card__metrics,
 .detail-stats,
 .profile-card__meta,
-.achievement-grid {
+.achievement-grid,
+.game-page-stat-grid,
+.game-page-session-metrics {
   display: grid;
   gap: 12px;
 }
 
 .library-card__metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.game-page-stat-grid,
+.game-page-session-metrics {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -1013,6 +1033,53 @@ button {
 .detail-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.game-page-hero,
+.game-page-insights {
+  display: grid;
+  gap: 16px;
+}
+
+.game-page-hero__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.game-page-hero__meta {
+  color: var(--text-soft);
+  font-size: 17px;
+}
+
+.game-page-hero__description {
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.game-page-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.game-page-tag-list {
+  margin-bottom: 16px;
+}
+
+.game-page-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.game-page-toggle input {
+  width: 16px;
+  height: 16px;
 }
 
 .profile-card,
@@ -1330,7 +1397,8 @@ button {
   .library-layout,
   .planner-layout,
   .stats-layout,
-  .profile-layout {
+  .profile-layout,
+  .game-page-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1385,7 +1453,10 @@ button {
   .detail-stats,
   .profile-card__meta,
   .achievement-grid,
-  .hero-panel__action-grid {
+  .hero-panel__action-grid,
+  .game-page-stat-grid,
+  .game-page-session-metrics,
+  .game-page-action-grid {
     grid-template-columns: 1fr;
   }
 

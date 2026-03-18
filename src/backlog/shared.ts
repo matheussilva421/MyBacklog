@@ -20,9 +20,11 @@ import type {
 } from "../core/types";
 import type { ImportPayload, ImportSource } from "../modules/import-export/utils/importExport";
 
-export type ScreenKey = "dashboard" | "library" | "planner" | "stats" | "profile";
+export type ScreenKey = "dashboard" | "library" | "planner" | "stats" | "profile" | "game";
 
-export const navigationItems: Array<{ key: ScreenKey; label: string; icon: LucideIcon }> = [
+type NavigationScreenKey = Exclude<ScreenKey, "game">;
+
+export const navigationItems: Array<{ key: NavigationScreenKey; label: string; icon: LucideIcon }> = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "library", label: "Biblioteca", icon: Library },
   { key: "planner", label: "Planner", icon: FolderKanban },

@@ -3,9 +3,14 @@ import type { ChangeEvent, FormEvent } from "react";
 import { db } from "../core/db";
 import type {
   Game as DbGameMetadata,
+  GameTag as DbGameTag,
+  Goal as DbGoal,
   LibraryEntry as DbLibraryEntry,
   PlaySession as DbPlaySession,
+  Review as DbReview,
+  Tag as DbTag,
 } from "../core/types";
+import { buildGamePageData } from "../modules/game-page/utils/gamePageData";
 import {
   backlogByDuration,
   buildImportPreview,
@@ -70,10 +75,14 @@ export function useBacklogApp() {
   const [screen, setScreen] = useState<ScreenKey>("dashboard");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("Todos");
-  const [selectedGameId, setSelectedGameId] = useState(1);
+  const [selectedGameId, setSelectedGameId] = useState(0);
   const [gameRows, setGameRows] = useState<DbGameMetadata[]>([]);
   const [libraryEntryRows, setLibraryEntryRows] = useState<DbLibraryEntry[]>([]);
   const [sessionRows, setSessionRows] = useState<DbPlaySession[]>([]);
+  const [reviewRows, setReviewRows] = useState<DbReview[]>([]);
+  const [tagRows, setTagRows] = useState<DbTag[]>([]);
+  const [gameTagRows, setGameTagRows] = useState<DbGameTag[]>([]);
+  const [goalRows, setGoalRows] = useState<DbGoal[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [gameModalMode, setGameModalMode] = useState<"create" | "edit" | null>(null);
@@ -108,10 +117,21 @@ export function useBacklogApp() {
       storedEntries = await db.libraryEntries.orderBy("updatedAt").reverse().toArray();
     }
 
-    const [storedGames, storedSessions] = await Promise.all([db.games.toArray(), db.playSessions.orderBy("date").reverse().toArray()]);
+    const [storedGames, storedSessions, storedReviews, storedTags, storedGameTags, storedGoals] = await Promise.all([
+      db.games.toArray(),
+      db.playSessions.orderBy("date").reverse().toArray(),
+      db.reviews.toArray(),
+      db.tags.toArray(),
+      db.gameTags.toArray(),
+      db.goals.toArray(),
+    ]);
     setGameRows(sortByUpdatedAtDesc(storedGames));
     setLibraryEntryRows(storedEntries);
     setSessionRows(storedSessions);
+    setReviewRows(storedReviews);
+    setTagRows(storedTags);
+    setGameTagRows(storedGameTags);
+    setGoalRows(storedGoals);
   };
 
   useEffect(() => {
@@ -141,6 +161,11 @@ export function useBacklogApp() {
     () => new Map(records.map((record) => [record.libraryEntry.id, record] as const)),
     [records],
   );
+  const reviewByEntryId = useMemo(
+    () => new Map(reviewRows.map((review) => [review.libraryEntryId, review] as const)),
+    [reviewRows],
+  );
+  const tagById = useMemo(() => new Map(tagRows.map((tag) => [tag.id, tag] as const)), [tagRows]);
   const games = useMemo(() => records.map(dbGameToUiGame), [records]);
   const findRecord = (entryId: number) => recordsByEntryId.get(entryId);
   const findGame = (id: number) => games.find((game) => game.id === id);
@@ -235,18 +260,50 @@ export function useBacklogApp() {
   const libraryGames = useMemo(() => searchedGames.filter((game) => (filter === "Todos" ? true : game.status === filter)), [filter, searchedGames]);
 
   useEffect(() => {
-    if (libraryGames.length > 0 && !libraryGames.some((game) => game.id === selectedGameId)) {
-      setSelectedGameId(libraryGames[0].id);
+    if (selectedGameId > 0 && games.some((game) => game.id === selectedGameId)) {
+      return;
     }
-  }, [libraryGames, selectedGameId]);
+    if (libraryGames.length > 0) {
+      setSelectedGameId(libraryGames[0].id);
+      return;
+    }
+    if (searchedGames.length > 0) {
+      setSelectedGameId(searchedGames[0].id);
+      return;
+    }
+    if (games.length > 0) {
+      setSelectedGameId(games[0].id);
+      return;
+    }
+    if (selectedGameId !== 0) {
+      setSelectedGameId(0);
+    }
+  }, [games, libraryGames, searchedGames, selectedGameId]);
 
   const selectedGame =
     libraryGames.find((game) => game.id === selectedGameId) ??
     searchedGames.find((game) => game.id === selectedGameId) ??
     findGame(selectedGameId) ??
-    games[0] ??
-    defaultGames[0];
-  const selectedRecord = findRecord(selectedGame.id);
+    games[0];
+  const selectedRecord = selectedGame ? findRecord(selectedGame.id) : undefined;
+  const selectedGamePage = useMemo(() => {
+    if (!selectedGame || !selectedRecord?.libraryEntry.id) return null;
+    const entryId = selectedRecord.libraryEntry.id;
+    const sessions = sessionRows.filter((session) => session.libraryEntryId === entryId);
+    const tags = gameTagRows
+      .filter((relation) => relation.libraryEntryId === entryId)
+      .map((relation) => tagById.get(relation.tagId))
+      .filter((tag): tag is DbTag => Boolean(tag));
+
+    return buildGamePageData({
+      game: selectedGame,
+      record: selectedRecord,
+      sessions,
+      review: reviewByEntryId.get(entryId),
+      tags,
+      goals: goalRows,
+    });
+  }, [gameTagRows, goalRows, reviewByEntryId, selectedGame, selectedRecord, sessionRows, tagById]);
 
   const stats = useMemo(() => {
     const total = games.length;
@@ -283,13 +340,23 @@ export function useBacklogApp() {
     setGameModalMode("create");
   };
   const openEditGameModal = () => {
+    if (!selectedGame) return;
     setGameForm(createGameFormState(selectedGame));
     setGameModalMode("edit");
   };
   const closeSessionModal = () => setSessionModalOpen(false);
-  const openSessionModal = (gameId = selectedGameId) => {
+  const openSessionModal = (gameId?: number) => {
     setSessionForm(createSessionFormState(gameId));
     setSessionModalOpen(true);
+  };
+  const openGamePage = (gameId?: number) => {
+    const nextGameId = typeof gameId === "number" ? gameId : selectedGame?.id;
+    if (typeof nextGameId === "number" && nextGameId > 0) {
+      setSelectedGameId(nextGameId);
+      setScreen("game");
+      return;
+    }
+    setScreen("library");
   };
   const resetImportPreview = () => setImportPreview(null);
   const openImportFlow = () => {
@@ -710,8 +777,106 @@ export function useBacklogApp() {
     setNotice("Sessão registrada com sucesso.");
   };
 
+  const handleGameReviewSave = async (payload: {
+    score: string;
+    recommend: "" | "yes" | "no";
+    shortReview: string;
+    longReview: string;
+    pros: string;
+    cons: string;
+    hasSpoiler: boolean;
+  }) => {
+    if (!selectedRecord?.libraryEntry.id) return;
+
+    const libraryEntryId = selectedRecord.libraryEntry.id;
+    const normalizedScore = payload.score.trim();
+    const parsedScore = normalizedScore === "" ? undefined : Number.parseFloat(normalizedScore);
+    const score =
+      typeof parsedScore === "number" && Number.isFinite(parsedScore)
+        ? Math.max(0, Math.min(10, parsedScore))
+        : undefined;
+    const reviewData = {
+      libraryEntryId,
+      score,
+      shortReview: payload.shortReview.trim() || undefined,
+      longReview: payload.longReview.trim() || undefined,
+      pros: payload.pros.trim() || undefined,
+      cons: payload.cons.trim() || undefined,
+      recommend: payload.recommend || undefined,
+      hasSpoiler: payload.hasSpoiler || undefined,
+    };
+    const hasContent = Object.entries(reviewData).some(
+      ([key, value]) => key !== "libraryEntryId" && value != null && value !== "",
+    );
+
+    await db.transaction("rw", db.reviews, db.libraryEntries, async () => {
+      const existingReview = await db.reviews.where("libraryEntryId").equals(libraryEntryId).first();
+
+      if (hasContent) {
+        if (existingReview?.id != null) await db.reviews.put({ ...existingReview, ...reviewData, id: existingReview.id });
+        else await db.reviews.add(reviewData);
+      } else if (existingReview?.id != null) {
+        await db.reviews.delete(existingReview.id);
+      }
+
+      await db.libraryEntries.update(libraryEntryId, {
+        personalRating: score,
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    await refreshData();
+    setNotice(hasContent ? "Review do jogo atualizada." : "Review removida.");
+  };
+
+  const handleGameTagsSave = async (value: string) => {
+    if (!selectedRecord?.libraryEntry.id) return;
+
+    const libraryEntryId = selectedRecord.libraryEntry.id;
+    const names = Array.from(
+      new Set(
+        value
+          .split(",")
+          .map((token) => token.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    await db.transaction("rw", db.tags, db.gameTags, async () => {
+      const existingTags = await db.tags.toArray();
+      const tagsByName = new Map(existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag] as const));
+      const currentRelations = await db.gameTags.where("libraryEntryId").equals(libraryEntryId).toArray();
+      const nextTagIds = new Set<number>();
+
+      for (const name of names) {
+        const key = name.toLowerCase();
+        const existing = tagsByName.get(key);
+        if (existing?.id != null) {
+          nextTagIds.add(existing.id);
+          continue;
+        }
+
+        const tagId = Number(await db.tags.add({ name }));
+        tagsByName.set(key, { id: tagId, name });
+        nextTagIds.add(tagId);
+      }
+
+      for (const relation of currentRelations) {
+        if (!nextTagIds.has(relation.tagId) && relation.id != null) await db.gameTags.delete(relation.id);
+      }
+
+      const currentTagIds = new Set(currentRelations.map((relation) => relation.tagId));
+      for (const tagId of nextTagIds) {
+        if (!currentTagIds.has(tagId)) await db.gameTags.add({ libraryEntryId, tagId });
+      }
+    });
+
+    await refreshData();
+    setNotice(names.length > 0 ? "Tags sincronizadas para este jogo." : "Tags removidas deste jogo.");
+  };
+
   const handleDeleteSelectedGame = async () => {
-    if (!selectedRecord) return;
+    if (!selectedRecord || !selectedGame) return;
     const confirmed = window.confirm(`Excluir ${selectedGame.title} da biblioteca?`);
     if (!confirmed) return;
     await db.transaction("rw", [db.games, db.libraryEntries, db.playSessions, db.reviews, db.gameTags], async () => {
@@ -724,11 +889,12 @@ export function useBacklogApp() {
       if (siblingCount === 0) await db.games.delete(selectedRecord.game.id!);
     });
     await refreshData();
+    setScreen("library");
     setNotice("Jogo removido da biblioteca.");
   };
 
   const handleResumeSelectedGame = async () => {
-    if (!selectedRecord?.libraryEntry.id) return;
+    if (!selectedRecord?.libraryEntry.id || !selectedGame) return;
     await db.libraryEntries.update(selectedRecord.libraryEntry.id, { ownershipStatus: "owned", progressStatus: "playing", updatedAt: new Date().toISOString() });
     await refreshData();
     setNotice(`${selectedGame.title} voltou para a fila ativa.`);
@@ -742,7 +908,7 @@ export function useBacklogApp() {
   };
 
   const handleSendSelectedToPlanner = async () => {
-    if (!selectedRecord?.libraryEntry.id) return;
+    if (!selectedRecord?.libraryEntry.id || !selectedGame) return;
     const updates: Partial<DbLibraryEntry> = { priority: "high", updatedAt: new Date().toISOString() };
     if (selectedGame.status === "Wishlist") {
       updates.ownershipStatus = "owned";
@@ -755,13 +921,13 @@ export function useBacklogApp() {
   };
 
   const openLibraryGame = (gameId?: number) => {
-    if (typeof gameId === "number") setSelectedGameId(gameId);
+    if (typeof gameId === "number" && gameId > 0) setSelectedGameId(gameId);
     setScreen("library");
   };
 
   return {
     screen, setScreen, query, setQuery, filter, setFilter, selectedGameId, setSelectedGameId,
-    loading, notice, heroCopy, games, libraryGames, selectedGame, monthlyProgress, platformData,
+    loading, notice, heroCopy, games, libraryGames, selectedGame, selectedGamePage, monthlyProgress, platformData,
     durationBuckets, visibleSessions, visiblePlannerQueue, continuePlayingGames, stats, goalProgress,
     achievementCards, systemRules, findGame, gameModalMode, gameForm, sessionModalOpen, sessionForm,
     importModalOpen, importSource, importText, importFileName, importPreview, importPreviewSummary,
@@ -772,7 +938,7 @@ export function useBacklogApp() {
     handleImportSourceChange, handleImportTextChange, handleRestoreModeChange, handleRestoreTextChange,
     handleImportPreviewActionChange, handleImportFileChange, handleRestoreFileChange, handleGameSubmit,
     handleImportSubmit, handleExport, handleBackupExport, handleRestoreSubmit, handleSessionSubmit,
-    handleDeleteSelectedGame, handleResumeSelectedGame, handleFavoriteSelectedGame,
-    handleSendSelectedToPlanner, openLibraryGame,
+    handleDeleteSelectedGame, handleResumeSelectedGame, handleFavoriteSelectedGame, handleGameReviewSave,
+    handleGameTagsSave, handleSendSelectedToPlanner, openLibraryGame, openGamePage,
   };
 }

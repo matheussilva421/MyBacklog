@@ -6,4 +6,5 @@ export const screenMeta: Record<ScreenKey, { before: string; accent: string }> =
   planner: { before: "Fila de", accent: "Execução" },
   stats: { before: "Telemetria", accent: "Pessoal" },
   profile: { before: "Camada de", accent: "Perfil" },
+  game: { before: "Ficha do", accent: "Jogo" },
 };

@@ -11,7 +11,7 @@ import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from
 
 type LibraryScreenProps = {
   libraryGames: Game[];
-  selectedGame: Game;
+  selectedGame?: Game;
   filter: StatusFilter;
   onFilterChange: (value: StatusFilter) => void;
   onSelectGame: (gameId: number) => void;
@@ -24,6 +24,7 @@ type LibraryScreenProps = {
   onResumeSelected: () => void;
   onFavoriteSelected: () => void;
   onOpenSession: (gameId?: number) => void;
+  onOpenGamePage: (gameId?: number) => void;
   onSendSelectedToPlanner: () => void;
 };
 
@@ -42,6 +43,7 @@ export function LibraryScreen({
   onResumeSelected,
   onFavoriteSelected,
   onOpenSession,
+  onOpenGamePage,
   onSendSelectedToPlanner,
 }: LibraryScreenProps) {
   return (
@@ -53,10 +55,22 @@ export function LibraryScreen({
           description="Catálogo completo com filtros e seleção rápida"
           action={
             <div className="panel-toolbar">
-              <NotchButton variant="secondary" onClick={onExport}><Download size={14} />Exportar CSV</NotchButton>
-              <NotchButton variant="secondary" onClick={onBackupExport}><Download size={14} />Backup JSON</NotchButton>
-              <NotchButton variant="ghost" onClick={onOpenRestore}><Upload size={14} />Restaurar</NotchButton>
-              <NotchButton variant="primary" onClick={onOpenCreate}><Plus size={14} />Adicionar</NotchButton>
+              <NotchButton variant="secondary" onClick={onExport}>
+                <Download size={14} />
+                Exportar CSV
+              </NotchButton>
+              <NotchButton variant="secondary" onClick={onBackupExport}>
+                <Download size={14} />
+                Backup JSON
+              </NotchButton>
+              <NotchButton variant="ghost" onClick={onOpenRestore}>
+                <Upload size={14} />
+                Restaurar
+              </NotchButton>
+              <NotchButton variant="primary" onClick={onOpenCreate}>
+                <Plus size={14} />
+                Adicionar
+              </NotchButton>
             </div>
           }
         />
@@ -82,7 +96,7 @@ export function LibraryScreen({
               <button
                 type="button"
                 key={game.id}
-                className={cx("library-card", selectedGame.id === game.id && "library-card--active")}
+                className={cx("library-card", selectedGame?.id === game.id && "library-card--active")}
                 onClick={() => onSelectGame(game.id)}
               >
                 <div className="library-card__platform">
@@ -103,9 +117,18 @@ export function LibraryScreen({
                   <ProgressBar value={game.progress} tone="cyan" thin />
                 </div>
                 <div className="library-card__metrics">
-                  <div><span>Nota</span><strong>{game.score.toFixed(1)}</strong></div>
-                  <div><span>Horas</span><strong>{game.hours}h</strong></div>
-                  <div><span>ETA</span><strong>{game.eta}</strong></div>
+                  <div>
+                    <span>Nota</span>
+                    <strong>{game.score.toFixed(1)}</strong>
+                  </div>
+                  <div>
+                    <span>Horas</span>
+                    <strong>{game.hours}h</strong>
+                  </div>
+                  <div>
+                    <span>ETA</span>
+                    <strong>{game.eta}</strong>
+                  </div>
                 </div>
               </button>
             ))}
@@ -120,55 +143,92 @@ export function LibraryScreen({
           description="Painel lateral com detalhes e ações rápidas"
           action={
             <div className="panel-toolbar">
-              <NotchButton variant="secondary" onClick={onOpenEdit}>Editar</NotchButton>
-              <NotchButton variant="ghost" onClick={onDeleteSelected}>Excluir</NotchButton>
+              <NotchButton variant="secondary" onClick={onOpenEdit} disabled={!selectedGame}>
+                Editar
+              </NotchButton>
+              <NotchButton variant="ghost" onClick={onDeleteSelected} disabled={!selectedGame}>
+                Excluir
+              </NotchButton>
             </div>
           }
         />
-        <div className="detail-panel__body">
-          <div className="detail-panel__headline">
-            <div>
-              <span className="detail-panel__eyebrow">Selecionado</span>
-              <h3>{selectedGame.title}</h3>
-              <p>{selectedGame.platform} • {selectedGame.year} • {selectedGame.genre}</p>
-            </div>
-            <div className="detail-panel__badges">
-              <Pill tone={statusTone[selectedGame.status]}>{selectedGame.status}</Pill>
-              <Pill tone={priorityTone[selectedGame.priority]}>{selectedGame.priority}</Pill>
-            </div>
-          </div>
 
-          <div className="detail-stats">
-            <div className="detail-stat"><span>Progresso</span><strong>{selectedGame.progress}%</strong></div>
-            <div className="detail-stat"><span>Horas</span><strong>{selectedGame.hours}h</strong></div>
-            <div className="detail-stat"><span>ETA</span><strong>{selectedGame.eta}</strong></div>
-            <div className="detail-stat"><span>Nota</span><strong>{selectedGame.score.toFixed(1)}</strong></div>
-          </div>
-
-          <div className="detail-progress">
-            <div className="detail-progress__head">
-              <span>Barra de avanço</span>
-              <strong>{selectedGame.progress}%</strong>
+        {selectedGame ? (
+          <div className="detail-panel__body">
+            <div className="detail-panel__headline">
+              <div>
+                <span className="detail-panel__eyebrow">Selecionado</span>
+                <h3>{selectedGame.title}</h3>
+                <p>
+                  {selectedGame.platform} • {selectedGame.year} • {selectedGame.genre}
+                </p>
+              </div>
+              <div className="detail-panel__badges">
+                <Pill tone={statusTone[selectedGame.status]}>{selectedGame.status}</Pill>
+                <Pill tone={priorityTone[selectedGame.priority]}>{selectedGame.priority}</Pill>
+              </div>
             </div>
-            <ProgressBar value={selectedGame.progress} tone="sunset" />
-          </div>
 
-          <div className="detail-note">
-            <span className="detail-note__eyebrow">Leitura do sistema</span>
-            <p>{selectedGame.notes}</p>
-            <div className="detail-note__tags">
-              <Pill tone="cyan">Mood: {selectedGame.mood}</Pill>
-              <Pill tone="magenta">Dificuldade: {selectedGame.difficulty}</Pill>
+            <div className="detail-stats">
+              <div className="detail-stat">
+                <span>Progresso</span>
+                <strong>{selectedGame.progress}%</strong>
+              </div>
+              <div className="detail-stat">
+                <span>Horas</span>
+                <strong>{selectedGame.hours}h</strong>
+              </div>
+              <div className="detail-stat">
+                <span>ETA</span>
+                <strong>{selectedGame.eta}</strong>
+              </div>
+              <div className="detail-stat">
+                <span>Nota</span>
+                <strong>{selectedGame.score.toFixed(1)}</strong>
+              </div>
+            </div>
+
+            <div className="detail-progress">
+              <div className="detail-progress__head">
+                <span>Barra de avanço</span>
+                <strong>{selectedGame.progress}%</strong>
+              </div>
+              <ProgressBar value={selectedGame.progress} tone="sunset" />
+            </div>
+
+            <div className="detail-note">
+              <span className="detail-note__eyebrow">Leitura do sistema</span>
+              <p>{selectedGame.notes}</p>
+              <div className="detail-note__tags">
+                <Pill tone="cyan">Mood: {selectedGame.mood}</Pill>
+                <Pill tone="magenta">Dificuldade: {selectedGame.difficulty}</Pill>
+              </div>
+            </div>
+
+            <div className="detail-actions">
+              <NotchButton variant="primary" onClick={() => onOpenGamePage(selectedGame.id)}>
+                Abrir página
+              </NotchButton>
+              <NotchButton variant="secondary" onClick={onResumeSelected}>
+                Retomar
+              </NotchButton>
+              <NotchButton variant="secondary" onClick={onFavoriteSelected}>
+                <Heart size={15} />
+                Favoritar
+              </NotchButton>
+              <NotchButton variant="ghost" onClick={() => onOpenSession(selectedGame.id)}>
+                <Plus size={15} />
+                Nova sessão
+              </NotchButton>
+              <NotchButton variant="ghost" onClick={onSendSelectedToPlanner}>
+                <FolderKanban size={15} />
+                Enviar ao planner
+              </NotchButton>
             </div>
           </div>
-
-          <div className="detail-actions">
-            <NotchButton variant="primary" onClick={onResumeSelected}>Retomar</NotchButton>
-            <NotchButton variant="secondary" onClick={onFavoriteSelected}><Heart size={15} />Favoritar</NotchButton>
-            <NotchButton variant="ghost" onClick={() => onOpenSession(selectedGame.id)}><Plus size={15} />Nova sessão</NotchButton>
-            <NotchButton variant="ghost" onClick={onSendSelectedToPlanner}><FolderKanban size={15} />Enviar ao planner</NotchButton>
-          </div>
-        </div>
+        ) : (
+          <EmptyState message="Selecione um jogo na biblioteca para abrir a ficha lateral." />
+        )}
       </Panel>
     </div>
   );

@@ -8,7 +8,7 @@ type PlannerScreenProps = {
   goalProgress: Goal[];
   systemRules: Rule[];
   findGame: (id: number) => Game | undefined;
-  onOpenLibrary: (gameId?: number) => void;
+  onOpenGamePage: (gameId?: number) => void;
 };
 
 export function PlannerScreen({
@@ -16,7 +16,7 @@ export function PlannerScreen({
   goalProgress,
   systemRules,
   findGame,
-  onOpenLibrary,
+  onOpenGamePage,
 }: PlannerScreenProps) {
   return (
     <div className="planner-layout">
@@ -31,7 +31,7 @@ export function PlannerScreen({
               if (!game) return null;
 
               return (
-                <button type="button" className="planner-card" key={entry.rank} onClick={() => onOpenLibrary(game.id)}>
+                <button type="button" className="planner-card" key={entry.rank} onClick={() => onOpenGamePage(game.id)}>
                   <div className="planner-card__slot">
                     <span>Slot</span>
                     <strong>{entry.rank}</strong>

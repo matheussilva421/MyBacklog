@@ -35,6 +35,7 @@ type DashboardScreenProps = {
   visiblePlannerQueue: PlannerEntry[];
   findGame: (id: number) => Game | undefined;
   onOpenLibrary: (gameId?: number) => void;
+  onOpenGamePage: (gameId?: number) => void;
   onOpenPlanner: () => void;
 };
 
@@ -46,6 +47,7 @@ export function DashboardScreen({
   visiblePlannerQueue,
   findGame,
   onOpenLibrary,
+  onOpenGamePage,
   onOpenPlanner,
 }: DashboardScreenProps) {
   return (
@@ -150,7 +152,7 @@ export function DashboardScreen({
                     </div>
                     <div className="continue-card__actions">
                       <Pill tone="magenta">{game.eta} restantes</Pill>
-                      <NotchButton variant="primary" onClick={() => onOpenLibrary(game.id)}>
+                      <NotchButton variant="primary" onClick={() => onOpenGamePage(game.id)}>
                         Detalhes
                       </NotchButton>
                     </div>
@@ -180,7 +182,7 @@ export function DashboardScreen({
                   type="button"
                   className="priority-card"
                   key={entry.rank}
-                  onClick={() => onOpenLibrary(game.id)}
+                  onClick={() => onOpenGamePage(game.id)}
                 >
                   <div className="priority-card__head">
                     <span>Posição {entry.rank}</span>
