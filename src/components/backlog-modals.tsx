@@ -12,10 +12,10 @@ import {
   type GoalFormState,
   type ImportPreviewAction,
   type ImportPreviewEntry,
+  type ImportSource,
   type RestoreMode,
   type RestorePreview,
   type SessionFormState,
-  type ImportSource,
 } from "../backlog/shared";
 import { Modal, NotchButton, Pill } from "./cyberpunk-ui";
 
@@ -66,28 +66,55 @@ export function GameModal({
             <input value={form.platform} onChange={(event) => onChange("platform", event.target.value)} />
           </label>
           <label className="field">
+            <span>Loja / fonte</span>
+            <input value={form.sourceStore} onChange={(event) => onChange("sourceStore", event.target.value)} />
+          </label>
+          <label className="field">
             <span>Gênero</span>
             <input value={form.genre} onChange={(event) => onChange("genre", event.target.value)} />
           </label>
           <label className="field">
             <span>Status</span>
             <select value={form.status} onChange={(event) => onChange("status", event.target.value as GameFormState["status"])}>
-              {gameStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+              {gameStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
             </select>
           </label>
           <label className="field">
             <span>Prioridade</span>
-            <select value={form.priority} onChange={(event) => onChange("priority", event.target.value as GameFormState["priority"])}>
-              {gamePriorities.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+            <select
+              value={form.priority}
+              onChange={(event) => onChange("priority", event.target.value as GameFormState["priority"])}
+            >
+              {gamePriorities.map((priority) => (
+                <option key={priority} value={priority}>
+                  {priority}
+                </option>
+              ))}
             </select>
           </label>
           <label className="field">
             <span>Progresso %</span>
-            <input type="number" min="0" max="100" value={form.progress} onChange={(event) => onChange("progress", event.target.value)} />
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={form.progress}
+              onChange={(event) => onChange("progress", event.target.value)}
+            />
           </label>
           <label className="field">
             <span>Horas</span>
-            <input type="number" min="0" step="0.5" value={form.hours} onChange={(event) => onChange("hours", event.target.value)} />
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={form.hours}
+              onChange={(event) => onChange("hours", event.target.value)}
+            />
           </label>
           <label className="field">
             <span>ETA</span>
@@ -95,11 +122,24 @@ export function GameModal({
           </label>
           <label className="field">
             <span>Nota</span>
-            <input type="number" min="0" max="10" step="0.1" value={form.score} onChange={(event) => onChange("score", event.target.value)} />
+            <input
+              type="number"
+              min="0"
+              max="10"
+              step="0.1"
+              value={form.score}
+              onChange={(event) => onChange("score", event.target.value)}
+            />
           </label>
           <label className="field">
             <span>Ano</span>
-            <input type="number" min="1980" max="2100" value={form.year} onChange={(event) => onChange("year", event.target.value)} />
+            <input
+              type="number"
+              min="1980"
+              max="2100"
+              value={form.year}
+              onChange={(event) => onChange("year", event.target.value)}
+            />
           </label>
           <label className="field">
             <span>Mood</span>
@@ -115,8 +155,12 @@ export function GameModal({
           </label>
         </div>
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={onClose}>Cancelar</NotchButton>
-          <NotchButton variant="primary" type="submit">{mode === "edit" ? "Salvar alterações" : "Criar jogo"}</NotchButton>
+          <NotchButton variant="ghost" type="button" onClick={onClose}>
+            Cancelar
+          </NotchButton>
+          <NotchButton variant="primary" type="submit">
+            {mode === "edit" ? "Salvar alterações" : "Criar jogo"}
+          </NotchButton>
         </div>
       </form>
     </Modal>
@@ -135,6 +179,8 @@ export function ImportModal({
   onTextChange,
   onFileChange,
   onActionChange,
+  onMatchChange,
+  onRawgChange,
   onSubmit,
   onClose,
 }: {
@@ -149,6 +195,8 @@ export function ImportModal({
   onTextChange: (value: string) => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   onActionChange: (entryId: string, action: ImportPreviewAction) => void;
+  onMatchChange: (entryId: string, matchId: number | null) => void;
+  onRawgChange: (entryId: string, rawgId: number | null) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onClose: () => void;
 }) {
@@ -165,7 +213,11 @@ export function ImportModal({
           <label className="field">
             <span>Origem</span>
             <select value={source} onChange={(event) => onSourceChange(event.target.value as ImportSource)}>
-              {importSources.map((s) => <option key={s} value={s}>{s.toUpperCase()}</option>)}
+              {importSources.map((item) => (
+                <option key={item} value={item}>
+                  {item.toUpperCase()}
+                </option>
+              ))}
             </select>
           </label>
           <div className="field">
@@ -205,7 +257,7 @@ export function ImportModal({
                 <small>Entradas sem match local</small>
               </article>
               <article className="preview-summary-card">
-                <span>Duplicados locais</span>
+                <span>Matches diretos</span>
                 <strong>{summary.existing}</strong>
                 <small>Itens que podem atualizar</small>
               </article>
@@ -227,7 +279,9 @@ export function ImportModal({
                   <div className="preview-card__head">
                     <div>
                       <strong>{entry.payload.title}</strong>
-                      <span>{entry.payload.platform} • {entry.payload.sourceStore}</span>
+                      <span>
+                        {entry.payload.platform} • {entry.payload.sourceStore}
+                      </span>
                     </div>
                     <label className="field preview-card__field">
                       <span>Ação</span>
@@ -235,30 +289,71 @@ export function ImportModal({
                         value={entry.action}
                         onChange={(event) => onActionChange(entry.id, event.target.value as ImportPreviewAction)}
                       >
-                        {entry.status === "new" ? (
-                          <>
-                            <option value="create">Criar</option>
-                            <option value="ignore">Ignorar</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="update">Atualizar existente</option>
-                            <option value="ignore">Ignorar</option>
-                          </>
-                        )}
+                        <option value="create">Criar</option>
+                        <option value="update">Atualizar</option>
+                        <option value="ignore">Ignorar</option>
                       </select>
                     </label>
                   </div>
+
                   <p>
                     {entry.status === "existing"
                       ? `Match encontrado no catálogo: ${entry.existingTitle}`
-                      : "Novo item pronto para entrar na biblioteca."}
+                      : entry.status === "review"
+                        ? "Há possíveis matches locais ou enriquecimento externo. Revise antes de aplicar."
+                        : "Novo item pronto para entrar na biblioteca."}
                   </p>
+
+                  {entry.matchCandidates.length > 0 ? (
+                    <label className="field preview-card__field preview-card__field--wide">
+                      <span>Match local</span>
+                      <select
+                        value={entry.selectedMatchId ?? ""}
+                        onChange={(event) =>
+                          onMatchChange(entry.id, event.target.value ? Number(event.target.value) : null)
+                        }
+                      >
+                        <option value="">Criar novo item</option>
+                        {entry.matchCandidates.map((candidate) => (
+                          <option key={`${candidate.entryId}-${candidate.platform}`} value={candidate.entryId}>
+                            {candidate.title} • {candidate.platform} • {candidate.sourceStore}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+
+                  {entry.rawgCandidates.length > 0 ? (
+                    <label className="field preview-card__field preview-card__field--wide">
+                      <span>Enriquecimento RAWG</span>
+                      <select
+                        value={entry.selectedRawgId ?? ""}
+                        onChange={(event) =>
+                          onRawgChange(entry.id, event.target.value ? Number(event.target.value) : null)
+                        }
+                      >
+                        <option value="">Sem enriquecimento</option>
+                        {entry.rawgCandidates.map((candidate) => (
+                          <option key={candidate.rawgId} value={candidate.rawgId}>
+                            {candidate.title}
+                            {candidate.releaseYear ? ` (${candidate.releaseYear})` : ""}
+                            {candidate.platforms.length > 0 ? ` • ${candidate.platforms.join(", ")}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : entry.enrichmentStatus === "missing" ? (
+                    <p className="preview-card__hint">Nenhum candidato RAWG confiável foi encontrado para este item.</p>
+                  ) : null}
+
                   <div className="preview-card__meta">
-                    <Pill tone={entry.status === "new" ? "yellow" : "magenta"}>
-                      {entry.status === "new" ? "Novo" : "Duplicado"}
+                    <Pill tone={entry.status === "new" ? "yellow" : entry.status === "review" ? "cyan" : "magenta"}>
+                      {entry.status === "new" ? "Novo" : entry.status === "review" ? "Revisar" : "Duplicado"}
                     </Pill>
-                    {entry.duplicateCount > 0 ? <Pill tone="neutral">+{entry.duplicateCount} repetições</Pill> : null}
+                    {entry.duplicateCount > 0 ? (
+                      <Pill tone="neutral">+{entry.duplicateCount} repetições</Pill>
+                    ) : null}
+                    {entry.selectedRawgId ? <Pill tone="cyan">RAWG ativo</Pill> : null}
                     <Pill tone={entry.action === "ignore" ? "neutral" : entry.action === "update" ? "magenta" : "cyan"}>
                       {entry.action === "create" ? "Criar" : entry.action === "update" ? "Atualizar" : "Ignorar"}
                     </Pill>
@@ -387,9 +482,15 @@ export function RestoreModal({
                     <Pill tone="neutral">{item.create + item.update + item.skip} itens</Pill>
                   </div>
                   <div className="preview-card__stats">
-                    <span>Novo <strong>{item.create}</strong></span>
-                    <span>Atualizar <strong>{item.update}</strong></span>
-                    <span>Ignorar <strong>{item.skip}</strong></span>
+                    <span>
+                      Novo <strong>{item.create}</strong>
+                    </span>
+                    <span>
+                      Atualizar <strong>{item.update}</strong>
+                    </span>
+                    <span>
+                      Ignorar <strong>{item.skip}</strong>
+                    </span>
                   </div>
                 </article>
               ))}
@@ -447,7 +548,11 @@ export function SessionModal({
             <span>Jogo</span>
             <select value={form.gameId} onChange={(event) => onChange("gameId", event.target.value)} disabled={mode === "edit"}>
               <option value="">Selecione...</option>
-              {libraryGames.map((game) => <option key={game.id} value={game.id}>{game.title}</option>)}
+              {libraryGames.map((game) => (
+                <option key={game.id} value={game.id}>
+                  {game.title}
+                </option>
+              ))}
             </select>
           </label>
           <label className="field">
@@ -472,8 +577,12 @@ export function SessionModal({
           </label>
         </div>
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={onClose}>Cancelar</NotchButton>
-          <NotchButton variant="primary" type="submit">{mode === "edit" ? "Salvar alterações" : "Salvar sessão"}</NotchButton>
+          <NotchButton variant="ghost" type="button" onClick={onClose}>
+            Cancelar
+          </NotchButton>
+          <NotchButton variant="primary" type="submit">
+            {mode === "edit" ? "Salvar alterações" : "Salvar sessão"}
+          </NotchButton>
         </div>
       </form>
     </Modal>
@@ -506,13 +615,21 @@ export function GoalModal({
           <label className="field">
             <span>Tipo</span>
             <select value={form.type} onChange={(event) => onChange("type", event.target.value)}>
-              {goalTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {goalTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </label>
           <label className="field">
             <span>Período</span>
             <select value={form.period} onChange={(event) => onChange("period", event.target.value)}>
-              {goalPeriodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {goalPeriodOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </label>
           <label className="field">
@@ -521,8 +638,12 @@ export function GoalModal({
           </label>
         </div>
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={onClose}>Cancelar</NotchButton>
-          <NotchButton variant="primary" type="submit">{mode === "edit" ? "Salvar alterações" : "Criar meta"}</NotchButton>
+          <NotchButton variant="ghost" type="button" onClick={onClose}>
+            Cancelar
+          </NotchButton>
+          <NotchButton variant="primary" type="submit">
+            {mode === "edit" ? "Salvar alterações" : "Criar meta"}
+          </NotchButton>
         </div>
       </form>
     </Modal>

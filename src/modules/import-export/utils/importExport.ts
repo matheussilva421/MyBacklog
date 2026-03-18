@@ -1,7 +1,34 @@
-import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry, LibraryEntryList as DbLibraryEntryList, PlaySession as DbPlaySession, Goal as DbGoal, List as DbList, Tag as DbTag, Review as DbReview, OwnershipStatus, Priority, ProgressStatus } from "../../../core/types";
-import { normalizeGameTitle, mergePlatformList } from "../../../core/utils";
+import type {
+  Game as DbGameMetadata,
+  LibraryEntry as DbLibraryEntry,
+  LibraryEntryList as DbLibraryEntryList,
+  PlaySession as DbPlaySession,
+  Goal as DbGoal,
+  List as DbList,
+  Review as DbReview,
+  Setting as DbSetting,
+  Tag as DbTag,
+  OwnershipStatus,
+  Priority,
+  ProgressStatus,
+} from "../../../core/types";
+import { mergePlatformList, normalizeGameTitle } from "../../../core/utils";
 import { composeLibraryRecords } from "../../library/utils";
-import type { BackupPayload, RestoreMode, ImportPreviewEntry, RestorePreview, ImportPayload, ImportSource } from "../../../backlog/shared";
+import type {
+  BackupPayload,
+  ImportMatchCandidate,
+  ImportPayload,
+  ImportPreviewEntry,
+  ImportRawgCandidate,
+  ImportSource,
+  RestoreMode,
+  RestorePreview,
+} from "../../../backlog/shared";
+
+type ImportDefaults = {
+  platform?: string;
+  sourceStore?: string;
+};
 
 export function normalizeImportValue(value: string): string {
   return value.trim().toLowerCase();
@@ -16,12 +43,12 @@ function splitCsvLine(line: string): string[] {
   let current = "";
   let insideQuotes = false;
 
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
     if (char === '"') {
-      if (insideQuotes && line[i + 1] === '"') {
+      if (insideQuotes && line[index + 1] === '"') {
         current += '"';
-        i += 1;
+        index += 1;
       } else {
         insideQuotes = !insideQuotes;
       }
@@ -58,13 +85,13 @@ function parseCsvRows(text: string): Array<Record<string, string>> {
 function parseMinutes(raw: string | number | undefined): number {
   if (typeof raw === "number") return Math.max(0, Math.round(raw));
   if (!raw) return 0;
-  const n = Number(String(raw).replace(",", "."));
-  return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
+  const parsed = Number(String(raw).replace(",", "."));
+  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0;
 }
 
 function parseHoursToMinutes(raw: string | number | undefined): number {
-  const n = typeof raw === "number" ? raw : Number(String(raw ?? "").replace(",", "."));
-  return Number.isFinite(n) ? Math.max(0, Math.round(n * 60)) : 0;
+  const parsed = typeof raw === "number" ? raw : Number(String(raw ?? "").replace(",", "."));
+  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed * 60)) : 0;
 }
 
 function mapOwnership(raw: string): OwnershipStatus {
@@ -95,11 +122,11 @@ function mapPriority(raw: string): Priority {
   return "medium";
 }
 
-function defaultPayload(title: string): ImportPayload {
+function defaultPayload(title: string, defaults?: ImportDefaults): ImportPayload {
   return {
     title,
-    platform: "PC",
-    sourceStore: "Manual",
+    platform: defaults?.platform || "PC",
+    sourceStore: defaults?.sourceStore || "Manual",
     format: "digital",
     ownershipStatus: "owned",
     progressStatus: "not_started",
@@ -109,12 +136,29 @@ function defaultPayload(title: string): ImportPayload {
   };
 }
 
-function fromCsvRows(rows: Array<Record<string, string>>, fallbackStore: string): ImportPayload[] {
+function defaultStoreForSource(source: ImportSource, defaults?: ImportDefaults): string {
+  if (defaults?.sourceStore?.trim()) return defaults.sourceStore.trim();
+  if (source === "steam") return "Steam";
+  if (source === "playnite") return "Playnite";
+  return "CSV";
+}
+
+function applyImportDefaults(payload: ImportPayload, defaults?: ImportDefaults): ImportPayload {
+  return {
+    ...payload,
+    platform: payload.platform.trim() || defaults?.platform || "PC",
+    sourceStore: payload.sourceStore.trim() || defaults?.sourceStore || "Manual",
+  };
+}
+
+function fromCsvRows(rows: Array<Record<string, string>>, source: ImportSource, defaults?: ImportDefaults): ImportPayload[] {
+  const fallbackStore = defaultStoreForSource(source, defaults);
   return rows
     .map((row) => {
       const title = row.title || row.name;
       if (!title) return null;
-      const payload = defaultPayload(title);
+
+      const payload = defaultPayload(title, defaults);
       payload.platform = row.platform || row.plataforma || payload.platform;
       payload.sourceStore = row.sourcestore || row.loja || row.source || fallbackStore;
       payload.ownershipStatus = mapOwnership(row.ownershipstatus || row.ownership || row.posse || "");
@@ -132,12 +176,12 @@ function fromCsvRows(rows: Array<Record<string, string>>, fallbackStore: string)
       payload.coverUrl = row.coverurl || row.cover || undefined;
       payload.developer = row.developer || row.studio || undefined;
       payload.publisher = row.publisher || row.publishers || undefined;
-      return payload;
+      return applyImportDefaults(payload, defaults);
     })
     .filter((value): value is ImportPayload => Boolean(value));
 }
 
-export function parseImportText(source: ImportSource, text: string): ImportPayload[] {
+export function parseImportText(source: ImportSource, text: string, defaults?: ImportDefaults): ImportPayload[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
 
@@ -149,12 +193,13 @@ export function parseImportText(source: ImportSource, text: string): ImportPaylo
       .map((item: Record<string, unknown>) => {
         const title = String(item.name ?? item.title ?? item.Name ?? "").trim();
         if (!title) return null;
-        const payload = defaultPayload(title);
-        payload.platform = String(item.platform ?? item.platforms ?? item.Platforms ?? payload.platform)
-          .split(",")[0]
-          .trim() || payload.platform;
+
+        const payload = defaultPayload(title, defaults);
+        payload.platform =
+          String(item.platform ?? item.platforms ?? item.Platforms ?? payload.platform).split(",")[0].trim() ||
+          payload.platform;
         payload.sourceStore = String(
-          item.sourceStore ?? item.store ?? item.Source ?? (source === "steam" ? "Steam" : "Playnite"),
+          item.sourceStore ?? item.store ?? item.Source ?? defaultStoreForSource(source, defaults),
         );
         payload.ownershipStatus = mapOwnership(String(item.ownershipStatus ?? item.Owned ?? "owned"));
         payload.progressStatus = mapProgress(String(item.progressStatus ?? item.CompletionStatus ?? "not_started"));
@@ -173,38 +218,13 @@ export function parseImportText(source: ImportSource, text: string): ImportPaylo
         payload.coverUrl = String(item.coverUrl ?? item.background_image ?? "") || undefined;
         payload.developer = String(item.developer ?? item.Developer ?? "") || undefined;
         payload.publisher = String(item.publisher ?? item.Publisher ?? "") || undefined;
-        return payload;
+        return applyImportDefaults(payload, defaults);
       })
       .filter((value): value is ImportPayload => Boolean(value));
   }
 
   const rows = parseCsvRows(trimmed);
-  return fromCsvRows(rows, source === "steam" ? "Steam" : source === "playnite" ? "Playnite" : "CSV");
-}
-
-export function dedupeImport(
-  incoming: ImportPayload[],
-  existing: Array<Pick<ImportPayload, "title" | "platform">>,
-): { toCreate: ImportPayload[]; duplicates: number } {
-  const existingMap = new Map(existing.map((game) => [createImportKey(game.title, game.platform), game]));
-  const batchMap = new Map<string, ImportPayload>();
-  let duplicates = 0;
-
-  for (const item of incoming) {
-    const key = createImportKey(item.title, item.platform);
-    if (existingMap.has(key) || batchMap.has(key)) {
-      duplicates += 1;
-      const previous = batchMap.get(key);
-      if (previous) {
-        previous.playtimeMinutes = Math.max(previous.playtimeMinutes, item.playtimeMinutes);
-        previous.completionPercent = Math.max(previous.completionPercent, item.completionPercent);
-      }
-      continue;
-    }
-    batchMap.set(key, item);
-  }
-
-  return { toCreate: Array.from(batchMap.values()), duplicates };
+  return fromCsvRows(rows, source, defaults);
 }
 
 function escapeCsv(value: string | number | undefined): string {
@@ -241,6 +261,7 @@ export function gamesToCsv(records: ImportPayload[]): string {
   );
   return [headers.join(","), ...rows].join("\n");
 }
+
 export function recordToImportPayload(record: { game: DbGameMetadata; libraryEntry: DbLibraryEntry }): ImportPayload {
   const { game, libraryEntry } = record;
   return {
@@ -271,14 +292,22 @@ export function recordToImportPayload(record: { game: DbGameMetadata; libraryEnt
 
 function progressStatusWeight(status: ProgressStatus): number {
   switch (status) {
-    case "completed_100": return 6;
-    case "finished": return 5;
-    case "playing": return 4;
-    case "paused": return 3;
-    case "replay_later": return 2;
-    case "abandoned": return 1;
-    case "archived": return 0;
-    default: return 2;
+    case "completed_100":
+      return 6;
+    case "finished":
+      return 5;
+    case "playing":
+      return 4;
+    case "paused":
+      return 3;
+    case "replay_later":
+      return 2;
+    case "abandoned":
+      return 1;
+    case "archived":
+      return 0;
+    default:
+      return 2;
   }
 }
 
@@ -331,10 +360,31 @@ function mergeImportPayloads(current: ImportPayload, incoming: ImportPayload): I
   };
 }
 
-export function buildImportPreview(parsed: ImportPayload[], existingRecords: Array<{ game: DbGameMetadata; libraryEntry: DbLibraryEntry }>): ImportPreviewEntry[] {
-  const existingMap = new Map(
-    existingRecords.map((record) => [createImportKey(record.game.title, record.libraryEntry.platform), record]),
+function createMatchCandidate(record: { game: DbGameMetadata; libraryEntry: DbLibraryEntry }, confidence: "exact" | "title"): ImportMatchCandidate {
+  return {
+    entryId: record.libraryEntry.id ?? 0,
+    title: record.game.title,
+    platform: record.libraryEntry.platform,
+    sourceStore: record.libraryEntry.sourceStore,
+    confidence,
+  };
+}
+
+export function buildImportPreview(
+  parsed: ImportPayload[],
+  existingRecords: Array<{ game: DbGameMetadata; libraryEntry: DbLibraryEntry }>,
+): ImportPreviewEntry[] {
+  const existingExactMap = new Map(
+    existingRecords.map((record) => [createImportKey(record.game.title, record.libraryEntry.platform), record] as const),
   );
+  const existingByTitle = new Map<string, Array<{ game: DbGameMetadata; libraryEntry: DbLibraryEntry }>>();
+  for (const record of existingRecords) {
+    const normalizedTitle = normalizeGameTitle(record.game.title);
+    const current = existingByTitle.get(normalizedTitle) ?? [];
+    current.push(record);
+    existingByTitle.set(normalizedTitle, current);
+  }
+
   const previewMap = new Map<string, ImportPreviewEntry>();
 
   for (const item of parsed) {
@@ -346,26 +396,66 @@ export function buildImportPreview(parsed: ImportPayload[], existingRecords: Arr
       continue;
     }
 
-    const existing = existingMap.get(key);
+    const exactRecord = existingExactMap.get(key);
+    const titleCandidates = (existingByTitle.get(normalizeGameTitle(item.title)) ?? [])
+      .map((record) =>
+        exactRecord?.libraryEntry.id === record.libraryEntry.id ? createMatchCandidate(record, "exact") : createMatchCandidate(record, "title"),
+      )
+      .filter((candidate) => candidate.entryId > 0);
+
+    const hasExactMatch = exactRecord?.libraryEntry.id != null;
     previewMap.set(key, {
       id: `${key}-${previewMap.size + 1}`,
       key,
       payload: item,
-      status: existing ? "existing" : "new",
-      action: existing ? "update" : "create",
-      existingId: existing?.libraryEntry.id,
-      existingTitle: existing?.game.title,
+      status: hasExactMatch ? "existing" : titleCandidates.length > 0 ? "review" : "new",
+      action: hasExactMatch ? "update" : "create",
+      existingId: exactRecord?.libraryEntry.id,
+      existingTitle: exactRecord?.game.title,
       duplicateCount: 0,
+      matchCandidates: titleCandidates,
+      selectedMatchId: exactRecord?.libraryEntry.id ?? null,
+      rawgCandidates: [],
+      selectedRawgId: null,
+      enrichmentStatus: "idle",
     });
   }
 
   return Array.from(previewMap.values()).sort((left, right) => {
-    if (left.status !== right.status) return left.status === "new" ? -1 : 1;
+    const statusRank = { new: 0, review: 1, existing: 2 };
+    if (left.status !== right.status) return statusRank[left.status] - statusRank[right.status];
     return left.payload.title.localeCompare(right.payload.title, "pt-BR");
   });
 }
 
-export function createDbGameFromImport(item: ImportPayload, currentGame?: DbGameMetadata, currentEntry?: DbLibraryEntry): { game: DbGameMetadata; libraryEntry: DbLibraryEntry } {
+export function attachRawgCandidatesToPreview(
+  preview: ImportPreviewEntry[],
+  candidateMap: Map<string, ImportRawgCandidate[]>,
+): ImportPreviewEntry[] {
+  return preview.map((entry) => {
+    const candidates = candidateMap.get(entry.key) ?? [];
+    const bestCandidate = candidates[0];
+    const selectedRawgId = bestCandidate && bestCandidate.score >= 88 ? bestCandidate.rawgId : entry.selectedRawgId;
+
+    return {
+      ...entry,
+      rawgCandidates: candidates,
+      selectedRawgId,
+      enrichmentStatus:
+        candidates.length === 0
+          ? "missing"
+          : selectedRawgId != null
+            ? "matched"
+            : "ambiguous",
+    };
+  });
+}
+
+export function createDbGameFromImport(
+  item: ImportPayload,
+  currentGame?: DbGameMetadata,
+  currentEntry?: DbLibraryEntry,
+): { game: DbGameMetadata; libraryEntry: DbLibraryEntry } {
   const now = new Date().toISOString();
   return {
     game: {
@@ -376,7 +466,10 @@ export function createDbGameFromImport(item: ImportPayload, currentGame?: DbGame
       coverUrl: item.coverUrl || currentGame?.coverUrl,
       rawgId: item.rawgId ?? currentGame?.rawgId,
       genres: item.genres || currentGame?.genres,
-      estimatedTime: item.estimatedTime || currentGame?.estimatedTime || (item.playtimeMinutes ? `${Math.max(1, Math.round(item.playtimeMinutes / 60))}h` : "Sem dado"),
+      estimatedTime:
+        item.estimatedTime ||
+        currentGame?.estimatedTime ||
+        (item.playtimeMinutes ? `${Math.max(1, Math.round(item.playtimeMinutes / 60))}h` : "Sem dado"),
       difficulty: item.difficulty || currentGame?.difficulty || "Média",
       releaseYear: item.releaseYear ?? currentGame?.releaseYear,
       platforms: mergePlatformList(currentGame?.platforms, item.platform),
@@ -411,10 +504,15 @@ export function createDbGameFromImport(item: ImportPayload, currentGame?: DbGame
   };
 }
 
-export function mergeImportedGame(existing: { game: DbGameMetadata; libraryEntry: DbLibraryEntry }, incoming: ImportPayload): { game: DbGameMetadata; libraryEntry: DbLibraryEntry } {
+export function mergeImportedGame(
+  existing: { game: DbGameMetadata; libraryEntry: DbLibraryEntry },
+  incoming: ImportPayload,
+): { game: DbGameMetadata; libraryEntry: DbLibraryEntry } {
   const merged = createDbGameFromImport(incoming, existing.game, existing.libraryEntry);
   const completionPercent = Math.max(existing.libraryEntry.completionPercent || 0, incoming.completionPercent || 0);
-  const priority = priorityWeight(incoming.priority) > priorityWeight(existing.libraryEntry.priority) ? incoming.priority : existing.libraryEntry.priority;
+  const priority = priorityWeight(incoming.priority) > priorityWeight(existing.libraryEntry.priority)
+    ? incoming.priority
+    : existing.libraryEntry.priority;
 
   return {
     game: {
@@ -439,34 +537,48 @@ export function mergeImportedGame(existing: { game: DbGameMetadata; libraryEntry
   };
 }
 
-export function buildRestorePreview(
-  payload: BackupPayload,
-  mode: RestoreMode,
-  tables: {
-    games: DbGameMetadata[];
-    libraryEntries: DbLibraryEntry[];
-    playSessions: DbPlaySession[];
-    reviews: DbReview[];
-    lists: DbList[];
-    libraryEntryLists: DbLibraryEntryList[];
-    tags: DbTag[];
-    gameTags: Array<{ libraryEntryId: number; tagId: number }>;
-    goals: DbGoal[];
-  },
-): RestorePreview {
-  const { games, libraryEntries, playSessions, reviews, lists, libraryEntryLists, tags, gameTags, goals } = tables;
+type RestoreTables = {
+  games: DbGameMetadata[];
+  libraryEntries: DbLibraryEntry[];
+  playSessions: DbPlaySession[];
+  reviews: DbReview[];
+  lists: DbList[];
+  libraryEntryLists: DbLibraryEntryList[];
+  tags: DbTag[];
+  gameTags: Array<{ libraryEntryId: number; tagId: number }>;
+  goals: DbGoal[];
+  settings: DbSetting[];
+};
 
-  const currentGames = games;
-  const currentEntries = libraryEntries;
-  const currentSessions = new Set(playSessions.map((s) => `${s.libraryEntryId}::${s.date}::${s.durationMinutes}::${(s.note || "").trim().toLowerCase()}::${s.completionPercent ?? ""}`));
-  const currentReviewsByEntry = new Map(reviews.map((r) => [r.libraryEntryId, r]));
-  const currentListsByName = new Map(lists.map((l) => [l.name.trim().toLowerCase(), l]));
+export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, tables: RestoreTables): RestorePreview {
+  const {
+    games,
+    libraryEntries,
+    playSessions,
+    reviews,
+    lists,
+    libraryEntryLists,
+    tags,
+    gameTags,
+    goals,
+    settings,
+  } = tables;
+
+  const currentSessions = new Set(
+    playSessions.map(
+      (session) =>
+        `${session.libraryEntryId}::${session.date}::${session.durationMinutes}::${(session.note || "").trim().toLowerCase()}::${session.completionPercent ?? ""}`,
+    ),
+  );
+  const currentReviewsByEntry = new Map(reviews.map((review) => [review.libraryEntryId, review]));
+  const currentListsByName = new Map(lists.map((list) => [list.name.trim().toLowerCase(), list]));
   const currentLibraryEntryLists = new Set(libraryEntryLists.map((entry) => `${entry.libraryEntryId}::${entry.listId}`));
-  const currentTagsByName = new Map(tags.map((t) => [t.name.trim().toLowerCase(), t]));
-  const currentGameTags = new Set(gameTags.map((gt) => `${gt.libraryEntryId}::${gt.tagId}`));
-  const currentGoalsByKey = new Map(goals.map((g) => [`${g.type}::${g.period}`, g]));
+  const currentTagsByName = new Map(tags.map((tag) => [tag.name.trim().toLowerCase(), tag]));
+  const currentGameTags = new Set(gameTags.map((entry) => `${entry.libraryEntryId}::${entry.tagId}`));
+  const currentGoalsByKey = new Map(goals.map((goal) => [`${goal.type}::${goal.period}`, goal]));
+  const currentSettingsByKey = new Map(settings.map((setting) => [setting.key, setting]));
   const currentEntryByKey = new Map(
-    composeLibraryRecords(currentGames, currentEntries).map((record) => [
+    composeLibraryRecords(games, libraryEntries).map((record) => [
       createImportKey(record.game.title, record.libraryEntry.platform),
       record.libraryEntry,
     ]),
@@ -480,7 +592,7 @@ export function buildRestorePreview(
   let gameCreate = 0;
   let gameUpdate = 0;
   let gameSkip = 0;
-  const currentGamesByName = new Map(currentGames.map((game) => [game.normalizedTitle, game]));
+  const currentGamesByName = new Map(games.map((game) => [game.normalizedTitle, game]));
   for (const game of payload.games) {
     if (currentGamesByName.has(normalizeGameTitle(game.title))) gameUpdate += 1;
     else gameCreate += 1;
@@ -517,7 +629,8 @@ export function buildRestorePreview(
       sessionSkip += 1;
       continue;
     }
-    const signature = `${targetEntryId}::${session.date}::${session.durationMinutes}::${(session.note || "").trim().toLowerCase()}::${session.completionPercent ?? ""}`;
+    const signature =
+      `${targetEntryId}::${session.date}::${session.durationMinutes}::${(session.note || "").trim().toLowerCase()}::${session.completionPercent ?? ""}`;
     if (currentSessions.has(signature)) sessionSkip += 1;
     else sessionCreate += 1;
   }
@@ -550,7 +663,6 @@ export function buildRestorePreview(
     seenLists.add(key);
     const existing = currentListsByName.get(key);
     if (existing?.id != null && list.id != null) resolvedListIdByPayloadId.set(list.id, existing.id);
-    if (list.id != null && !resolvedListIdByPayloadId.has(list.id)) resolvedListIdByPayloadId.set(list.id, list.id);
     if (existing) listUpdate += 1;
     else listCreate += 1;
   }
@@ -565,13 +677,11 @@ export function buildRestorePreview(
       libraryEntryListSkip += 1;
       continue;
     }
-
     const key = `${targetEntryId}::${targetListId}`;
     if (currentLibraryEntryLists.has(key) || seenLibraryEntryLists.has(key)) {
       libraryEntryListSkip += 1;
       continue;
     }
-
     seenLibraryEntryLists.add(key);
     libraryEntryListCreate += 1;
   }
@@ -626,6 +736,21 @@ export function buildRestorePreview(
     else goalCreate += 1;
   }
 
+  let settingCreate = 0;
+  let settingUpdate = 0;
+  let settingSkip = 0;
+  const seenSettings = new Set<string>();
+  for (const setting of payload.settings) {
+    const key = setting.key.trim();
+    if (!key || seenSettings.has(key)) {
+      settingSkip += 1;
+      continue;
+    }
+    seenSettings.add(key);
+    if (currentSettingsByKey.has(key)) settingUpdate += 1;
+    else settingCreate += 1;
+  }
+
   return {
     mode,
     payload,
@@ -641,9 +766,11 @@ export function buildRestorePreview(
       { label: "Tags", create: tagCreate, update: tagUpdate, skip: tagSkip },
       { label: "Relações tag", create: gameTagCreate, update: 0, skip: gameTagSkip },
       { label: "Metas", create: goalCreate, update: goalUpdate, skip: goalSkip },
+      { label: "Configurações", create: settingCreate, update: settingUpdate, skip: settingSkip },
     ],
   };
 }
+
 export function parseBackupText(text: string): BackupPayload | null {
   try {
     const data = JSON.parse(text);
@@ -657,6 +784,7 @@ export function parseBackupText(text: string): BackupPayload | null {
     ) {
       return null;
     }
+
     return {
       ...data,
       playSessions: Array.isArray(data.playSessions) ? data.playSessions : [],
@@ -666,6 +794,7 @@ export function parseBackupText(text: string): BackupPayload | null {
       tags: Array.isArray(data.tags) ? data.tags : [],
       gameTags: Array.isArray(data.gameTags) ? data.gameTags : [],
       goals: Array.isArray(data.goals) ? data.goals : [],
+      settings: Array.isArray(data.settings) ? data.settings : [],
     };
   } catch {
     return null;

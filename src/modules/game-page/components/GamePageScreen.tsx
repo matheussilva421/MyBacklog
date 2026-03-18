@@ -186,6 +186,39 @@ export function GamePageScreen({
             <ProgressBar value={data.game.progress} tone="sunset" />
           </div>
 
+          {data.record.game.coverUrl ? (
+            <div className="game-page-cover">
+              <img src={data.record.game.coverUrl} alt={`Capa de ${data.game.title}`} />
+            </div>
+          ) : null}
+
+          <div className="game-page-metadata-grid">
+            <div className="detail-stat">
+              <span>Fonte</span>
+              <strong>{data.record.libraryEntry.sourceStore || "Manual"}</strong>
+            </div>
+            <div className="detail-stat">
+              <span>Formato</span>
+              <strong>{data.record.libraryEntry.format}</strong>
+            </div>
+            <div className="detail-stat">
+              <span>Estúdio</span>
+              <strong>{data.record.game.developer || "--"}</strong>
+            </div>
+            <div className="detail-stat">
+              <span>Publisher</span>
+              <strong>{data.record.game.publisher || "--"}</strong>
+            </div>
+            <div className="detail-stat">
+              <span>Plataformas</span>
+              <strong>{data.record.game.platforms || data.game.platform}</strong>
+            </div>
+            <div className="detail-stat">
+              <span>RAWG</span>
+              <strong>{data.record.game.rawgId ? `#${data.record.game.rawgId}` : "Manual"}</strong>
+            </div>
+          </div>
+
           <div className="game-page-action-grid">
             <NotchButton variant="primary" onClick={() => onOpenSession(data.game.id)}>
               <Clock3 size={14} />

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { Game, LibraryRecord } from "../../../backlog/shared";
 import type { Goal, LibraryEntryList, List, PlaySession, Review, Tag } from "../../../core/types";
 import type { PlannerGoalSignals } from "../../planner/utils/goals";
+import type { AppPreferences } from "../../settings/utils/preferences";
 import { buildGamePageData } from "../utils/gamePageData";
 
 type UseSelectedGamePageArgs = {
@@ -15,6 +16,7 @@ type UseSelectedGamePageArgs = {
   reviewByEntryId: Map<number, Review>;
   goalRows: Goal[];
   plannerGoalSignals: PlannerGoalSignals;
+  preferences: AppPreferences;
 };
 
 export function useSelectedGamePage({
@@ -28,6 +30,7 @@ export function useSelectedGamePage({
   reviewByEntryId,
   goalRows,
   plannerGoalSignals,
+  preferences,
 }: UseSelectedGamePageArgs) {
   return useMemo(() => {
     if (!selectedGame || !selectedRecord?.libraryEntry.id) return null;
@@ -52,6 +55,7 @@ export function useSelectedGamePage({
       lists,
       goals: goalRows,
       goalSignals: plannerGoalSignals,
+      preferences,
     });
   }, [
     gameTagRows,
@@ -59,6 +63,7 @@ export function useSelectedGamePage({
     libraryEntryListRows,
     listById,
     plannerGoalSignals,
+    preferences,
     reviewByEntryId,
     selectedGame,
     selectedRecord,

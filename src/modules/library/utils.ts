@@ -23,6 +23,7 @@ export function dbGameToUiGame(record: LibraryRecord): Game {
     id: libraryEntry.id ?? Date.now(),
     title: game.title,
     platform: libraryEntry.platform || game.platforms?.split(",")[0]?.trim() || "PC",
+    sourceStore: libraryEntry.sourceStore || "Manual",
     genre,
     status: dbStatusToStatus(libraryEntry),
     progress: Math.max(0, Math.min(100, Math.round(libraryEntry.completionPercent || 0))),

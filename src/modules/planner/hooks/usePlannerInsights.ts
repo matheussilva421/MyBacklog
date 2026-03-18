@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { Game, Goal as GoalCard, PlannerEntry } from "../../../backlog/shared";
 import type { Goal as DbGoal, LibraryEntry as DbLibraryEntry, PlaySession as DbPlaySession } from "../../../core/types";
+import type { AppPreferences } from "../../settings/utils/preferences";
 import { buildPlannerFit, buildPlannerReason, computePlannerScore } from "../utils/scoring";
 import { createGoalProgressCards, createPlannerGoalSignals, resolveGoalRows } from "../utils/goals";
 
@@ -10,6 +11,7 @@ type UsePlannerInsightsArgs = {
   sessionRows: DbPlaySession[];
   goalRows: DbGoal[];
   fallbackGoalProgress: GoalCard[];
+  preferences: AppPreferences;
 };
 
 export function usePlannerInsights({
@@ -18,6 +20,7 @@ export function usePlannerInsights({
   sessionRows,
   goalRows,
   fallbackGoalProgress,
+  preferences,
 }: UsePlannerInsightsArgs) {
   const resolvedGoalRows = useMemo(
     () => resolveGoalRows(goalRows, libraryEntryRows, sessionRows),
@@ -32,16 +35,20 @@ export function usePlannerInsights({
   const computedPlannerQueue = useMemo<PlannerEntry[]>(() => {
     return games
       .filter((game) => game.status !== "Terminado" && game.status !== "Wishlist")
-      .sort((left, right) => computePlannerScore(right, plannerGoalSignals) - computePlannerScore(left, plannerGoalSignals))
+      .sort(
+        (left, right) =>
+          computePlannerScore(right, plannerGoalSignals, preferences) -
+          computePlannerScore(left, plannerGoalSignals, preferences),
+      )
       .slice(0, 4)
       .map((game, index) => ({
         rank: index + 1,
         gameId: game.id,
-        reason: buildPlannerReason(game, plannerGoalSignals),
+        reason: buildPlannerReason(game, plannerGoalSignals, preferences),
         eta: game.eta,
-        fit: buildPlannerFit(game, plannerGoalSignals),
+        fit: buildPlannerFit(game, plannerGoalSignals, preferences),
       }));
-  }, [games, plannerGoalSignals]);
+  }, [games, plannerGoalSignals, preferences]);
 
   const goalProgress = useMemo<GoalCard[]>(
     () => (resolvedGoalRows.length > 0 ? createGoalProgressCards(resolvedGoalRows) : fallbackGoalProgress),

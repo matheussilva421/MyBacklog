@@ -75,6 +75,7 @@ export type Game = {
   id: number;
   title: string;
   platform: string;
+  sourceStore: string;
   genre: string;
   status: Status;
   progress: number;
@@ -147,6 +148,7 @@ export type Achievement = {
 export type GameFormState = {
   title: string;
   platform: string;
+  sourceStore: string;
   genre: string;
   status: Status;
   priority: Priority;
@@ -190,15 +192,36 @@ export const goalPeriodOptions: Array<{ value: Period; label: string }> = [
 
 export type ImportPreviewAction = "create" | "update" | "ignore";
 
+export type ImportMatchCandidate = {
+  entryId: number;
+  title: string;
+  platform: string;
+  sourceStore: string;
+  confidence: "exact" | "title";
+};
+
+export type ImportRawgCandidate = {
+  rawgId: number;
+  title: string;
+  releaseYear?: number;
+  platforms: string[];
+  score: number;
+};
+
 export type ImportPreviewEntry = {
   id: string;
   key: string;
   payload: ImportPayload;
-  status: "new" | "existing";
+  status: "new" | "existing" | "review";
   action: ImportPreviewAction;
   existingId?: number;
   existingTitle?: string;
   duplicateCount: number;
+  matchCandidates: ImportMatchCandidate[];
+  selectedMatchId: number | null;
+  rawgCandidates: ImportRawgCandidate[];
+  selectedRawgId: number | null;
+  enrichmentStatus: "idle" | "matched" | "ambiguous" | "missing";
 };
 
 export type BackupPayload = {
@@ -214,6 +237,7 @@ export type BackupPayload = {
   tags: DbTag[];
   gameTags: DbGameTag[];
   goals: DbGoal[];
+  settings: DbSetting[];
 };
 
 export type BackupTables = Omit<BackupPayload, "version" | "exportedAt" | "source">;
@@ -314,10 +338,36 @@ export { composeLibraryRecords, dbGameToUiGame } from "../modules/library/utils"
 export { createDbGameFromForm, createGameFormState } from "../modules/game-page/utils/formState";
 export { createSessionFormState, defaultSessionToDbSession } from "../modules/sessions/utils/sessionForm";
 export { buildPlannerFit, buildPlannerReason, computePlannerScore } from "../modules/planner/utils/scoring";
-export { buildImportPreview, buildRestorePreview, recordToImportPayload, parseBackupText, gamesToCsv, parseImportText } from "../modules/import-export/utils/importExport";
+export {
+  attachRawgCandidatesToPreview,
+  buildImportPreview,
+  buildRestorePreview,
+  recordToImportPayload,
+  parseBackupText,
+  gamesToCsv,
+  parseImportText,
+} from "../modules/import-export/utils/importExport";
 export { backlogByDuration, platformDistribution, yearlyEvolution } from "../modules/dashboard/utils/dashboardData";
 export { plannerQueue, tacticalGoals, systemRules } from "../modules/planner/utils/plannerData";
 export { screenMeta } from "../modules/dashboard/utils/navigationData";
 export { profileAchievements } from "../modules/settings/utils/profileData";
 export { defaultGames, defaultSessions, defaultGameToDbGame, defaultGameToDbLibraryEntry } from "../core/defaults";
 export { createDbGameFromImport, mergeImportedGame } from "../modules/import-export/utils/importExport";
+export {
+  createPreferencesDraft,
+  getDefaultPreferences,
+  normalizePreferencesDraft,
+  onboardingGoalTemplates,
+  parseAppPreferences,
+  plannerPreferenceOptions,
+  preferencesToSettingPairs,
+  settingsKeys,
+  suggestedPlatforms,
+  suggestedStarterLists,
+  suggestedStores,
+  toggleTokenInText,
+  type AppPreferences,
+  type OnboardingGoalTemplate,
+  type PlannerPreference,
+  type PreferencesDraft,
+} from "../modules/settings/utils/preferences";

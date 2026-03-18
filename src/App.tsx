@@ -5,6 +5,7 @@ import { NotchButton, Panel, SectionHeader, SidebarItem, Tag } from "./component
 import { useBacklogApp } from "./hooks/useBacklogApp";
 import { DashboardScreen } from "./modules/dashboard/components/DashboardScreen";
 import { GamePageScreen } from "./modules/game-page/components/GamePageScreen";
+import { OnboardingScreen } from "./modules/onboarding/components/OnboardingScreen";
 import { LibraryScreen } from "./modules/library/components/LibraryScreen";
 import { PlannerScreen } from "./modules/planner/components/PlannerScreen";
 import { ProfileScreen } from "./modules/settings/components/ProfileScreen";
@@ -12,6 +13,34 @@ import { StatsScreen } from "./modules/stats/components/StatsScreen";
 
 export default function App() {
   const app = useBacklogApp();
+
+  if (app.loading) {
+    return (
+      <div className="app-shell">
+        <div className="app-shell__backdrop" aria-hidden="true" />
+        <div className="app-layout">
+          <main className="main-column">
+            <div className="system-banner">
+              <span>Sincronizando biblioteca local...</span>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (!app.hasCompletedOnboarding) {
+    return (
+      <OnboardingScreen
+        initialDraft={app.onboardingInitialDraft}
+        initialLists={app.onboardingInitialLists}
+        initialGoalIds={app.onboardingInitialGoalIds}
+        notice={app.notice}
+        submitting={app.submitting}
+        onSubmit={app.handleOnboardingSubmit}
+      />
+    );
+  }
 
   let screenContent = null;
 
@@ -84,9 +113,9 @@ export default function App() {
         achievementCards={app.achievementCards}
         totalGames={app.stats.total}
         totalHours={app.stats.hours}
-        displayName={app.displayName}
+        preferences={app.preferences}
         listRows={app.listRows}
-        onSettingSave={app.handleSettingSave}
+        onPreferencesSave={app.handlePreferencesSave}
         onListCreate={app.handleListCreate}
         onListDelete={app.handleListDelete}
       />
@@ -287,6 +316,8 @@ export default function App() {
         onTextChange={app.handleImportTextChange}
         onFileChange={app.handleImportFileChange}
         onActionChange={app.handleImportPreviewActionChange}
+        onMatchChange={app.handleImportPreviewMatchChange}
+        onRawgChange={app.handleImportPreviewRawgChange}
         onSubmit={app.handleImportSubmit}
       />
 

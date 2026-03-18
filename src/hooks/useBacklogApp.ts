@@ -1,5 +1,5 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent, FormEvent } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { db } from "../core/db";
 import type {
   Game as DbGameMetadata,
@@ -15,11 +15,8 @@ import type {
   Setting as DbSetting,
   Tag as DbTag,
 } from "../core/types";
-import { useDashboardInsights } from "../modules/dashboard/hooks/useDashboardInsights";
-import { useSelectedGamePage } from "../modules/game-page/hooks/useSelectedGamePage";
-import { useLibraryState } from "../modules/library/hooks/useLibraryState";
-import { usePlannerInsights } from "../modules/planner/hooks/usePlannerInsights";
 import {
+  attachRawgCandidatesToPreview,
   buildImportPreview,
   buildRestorePreview,
   composeLibraryRecords,
@@ -27,45 +24,102 @@ import {
   createDbGameFromForm,
   createDbGameFromImport,
   createGameFormState,
+  createPreferencesDraft,
   createSessionFormState,
   dbGameToUiGame,
   defaultGameToDbGame,
   defaultGameToDbLibraryEntry,
   defaultGames,
-  defaultSessionToDbSession,
-  defaultSessions,
   downloadText,
   formatDuration,
+  gamesToCsv,
   mergeImportedGame,
+  mergePlatformList,
+  normalizePreferencesDraft,
+  onboardingGoalTemplates,
   parseBackupText,
+  parseImportText,
+  preferencesToSettingPairs,
   recordToImportPayload,
   screenMeta,
+  suggestedStarterLists,
   systemRules,
   tacticalGoals,
-  mergePlatformList,
   type BackupPayload,
   type BackupTables,
   type GameFormState,
   type GoalFormState,
-  type ImportPreviewAction,
-  type ImportPreviewEntry,
+  type ImportPayload,
   type LibraryListFilter,
-  type RestoreMode,
-  type RestorePreview,
   type ScreenKey,
   type SessionFormState,
   type StatusFilter,
-  type ImportSource,
-  gamesToCsv,
-  parseImportText,
 } from "../backlog/shared";
+import { useDashboardInsights } from "../modules/dashboard/hooks/useDashboardInsights";
+import { useSelectedGamePage } from "../modules/game-page/hooks/useSelectedGamePage";
+import { useImportExportState } from "../modules/import-export/hooks/useImportExportState";
+import {
+  applyRawgMetadataToImportPayload,
+  fetchRawgMetadata,
+  resolveBestRawgCandidate,
+  searchRawgCandidates,
+} from "../modules/import-export/utils/rawg";
+import { useLibraryState } from "../modules/library/hooks/useLibraryState";
+import { usePlannerInsights } from "../modules/planner/hooks/usePlannerInsights";
+import { useAppPreferences } from "../modules/settings/hooks/useAppPreferences";
+import type { PreferencesDraft } from "../modules/settings/utils/preferences";
 
-function normalizeTitle(title: string): string {
+function normalizeTitle(title: string) {
   return title.trim().toLowerCase();
 }
 
-function sortByUpdatedAtDesc<T extends { updatedAt: string }>(rows: T[]): T[] {
+function sortByUpdatedAtDesc<T extends { updatedAt: string }>(rows: T[]) {
   return [...rows].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+async function seedDefaultLibrary() {
+  await db.transaction("rw", db.games, db.libraryEntries, async () => {
+    for (const template of defaultGames) {
+      const game = defaultGameToDbGame(template);
+      const gameId = Number(await db.games.add(game));
+      const libraryEntry = defaultGameToDbLibraryEntry(template);
+      await db.libraryEntries.add({ ...libraryEntry, gameId });
+    }
+  });
+}
+
+async function upsertSettingsRows(pairs: Array<{ key: string; value: string }>) {
+  const existingRows = await db.settings.toArray();
+  const existingByKey = new Map(existingRows.map((row) => [row.key, row] as const));
+  for (const pair of pairs) {
+    const existing = existingByKey.get(pair.key);
+    if (existing?.id != null) {
+      await db.settings.update(existing.id, { value: pair.value, updatedAt: new Date().toISOString() });
+    } else {
+      await db.settings.add({ key: pair.key, value: pair.value, updatedAt: new Date().toISOString() });
+    }
+  }
+}
+
+async function fetchRawgCandidateMap(preview: Array<{ key: string; payload: { title: string } }>, apiKey: string) {
+  const candidateMap = new Map<string, Awaited<ReturnType<typeof searchRawgCandidates>>>();
+  const results = await Promise.allSettled(
+    preview.map(async (entry) => ({ key: entry.key, candidates: await searchRawgCandidates(entry.payload.title, apiKey) })),
+  );
+  for (const result of results) {
+    if (result.status === "fulfilled") candidateMap.set(result.value.key, result.value.candidates);
+  }
+  return candidateMap;
+}
+
+async function fetchSelectedRawgMetadata(preview: Array<{ selectedRawgId: number | null }>, apiKey: string) {
+  const uniqueRawgIds = Array.from(new Set(preview.map((entry) => entry.selectedRawgId).filter((rawgId): rawgId is number => typeof rawgId === "number" && rawgId > 0)));
+  const metadataMap = new Map<number, Awaited<ReturnType<typeof fetchRawgMetadata>>>();
+  const results = await Promise.allSettled(uniqueRawgIds.map(async (rawgId) => ({ rawgId, metadata: await fetchRawgMetadata(rawgId, apiKey) })));
+  for (const result of results) {
+    if (result.status === "fulfilled") metadataMap.set(result.value.rawgId, result.value.metadata);
+  }
+  return metadataMap;
 }
 
 export function useBacklogApp() {
@@ -95,34 +149,16 @@ export function useBacklogApp() {
   const [goalModalMode, setGoalModalMode] = useState<"create" | "edit" | null>(null);
   const [goalForm, setGoalForm] = useState<GoalFormState>({ type: "finished", target: "", period: "monthly" });
   const [editingGoalId, setEditingGoalId] = useState<number | null>(null);
-  const [importModalOpen, setImportModalOpen] = useState(false);
-  const [importSource, setImportSource] = useState<ImportSource>("csv");
-  const [importText, setImportText] = useState("");
-  const [importFileName, setImportFileName] = useState("");
-  const [importPreview, setImportPreview] = useState<ImportPreviewEntry[] | null>(null);
-  const importFileInputRef = useRef<HTMLInputElement | null>(null);
-  const [restoreModalOpen, setRestoreModalOpen] = useState(false);
-  const [restoreMode, setRestoreMode] = useState<RestoreMode>("merge");
-  const [restoreText, setRestoreText] = useState("");
-  const [restoreFileName, setRestoreFileName] = useState("");
-  const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null);
-  const restoreFileInputRef = useRef<HTMLInputElement | null>(null);
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
+  const importState = useImportExportState(setNotice);
+  const preferences = useAppPreferences(settingRows);
 
   const refreshData = async (seed = false) => {
     let storedEntries = await db.libraryEntries.orderBy("updatedAt").reverse().toArray();
     if (seed && storedEntries.length === 0) {
-      await db.transaction("rw", db.games, db.libraryEntries, async () => {
-        await db.games.bulkPut(defaultGames.map(defaultGameToDbGame));
-        await db.libraryEntries.bulkPut(defaultGames.map(defaultGameToDbLibraryEntry));
-      });
-      const existingSessions = await db.playSessions.count();
-      if (existingSessions === 0) {
-        await db.playSessions.bulkAdd(defaultSessions.map(defaultSessionToDbSession));
-      }
+      await seedDefaultLibrary();
       storedEntries = await db.libraryEntries.orderBy("updatedAt").reverse().toArray();
     }
-
     const [storedGames, storedSessions, storedReviews, storedTags, storedGameTags, storedGoals, storedLists, storedLibraryEntryLists, storedSettings] = await Promise.all([
       db.games.toArray(),
       db.playSessions.orderBy("date").reverse().toArray(),
@@ -175,43 +211,31 @@ export function useBacklogApp() {
   }, [listRows, selectedListFilter]);
 
   const records = useMemo(() => composeLibraryRecords(gameRows, libraryEntryRows), [gameRows, libraryEntryRows]);
-  const recordsByEntryId = useMemo(
-    () => new Map(records.map((record) => [record.libraryEntry.id, record] as const)),
-    [records],
-  );
-  const reviewByEntryId = useMemo(
-    () => new Map(reviewRows.map((review) => [review.libraryEntryId, review] as const)),
-    [reviewRows],
-  );
+  const recordsByEntryId = useMemo(() => new Map(records.map((record) => [record.libraryEntry.id, record] as const)), [records]);
+  const reviewByEntryId = useMemo(() => new Map(reviewRows.map((review) => [review.libraryEntryId, review] as const)), [reviewRows]);
   const tagById = useMemo(() => new Map(tagRows.map((tag) => [tag.id, tag] as const)), [tagRows]);
   const listById = useMemo(() => new Map(listRows.map((list) => [list.id, list] as const)), [listRows]);
   const games = useMemo(() => records.map(dbGameToUiGame), [records]);
-  const displayName = useMemo(() => {
-    const setting = settingRows.find((s) => s.key === "displayName");
-    return setting?.value || "Backlog OS";
-  }, [settingRows]);
+  const displayName = preferences.operatorName;
+  const hasCompletedOnboarding = preferences.onboardingCompleted;
+  const onboardingInitialDraft = useMemo(() => createPreferencesDraft(preferences), [preferences]);
+  const onboardingInitialLists = useMemo(() => (listRows.length > 0 ? listRows.map((list) => list.name) : Array.from(suggestedStarterLists.slice(0, 3))), [listRows]);
+  const onboardingInitialGoalIds = useMemo(() => {
+    const matchingTemplates = onboardingGoalTemplates.filter((template) => goalRows.some((goal) => goal.type === template.type && goal.period === template.period)).map((template) => template.id);
+    return matchingTemplates.length > 0 ? matchingTemplates : onboardingGoalTemplates.slice(0, 2).map((template) => template.id);
+  }, [goalRows]);
 
   const findGame = (id: number) => games.find((game) => game.id === id);
-
-  const { monthlyProgress, platformData, durationBuckets, stats, achievementCards } = useDashboardInsights({
-    games,
-    libraryEntryRows,
-    sessionRows,
-  });
-
+  const { monthlyProgress, platformData, durationBuckets, stats, achievementCards } = useDashboardInsights({ games, libraryEntryRows, sessionRows });
   const { resolvedGoalRows, plannerGoalSignals, computedPlannerQueue, goalProgress } = usePlannerInsights({
     games,
     libraryEntryRows,
     sessionRows,
     goalRows,
     fallbackGoalProgress: tacticalGoals,
+    preferences,
   });
-
-  const matchesQuery = (values: Array<string | number>) => {
-    if (!deferredQuery) return true;
-    return values.some((value) => String(value).toLowerCase().includes(deferredQuery));
-  };
-
+  const matchesQuery = (values: Array<string | number>) => !deferredQuery || values.some((value) => String(value).toLowerCase().includes(deferredQuery));
   const { listOptions, searchedGames, libraryGames, selectedGame, selectedRecord, selectedGameLists } = useLibraryState({
     games,
     recordsByEntryId,
@@ -226,27 +250,12 @@ export function useBacklogApp() {
   });
 
   useEffect(() => {
-    if (selectedGameId > 0 && libraryGames.some((game) => game.id === selectedGameId)) {
-      return;
-    }
-    if (libraryGames.length > 0) {
-      setSelectedGameId(libraryGames[0].id);
-      return;
-    }
-    if (selectedGameId > 0 && searchedGames.some((game) => game.id === selectedGameId)) {
-      return;
-    }
-    if (searchedGames.length > 0) {
-      setSelectedGameId(searchedGames[0].id);
-      return;
-    }
-    if (games.length > 0) {
-      setSelectedGameId(games[0].id);
-      return;
-    }
-    if (selectedGameId !== 0) {
-      setSelectedGameId(0);
-    }
+    if (selectedGameId > 0 && libraryGames.some((game) => game.id === selectedGameId)) return;
+    if (libraryGames.length > 0) return void setSelectedGameId(libraryGames[0].id);
+    if (selectedGameId > 0 && searchedGames.some((game) => game.id === selectedGameId)) return;
+    if (searchedGames.length > 0) return void setSelectedGameId(searchedGames[0].id);
+    if (games.length > 0) return void setSelectedGameId(games[0].id);
+    if (selectedGameId !== 0) setSelectedGameId(0);
   }, [games, libraryGames, searchedGames, selectedGameId]);
 
   const selectedGamePage = useSelectedGamePage({
@@ -260,56 +269,17 @@ export function useBacklogApp() {
     reviewByEntryId,
     goalRows: resolvedGoalRows,
     plannerGoalSignals,
+    preferences,
   });
 
-  const continuePlayingGames = useMemo(
-    () =>
-      games
-        .filter((game) => game.status === "Jogando" || game.status === "Pausado")
-        .sort(
-          (left, right) =>
-            computePlannerScore(right, plannerGoalSignals) - computePlannerScore(left, plannerGoalSignals),
-        )
-        .slice(0, 3)
-        .filter((game) => matchesQuery([game.title, game.genre, game.platform, game.notes])),
-    [games, plannerGoalSignals, deferredQuery],
-  );
-  const visiblePlannerQueue = useMemo(
-    () =>
-      computedPlannerQueue.filter((entry) => {
-        const game = findGame(entry.gameId);
-        return matchesQuery([game?.title ?? "", entry.reason, entry.fit, entry.eta]);
-      }),
-    [computedPlannerQueue, deferredQuery, games],
-  );
-  const visibleSessions = useMemo(
-    () =>
-      sessionRows.filter((entry) => {
-        const game = findGame(entry.libraryEntryId);
-        return matchesQuery([game?.title ?? "", game?.platform ?? "", entry.note ?? "", formatDuration(entry.durationMinutes)]);
-      }),
-    [deferredQuery, games, sessionRows],
-  );
-
-  const importPreviewSummary = useMemo(() => {
-    const summary = { create: 0, update: 0, ignore: 0, fresh: 0, existing: 0, duplicates: 0 };
-    for (const entry of importPreview ?? []) {
-      if (entry.action === "create") summary.create += 1;
-      if (entry.action === "update") summary.update += 1;
-      if (entry.action === "ignore") summary.ignore += 1;
-      if (entry.status === "new") summary.fresh += 1;
-      if (entry.status === "existing") summary.existing += 1;
-      summary.duplicates += entry.duplicateCount;
-    }
-    return summary;
-  }, [importPreview]);
-
-  const restorePreviewTotals = useMemo(() => (restorePreview?.items ?? []).reduce((totals, item) => { totals.create += item.create; totals.update += item.update; totals.skip += item.skip; return totals; }, { create: 0, update: 0, skip: 0 }), [restorePreview]);
+  const continuePlayingGames = useMemo(() => games.filter((game) => game.status === "Jogando" || game.status === "Pausado").sort((left, right) => computePlannerScore(right, plannerGoalSignals, preferences) - computePlannerScore(left, plannerGoalSignals, preferences)).slice(0, 3).filter((game) => matchesQuery([game.title, game.genre, game.platform, game.notes])), [games, plannerGoalSignals, preferences, deferredQuery]);
+  const visiblePlannerQueue = useMemo(() => computedPlannerQueue.filter((entry) => { const game = findGame(entry.gameId); return matchesQuery([game?.title ?? "", entry.reason, entry.fit, entry.eta]); }), [computedPlannerQueue, deferredQuery, games]);
+  const visibleSessions = useMemo(() => sessionRows.filter((entry) => { const game = findGame(entry.libraryEntryId); return matchesQuery([game?.title ?? "", game?.platform ?? "", entry.note ?? "", formatDuration(entry.durationMinutes)]); }), [deferredQuery, games, sessionRows]);
   const heroCopy = screenMeta[screen];
 
   const closeGameModal = () => setGameModalMode(null);
   const openCreateGameModal = () => {
-    setGameForm(createGameFormState());
+    setGameForm(createGameFormState(undefined, { platform: preferences.primaryPlatforms[0], sourceStore: preferences.defaultStores[0] }));
     setGameModalMode("create");
   };
   const openEditGameModal = () => {
@@ -329,14 +299,7 @@ export function useBacklogApp() {
   const openEditSessionModal = (session: DbPlaySession) => {
     if (!session.id) return;
     setSessionEditId(session.id);
-    setSessionForm({
-      gameId: String(session.libraryEntryId),
-      date: session.date,
-      durationMinutes: String(session.durationMinutes),
-      completionPercent: session.completionPercent != null ? String(session.completionPercent) : "",
-      mood: session.mood ?? "",
-      note: session.note ?? "",
-    });
+    setSessionForm({ gameId: String(session.libraryEntryId), date: session.date, durationMinutes: String(session.durationMinutes), completionPercent: session.completionPercent != null ? String(session.completionPercent) : "", mood: session.mood ?? "", note: session.note ?? "" });
     setSessionModalOpen(true);
   };
   const openGamePage = (gameId?: number) => {
@@ -348,34 +311,12 @@ export function useBacklogApp() {
     }
     setScreen("library");
   };
-  const resetImportPreview = () => setImportPreview(null);
-  const openImportFlow = () => {
-    setImportPreview(null);
-    setImportModalOpen(true);
+  const openLibraryGame = (gameId?: number) => {
+    if (typeof gameId === "number" && gameId > 0) setSelectedGameId(gameId);
+    setScreen("library");
   };
-  const closeImportFlow = () => {
-    setImportModalOpen(false);
-    setImportPreview(null);
-    setImportText("");
-    setImportFileName("");
-    if (importFileInputRef.current) importFileInputRef.current.value = "";
-  };
-  const resetRestorePreview = () => setRestorePreview(null);
-  const openRestoreFlow = () => {
-    setRestorePreview(null);
-    setRestoreModalOpen(true);
-  };
-  const closeRestoreFlow = () => {
-    setRestoreModalOpen(false);
-    setRestoreMode("merge");
-    setRestoreText("");
-    setRestoreFileName("");
-    setRestorePreview(null);
-    if (restoreFileInputRef.current) restoreFileInputRef.current.value = "";
-  };
-
   const readBackupTables = async (): Promise<BackupTables> => {
-    const [games, libraryEntries, playSessions, reviews, lists, libraryEntryLists, tags, gameTags, goals] = await Promise.all([
+    const [gamesRows, libraryEntries, playSessions, reviews, lists, libraryEntryLists, tags, gameTags, goals, settings] = await Promise.all([
       db.games.toArray(),
       db.libraryEntries.toArray(),
       db.playSessions.toArray(),
@@ -385,114 +326,75 @@ export function useBacklogApp() {
       db.tags.toArray(),
       db.gameTags.toArray(),
       db.goals.toArray(),
+      db.settings.toArray(),
     ]);
-    return { games, libraryEntries, playSessions, reviews, lists, libraryEntryLists, tags, gameTags, goals };
+    return { games: gamesRows, libraryEntries, playSessions, reviews, lists, libraryEntryLists, tags, gameTags, goals, settings };
   };
 
-  const handleGameFormChange = <K extends keyof GameFormState>(field: K, value: GameFormState[K]) => {
-    setGameForm((current) => ({ ...current, [field]: value }));
-  };
-  const handleSessionFormChange = <K extends keyof SessionFormState>(field: K, value: SessionFormState[K]) => {
-    setSessionForm((current) => ({ ...current, [field]: value }));
-  };
-  const handleImportSourceChange = (value: ImportSource) => {
-    setImportPreview(null);
-    setImportSource(value);
-  };
-  const handleImportTextChange = (value: string) => {
-    setImportPreview(null);
-    setImportText(value);
-  };
-  const handleRestoreModeChange = (value: RestoreMode) => {
-    setRestorePreview(null);
-    setRestoreMode(value);
-  };
-  const handleRestoreTextChange = (value: string) => {
-    setRestorePreview(null);
-    setRestoreText(value);
-  };
-  const handleImportPreviewActionChange = (entryId: string, action: ImportPreviewAction) => {
-    setImportPreview((current) => current?.map((entry) => (entry.id === entryId ? { ...entry, action } : entry)) ?? null);
-  };
-
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
-  const handleImportFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (file.size > MAX_FILE_SIZE) {
-      setNotice("Arquivo muito grande. O limite é 10MB.");
-      return;
-    }
-    try {
-      const nextText = await file.text();
-      setImportPreview(null);
-      setImportText(nextText);
-      setImportFileName(file.name);
-      setNotice(`Arquivo ${file.name} carregado. Revise os dados e confirme a importação.`);
-    } catch {
-      setNotice("Falha ao ler o arquivo de importação.");
-    }
-  };
-
-  const handleRestoreFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (file.size > MAX_FILE_SIZE) {
-      setNotice("Arquivo muito grande. O limite é 10MB.");
-      return;
-    }
-    try {
-      const nextText = await file.text();
-      setRestorePreview(null);
-      setRestoreText(nextText);
-      setRestoreFileName(file.name);
-      setNotice(`Backup ${file.name} carregado. Gere o preview antes de restaurar.`);
-    } catch {
-      setNotice("Falha ao ler o arquivo de backup.");
-    }
-  };
+  const handleGameFormChange = <K extends keyof GameFormState>(field: K, value: GameFormState[K]) => setGameForm((current) => ({ ...current, [field]: value }));
+  const handleSessionFormChange = <K extends keyof SessionFormState>(field: K, value: SessionFormState[K]) => setSessionForm((current) => ({ ...current, [field]: value }));
+  const handleGoalFormChange = <K extends keyof GoalFormState>(field: K, value: GoalFormState[K]) => setGoalForm((current) => ({ ...current, [field]: value }));
 
   const handleGameSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting) return;
-    if (!gameForm.title.trim()) {
-      setNotice("Informe um título para o jogo.");
-      return;
-    }
+    if (!gameForm.title.trim()) return void setNotice("Informe um título para o jogo.");
     setSubmitting(true);
-
-    const current = gameModalMode === "edit" ? selectedRecord : undefined;
-    const payload = createDbGameFromForm(gameForm, current);
-    let entryId = payload.libraryEntry.id;
-
-    await db.transaction("rw", db.games, db.libraryEntries, async () => {
-      let gameId = payload.game.id;
-      if (gameId == null) {
-        const existingMetadata = await db.games.where("normalizedTitle").equals(payload.game.normalizedTitle).first();
-        if (existingMetadata?.id != null) {
-          gameId = existingMetadata.id;
-          await db.games.put({
-            ...existingMetadata,
-            ...payload.game,
-            id: existingMetadata.id,
-            platforms: mergePlatformList(existingMetadata.platforms, payload.libraryEntry.platform),
-          });
-        } else {
-          gameId = Number(await db.games.add(payload.game));
+    try {
+      const current = gameModalMode === "edit" ? selectedRecord : undefined;
+      let payload = createDbGameFromForm(gameForm, current);
+      if (preferences.rawgApiKey.trim() && !current?.game.rawgId) {
+        try {
+          const bestCandidate = await resolveBestRawgCandidate(payload.game.title, preferences.rawgApiKey.trim());
+          if (bestCandidate) {
+            const metadata = await fetchRawgMetadata(bestCandidate.rawgId, preferences.rawgApiKey.trim());
+            if (metadata) {
+              payload = {
+                game: {
+                  ...payload.game,
+                  slug: payload.game.slug || metadata.slug,
+                  coverUrl: payload.game.coverUrl || metadata.coverUrl,
+                  rawgId: payload.game.rawgId ?? metadata.rawgId,
+                  genres: payload.game.genres || metadata.genres,
+                  releaseYear: payload.game.releaseYear ?? metadata.releaseYear,
+                  platforms: mergePlatformList(payload.game.platforms || metadata.platforms, payload.libraryEntry.platform),
+                  developer: payload.game.developer || metadata.developer,
+                  publisher: payload.game.publisher || metadata.publisher,
+                },
+                libraryEntry: payload.libraryEntry,
+              };
+            }
+          }
+        } catch {
+          // Save should still work even if external enrichment fails.
         }
-      } else {
-        await db.games.put(payload.game);
       }
-      entryId = Number(await db.libraryEntries.put({ ...payload.libraryEntry, gameId }));
-    });
-
-    await refreshData();
-    setSubmitting(false);
-    setGameModalMode(null);
-    setSelectedGameId(entryId ?? selectedGameId);
-    setScreen("library");
-    setNotice(gameModalMode === "edit" ? "Jogo atualizado no catálogo." : "Jogo adicionado ao catálogo.");
+      let entryId = payload.libraryEntry.id;
+      await db.transaction("rw", db.games, db.libraryEntries, async () => {
+        let gameId = payload.game.id;
+        if (gameId == null) {
+          const existingMetadata = await db.games.where("normalizedTitle").equals(payload.game.normalizedTitle).first();
+          if (existingMetadata?.id != null) {
+            gameId = existingMetadata.id;
+            await db.games.put({ ...existingMetadata, ...payload.game, id: existingMetadata.id, platforms: mergePlatformList(existingMetadata.platforms, payload.libraryEntry.platform) });
+          } else {
+            gameId = Number(await db.games.add(payload.game));
+          }
+        } else {
+          await db.games.put(payload.game);
+        }
+        entryId = Number(await db.libraryEntries.put({ ...payload.libraryEntry, gameId }));
+      });
+      await refreshData();
+      setGameModalMode(null);
+      setSelectedGameId(entryId ?? selectedGameId);
+      setScreen("library");
+      setNotice(gameModalMode === "edit" ? "Jogo atualizado no catálogo." : "Jogo adicionado ao catálogo.");
+    } catch (error) {
+      setNotice(`Falha ao salvar jogo: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleImportSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -500,39 +402,53 @@ export function useBacklogApp() {
     if (submitting) return;
     try {
       setSubmitting(true);
-      if (!importPreview) {
-        const parsed = parseImportText(importSource, importText);
-        if (parsed.length === 0) {
-          setNotice("Nenhum item válido foi encontrado na importação.");
-          return;
+      if (!importState.importPreview) {
+        const parsed = parseImportText(importState.importSource, importState.importText, {
+          platform: preferences.primaryPlatforms[0],
+          sourceStore: preferences.defaultStores[0],
+        });
+        if (parsed.length === 0) return void setNotice("Nenhum item válido foi encontrado na importação.");
+        let preview = buildImportPreview(parsed, records);
+        if (preview.length === 0) return void setNotice("Nenhum item novo ou atualizável foi encontrado.");
+        if (preferences.rawgApiKey.trim()) {
+          const candidateMap = await fetchRawgCandidateMap(
+            preview.filter((entry) => entry.status !== "existing" || !entry.payload.rawgId),
+            preferences.rawgApiKey.trim(),
+          );
+          preview = attachRawgCandidatesToPreview(preview, candidateMap);
         }
-        const preview = buildImportPreview(parsed, records);
-        if (preview.length === 0) {
-          setNotice("Nenhum item novo ou atualizável foi encontrado.");
-          return;
-        }
-        setImportPreview(preview);
+        importState.setImportPreview(preview);
         setNotice(`Preview pronto com ${preview.length} itens consolidados.`);
         return;
       }
 
+      const rawgMetadataMap = preferences.rawgApiKey.trim()
+        ? await fetchSelectedRawgMetadata(importState.importPreview, preferences.rawgApiKey.trim())
+        : new Map();
       let created = 0;
       let updated = 0;
       let ignored = 0;
 
       await db.transaction("rw", db.games, db.libraryEntries, async () => {
-        for (const previewEntry of importPreview) {
+        for (const previewEntry of importState.importPreview ?? []) {
           if (previewEntry.action === "ignore") {
             ignored += 1;
             continue;
           }
 
-          if (previewEntry.action === "create" || previewEntry.existingId == null) {
-            const existingMetadata = await db.games.where("normalizedTitle").equals(normalizeTitle(previewEntry.payload.title)).first();
-            const createdRecord = createDbGameFromImport(previewEntry.payload, existingMetadata);
+          let payload: ImportPayload = previewEntry.payload;
+          if (previewEntry.selectedRawgId) {
+            payload = applyRawgMetadataToImportPayload(payload, rawgMetadataMap.get(previewEntry.selectedRawgId) ?? null);
+          }
+
+          const targetEntryId = previewEntry.selectedMatchId ?? previewEntry.existingId;
+          if (previewEntry.action === "create" || targetEntryId == null) {
+            const existingMetadata = await db.games.where("normalizedTitle").equals(normalizeTitle(payload.title)).first();
+            const createdRecord = createDbGameFromImport(payload, existingMetadata);
             let gameId = existingMetadata?.id;
-            if (gameId == null) gameId = Number(await db.games.add(createdRecord.game));
-            else {
+            if (gameId == null) {
+              gameId = Number(await db.games.add(createdRecord.game));
+            } else {
               const baseMetadata = existingMetadata;
               if (!baseMetadata) continue;
               await db.games.put({
@@ -547,14 +463,14 @@ export function useBacklogApp() {
             continue;
           }
 
-          const currentEntry = await db.libraryEntries.get(previewEntry.existingId);
+          const currentEntry = await db.libraryEntries.get(targetEntryId);
           const currentGame = currentEntry ? await db.games.get(currentEntry.gameId) : undefined;
           if (!currentEntry || !currentGame) {
             ignored += 1;
             continue;
           }
 
-          const merged = mergeImportedGame({ game: currentGame, libraryEntry: currentEntry }, previewEntry.payload);
+          const merged = mergeImportedGame({ game: currentGame, libraryEntry: currentEntry }, payload);
           await db.games.put(merged.game);
           await db.libraryEntries.put({ ...merged.libraryEntry, gameId: merged.game.id ?? currentEntry.gameId });
           updated += 1;
@@ -562,7 +478,7 @@ export function useBacklogApp() {
       });
 
       await refreshData();
-      closeImportFlow();
+      importState.closeImportFlow();
       setScreen("library");
       setNotice(`${created} criados, ${updated} atualizados e ${ignored} ignorados na importação.`);
     } catch (error) {
@@ -573,31 +489,16 @@ export function useBacklogApp() {
   };
 
   const handleExport = async () => {
-    if (records.length === 0) {
-      setNotice("A biblioteca está vazia para exportar.");
-      return;
-    }
+    if (records.length === 0) return void setNotice("A biblioteca está vazia para exportar.");
     downloadText(`arsenal-gamer-${new Date().toISOString().slice(0, 10)}.csv`, gamesToCsv(records.map(recordToImportPayload)), "text/csv;charset=utf-8");
     setNotice("Biblioteca exportada em CSV.");
   };
 
   const handleBackupExport = async () => {
     const tables = await readBackupTables();
-    const totalRecords =
-      tables.games.length +
-      tables.libraryEntries.length +
-      tables.playSessions.length +
-      tables.reviews.length +
-      tables.lists.length +
-      tables.libraryEntryLists.length +
-      tables.tags.length +
-      tables.gameTags.length +
-      tables.goals.length;
-    if (totalRecords === 0) {
-      setNotice("A base local está vazia para backup.");
-      return;
-    }
-    const payload: BackupPayload = { version: 3, exportedAt: new Date().toISOString(), source: "mybacklog", ...tables };
+    const totalRecords = tables.games.length + tables.libraryEntries.length + tables.playSessions.length + tables.reviews.length + tables.lists.length + tables.libraryEntryLists.length + tables.tags.length + tables.gameTags.length + tables.goals.length + tables.settings.length;
+    if (totalRecords === 0) return void setNotice("A base local está vazia para backup.");
+    const payload: BackupPayload = { version: 4, exportedAt: new Date().toISOString(), source: "mybacklog", ...tables };
     downloadText(`arsenal-gamer-backup-${payload.exportedAt.slice(0, 10)}.json`, JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
     setNotice("Backup JSON exportado.");
   };
@@ -607,27 +508,22 @@ export function useBacklogApp() {
     if (submitting) return;
     try {
       setSubmitting(true);
-      if (!restorePreview) {
-        const payload = parseBackupText(restoreText);
-        if (!payload) {
-          setNotice("Arquivo de backup inválido.");
-          return;
-        }
-        const preview = buildRestorePreview(payload, restoreMode, await readBackupTables());
-        
-        setRestorePreview(preview);
+      if (!importState.restorePreview) {
+        const payload = parseBackupText(importState.restoreText);
+        if (!payload) return void setNotice("Arquivo de backup inválido.");
+        const preview = buildRestorePreview(payload, importState.restoreMode, await readBackupTables());
+        importState.setRestorePreview(preview);
         setNotice(`Preview de restore pronto para ${payload.libraryEntries.length} itens da biblioteca.`);
         return;
       }
-
-      if (restorePreview.mode === "replace") {
+      if (importState.restorePreview.mode === "replace") {
         const confirmed = window.confirm("Modo replace: toda a base local será apagada antes de restaurar. Deseja continuar?");
         if (!confirmed) return;
       }
 
-      const payload = restorePreview.payload;
-      await db.transaction("rw", [db.games, db.libraryEntries, db.playSessions, db.reviews, db.lists, db.libraryEntryLists, db.tags, db.gameTags, db.goals], async () => {
-        if (restorePreview.mode === "replace") {
+      const payload = importState.restorePreview.payload;
+      await db.transaction("rw", [db.games, db.libraryEntries, db.playSessions, db.reviews, db.lists, db.libraryEntryLists, db.tags, db.gameTags, db.goals, db.settings, db.importJobs], async () => {
+        if (importState.restorePreview?.mode === "replace") {
           await db.libraryEntryLists.clear();
           await db.gameTags.clear();
           await db.reviews.clear();
@@ -637,6 +533,8 @@ export function useBacklogApp() {
           await db.lists.clear();
           await db.libraryEntries.clear();
           await db.games.clear();
+          await db.settings.clear();
+          await db.importJobs.clear();
           if (payload.games.length) await db.games.bulkPut(payload.games);
           if (payload.libraryEntries.length) await db.libraryEntries.bulkPut(payload.libraryEntries);
           if (payload.playSessions.length) await db.playSessions.bulkPut(payload.playSessions);
@@ -646,10 +544,11 @@ export function useBacklogApp() {
           if (payload.tags.length) await db.tags.bulkPut(payload.tags);
           if (payload.gameTags.length) await db.gameTags.bulkPut(payload.gameTags);
           if (payload.goals.length) await db.goals.bulkPut(payload.goals);
+          if (payload.settings.length) await db.settings.bulkPut(payload.settings);
           return;
         }
 
-        const [existingGames, existingEntries, existingTags, existingLists, existingLibraryEntryLists, existingGoals, existingReviews, existingSessions, existingGameTags] = await Promise.all([
+        const [existingGames, existingEntries, existingTags, existingLists, existingLibraryEntryLists, existingGoals, existingReviews, existingSessions, existingGameTags, existingSettings] = await Promise.all([
           db.games.toArray(),
           db.libraryEntries.toArray(),
           db.tags.toArray(),
@@ -659,25 +558,20 @@ export function useBacklogApp() {
           db.reviews.toArray(),
           db.playSessions.toArray(),
           db.gameTags.toArray(),
+          db.settings.toArray(),
         ]);
-
-        const existingGamesByTitle = new Map(existingGames.map((game) => [game.normalizedTitle || normalizeTitle(game.title), game]));
-        const existingGamesById = new Map(existingGames.map((game) => [game.id, game]));
-        const existingEntryByKey = new Map(
-          existingEntries.map((entry) => {
-            const game = existingGamesById.get(entry.gameId);
-            return [`${game?.title.trim().toLowerCase() || ""}::${entry.platform.trim().toLowerCase()}`, entry] as const;
-          }),
-        );
-        const existingTagMap = new Map(existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag]));
-        const existingListMap = new Map(existingLists.map((list) => [list.name.trim().toLowerCase(), list]));
+        const existingGamesByTitle = new Map(existingGames.map((game) => [game.normalizedTitle || normalizeTitle(game.title), game] as const));
+        const existingGamesById = new Map(existingGames.map((game) => [game.id, game] as const));
+        const existingEntryByKey = new Map(existingEntries.map((entry) => { const game = existingGamesById.get(entry.gameId); return [`${game?.title.trim().toLowerCase() || ""}::${entry.platform.trim().toLowerCase()}`, entry] as const; }));
+        const existingTagMap = new Map(existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag] as const));
+        const existingListMap = new Map(existingLists.map((list) => [list.name.trim().toLowerCase(), list] as const));
         const libraryEntryListSet = new Set(existingLibraryEntryLists.map((entry) => `${entry.libraryEntryId}::${entry.listId}`));
-        const existingGoalMap = new Map(existingGoals.map((goal) => [`${goal.type}::${goal.period}`, goal]));
-        const existingReviewMap = new Map(existingReviews.map((review) => [review.libraryEntryId, review]));
+        const existingGoalMap = new Map<string, DbGoal>(existingGoals.map((goal) => [`${goal.type}::${goal.period}`, goal] as const));
+        const existingReviewMap = new Map(existingReviews.map((review) => [review.libraryEntryId, review] as const));
         const sessionSet = new Set(existingSessions.map((session) => `${session.libraryEntryId}::${session.date}::${session.durationMinutes}::${(session.note || "").trim().toLowerCase()}::${session.completionPercent ?? ""}`));
         const gameTagSet = new Set(existingGameTags.map((entry) => `${entry.libraryEntryId}::${entry.tagId}`));
-
-        const payloadGamesById = new Map(payload.games.map((game) => [game.id, game]));
+        const existingSettingMap = new Map(existingSettings.map((setting) => [setting.key, setting] as const));
+        const payloadGamesById = new Map(payload.games.map((game) => [game.id, game] as const));
         const resolvedGameIdByPayloadId = new Map<number, number>();
         const resolvedEntryIdByPayloadId = new Map<number, number>();
         const resolvedListIdByPayloadId = new Map<number, number>();
@@ -782,12 +676,18 @@ export function useBacklogApp() {
           gameTagSet.add(key);
           await db.gameTags.add({ libraryEntryId, tagId });
         }
+
+        for (const setting of payload.settings) {
+          const existing = existingSettingMap.get(setting.key);
+          if (existing?.id != null) await db.settings.put({ ...existing, ...setting, id: existing.id });
+          else await db.settings.add({ ...setting, id: undefined });
+        }
       });
 
       await refreshData();
-      closeRestoreFlow();
+      importState.closeRestoreFlow();
       setScreen("library");
-      setNotice(restorePreview.mode === "replace" ? "Backup restaurado com substituição total da base local." : "Backup mesclado com a base local.");
+      setNotice(importState.restorePreview.mode === "replace" ? "Backup restaurado com substituição total da base local." : "Backup mesclado com a base local.");
     } catch (error) {
       setNotice(`Falha ao restaurar o backup: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
     } finally {
@@ -812,39 +712,18 @@ export function useBacklogApp() {
       if (sessionEditId != null) {
         const oldSession = await db.playSessions.get(sessionEditId);
         await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
-          await db.playSessions.update(sessionEditId, {
-            date: sessionForm.date,
-            durationMinutes,
-            completionPercent: nextCompletion,
-            mood: sessionForm.mood.trim() || undefined,
-            note: sessionForm.note.trim() || undefined,
-          });
+          await db.playSessions.update(sessionEditId, { date: sessionForm.date, durationMinutes, completionPercent: nextCompletion, mood: sessionForm.mood.trim() || undefined, note: sessionForm.note.trim() || undefined });
           if (oldSession && currentEntry.id) {
             const timeDiff = durationMinutes - oldSession.durationMinutes;
-            await db.libraryEntries.update(currentEntry.id, {
-              playtimeMinutes: Math.max(0, currentEntry.playtimeMinutes + timeDiff),
-              completionPercent: nextCompletion ?? currentEntry.completionPercent,
-              updatedAt: new Date().toISOString(),
-            });
+            const nextStatus = nextCompletion === 100 ? "finished" : currentEntry.progressStatus === "not_started" || currentEntry.progressStatus === "paused" ? "playing" : currentEntry.progressStatus;
+            await db.libraryEntries.update(currentEntry.id, { playtimeMinutes: Math.max(0, currentEntry.playtimeMinutes + timeDiff), completionPercent: nextCompletion ?? currentEntry.completionPercent, progressStatus: nextStatus, updatedAt: new Date().toISOString() });
           }
         });
       } else {
-        const nextProgressStatus = nextCompletion === 100
-          ? "finished"
-          : currentEntry.progressStatus === "not_started" || currentEntry.progressStatus === "paused"
-            ? "playing"
-            : currentEntry.progressStatus;
+        const nextProgressStatus = nextCompletion === 100 ? "finished" : currentEntry.progressStatus === "not_started" || currentEntry.progressStatus === "paused" ? "playing" : currentEntry.progressStatus;
         await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
           await db.playSessions.add({ libraryEntryId, date: sessionForm.date, platform: currentEntry.platform, durationMinutes, completionPercent: nextCompletion, mood: sessionForm.mood || currentEntry.mood, note: sessionForm.note.trim() || undefined });
-          await db.libraryEntries.update(libraryEntryId, {
-            ownershipStatus: currentEntry.ownershipStatus === "wishlist" ? "owned" : currentEntry.ownershipStatus,
-            progressStatus: nextProgressStatus,
-            completionPercent: nextCompletion ?? currentEntry.completionPercent,
-            playtimeMinutes: currentEntry.playtimeMinutes + durationMinutes,
-            mood: sessionForm.mood.trim() || currentEntry.mood,
-            lastSessionAt: sessionForm.date,
-            updatedAt: new Date().toISOString(),
-          });
+          await db.libraryEntries.update(libraryEntryId, { ownershipStatus: currentEntry.ownershipStatus === "wishlist" ? "owned" : currentEntry.ownershipStatus, progressStatus: nextProgressStatus, completionPercent: nextCompletion ?? currentEntry.completionPercent, playtimeMinutes: currentEntry.playtimeMinutes + durationMinutes, mood: sessionForm.mood.trim() || currentEntry.mood, lastSessionAt: sessionForm.date, updatedAt: new Date().toISOString() });
         });
       }
       await refreshData();
@@ -859,128 +738,74 @@ export function useBacklogApp() {
     }
   };
 
-  const handleGameReviewSave = async (payload: {
-    score: string;
-    recommend: "" | "yes" | "no";
-    shortReview: string;
-    longReview: string;
-    pros: string;
-    cons: string;
-    hasSpoiler: boolean;
-  }) => {
+  const handleGameReviewSave = async (payload: { score: string; recommend: "" | "yes" | "no"; shortReview: string; longReview: string; pros: string; cons: string; hasSpoiler: boolean }) => {
     if (!selectedRecord?.libraryEntry.id) return;
-
     const libraryEntryId = selectedRecord.libraryEntry.id;
     const normalizedScore = payload.score.trim();
     const parsedScore = normalizedScore === "" ? undefined : Number.parseFloat(normalizedScore);
-    const score =
-      typeof parsedScore === "number" && Number.isFinite(parsedScore)
-        ? Math.max(0, Math.min(10, parsedScore))
-        : undefined;
-    const reviewData = {
-      libraryEntryId,
-      score,
-      shortReview: payload.shortReview.trim() || undefined,
-      longReview: payload.longReview.trim() || undefined,
-      pros: payload.pros.trim() || undefined,
-      cons: payload.cons.trim() || undefined,
-      recommend: payload.recommend || undefined,
-      hasSpoiler: payload.hasSpoiler || undefined,
-    };
-    const hasContent = Object.entries(reviewData).some(
-      ([key, value]) => key !== "libraryEntryId" && value != null && value !== "",
-    );
-
+    const score = typeof parsedScore === "number" && Number.isFinite(parsedScore) ? Math.max(0, Math.min(10, parsedScore)) : undefined;
+    const reviewData = { libraryEntryId, score, shortReview: payload.shortReview.trim() || undefined, longReview: payload.longReview.trim() || undefined, pros: payload.pros.trim() || undefined, cons: payload.cons.trim() || undefined, recommend: payload.recommend || undefined, hasSpoiler: payload.hasSpoiler || undefined };
+    const hasContent = Object.entries(reviewData).some(([key, value]) => key !== "libraryEntryId" && value != null && value !== "");
     await db.transaction("rw", db.reviews, db.libraryEntries, async () => {
       const existingReview = await db.reviews.where("libraryEntryId").equals(libraryEntryId).first();
-
       if (hasContent) {
         if (existingReview?.id != null) await db.reviews.put({ ...existingReview, ...reviewData, id: existingReview.id });
         else await db.reviews.add(reviewData);
       } else if (existingReview?.id != null) {
         await db.reviews.delete(existingReview.id);
       }
-
-      await db.libraryEntries.update(libraryEntryId, {
-        personalRating: score,
-        updatedAt: new Date().toISOString(),
-      });
+      await db.libraryEntries.update(libraryEntryId, { personalRating: score, updatedAt: new Date().toISOString() });
     });
-
     await refreshData();
     setNotice(hasContent ? "Review do jogo atualizada." : "Review removida.");
   };
 
   const handleGameTagsSave = async (value: string) => {
     if (!selectedRecord?.libraryEntry.id) return;
-
     const libraryEntryId = selectedRecord.libraryEntry.id;
-    const names = Array.from(
-      new Set(
-        value
-          .split(",")
-          .map((token) => token.trim())
-          .filter(Boolean),
-      ),
-    );
-
+    const names = Array.from(new Set(value.split(",").map((token) => token.trim()).filter(Boolean)));
     await db.transaction("rw", db.tags, db.gameTags, async () => {
       const existingTags = await db.tags.toArray();
       const tagsByName = new Map(existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag] as const));
       const currentRelations = await db.gameTags.where("libraryEntryId").equals(libraryEntryId).toArray();
       const nextTagIds = new Set<number>();
-
       for (const name of names) {
         const key = name.toLowerCase();
         const existing = tagsByName.get(key);
-        if (existing?.id != null) {
-          nextTagIds.add(existing.id);
-          continue;
+        if (existing?.id != null) nextTagIds.add(existing.id);
+        else {
+          const tagId = Number(await db.tags.add({ name }));
+          tagsByName.set(key, { id: tagId, name });
+          nextTagIds.add(tagId);
         }
-
-        const tagId = Number(await db.tags.add({ name }));
-        tagsByName.set(key, { id: tagId, name });
-        nextTagIds.add(tagId);
       }
-
       for (const relation of currentRelations) {
         if (!nextTagIds.has(relation.tagId) && relation.id != null) await db.gameTags.delete(relation.id);
       }
-
       const currentTagIds = new Set(currentRelations.map((relation) => relation.tagId));
       for (const tagId of nextTagIds) {
         if (!currentTagIds.has(tagId)) await db.gameTags.add({ libraryEntryId, tagId });
       }
     });
-
     await refreshData();
     setNotice(names.length > 0 ? "Tags sincronizadas para este jogo." : "Tags removidas deste jogo.");
   };
 
   const handleGameListsSave = async (listIds: number[]) => {
     if (!selectedRecord?.libraryEntry.id) return;
-
     const libraryEntryId = selectedRecord.libraryEntry.id;
     const validListIds = new Set(listRows.map((list) => list.id).filter((listId): listId is number => listId != null));
     const nextListIds = Array.from(new Set(listIds)).filter((listId) => validListIds.has(listId));
-
     await db.transaction("rw", db.libraryEntryLists, async () => {
       const currentRelations = await db.libraryEntryLists.where("libraryEntryId").equals(libraryEntryId).toArray();
       const currentListIds = new Set(currentRelations.map((relation) => relation.listId));
-
       for (const relation of currentRelations) {
-        if (!nextListIds.includes(relation.listId) && relation.id != null) {
-          await db.libraryEntryLists.delete(relation.id);
-        }
+        if (!nextListIds.includes(relation.listId) && relation.id != null) await db.libraryEntryLists.delete(relation.id);
       }
-
       for (const listId of nextListIds) {
-        if (!currentListIds.has(listId)) {
-          await db.libraryEntryLists.add({ libraryEntryId, listId, createdAt: new Date().toISOString() });
-        }
+        if (!currentListIds.has(listId)) await db.libraryEntryLists.add({ libraryEntryId, listId, createdAt: new Date().toISOString() });
       }
     });
-
     await refreshData();
     setNotice(nextListIds.length > 0 ? "Listas sincronizadas para este jogo." : "Jogo removido de todas as listas.");
   };
@@ -1036,7 +861,6 @@ export function useBacklogApp() {
     setNotice(`${selectedGame.title} recebeu prioridade alta no planner.`);
   };
 
-  // ── Goal CRUD ──
   const closeGoalModal = () => setGoalModalMode(null);
   const openCreateGoalModal = () => {
     setGoalForm({ type: "finished", target: "", period: "monthly" });
@@ -1048,25 +872,16 @@ export function useBacklogApp() {
     setEditingGoalId(goal.id ?? null);
     setGoalModalMode("edit");
   };
-  const handleGoalFormChange = <K extends keyof GoalFormState>(field: K, value: GoalFormState[K]) => {
-    setGoalForm((current) => ({ ...current, [field]: value }));
-  };
   const handleGoalSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting) return;
     const target = Number(goalForm.target);
-    if (!target || target <= 0) {
-      setNotice("Informe um valor alvo maior que zero.");
-      return;
-    }
+    if (!target || target <= 0) return void setNotice("Informe um valor alvo maior que zero.");
     setSubmitting(true);
     try {
       const goalData = { type: goalForm.type as GoalType, target, current: 0, period: goalForm.period as Period };
-      if (editingGoalId != null) {
-        await db.goals.update(editingGoalId, { type: goalData.type, target: goalData.target, period: goalData.period });
-      } else {
-        await db.goals.add(goalData);
-      }
+      if (editingGoalId != null) await db.goals.update(editingGoalId, { type: goalData.type, target: goalData.target, period: goalData.period });
+      else await db.goals.add(goalData);
       await refreshData();
       setGoalModalMode(null);
       setNotice(editingGoalId != null ? "Meta atualizada." : "Meta criada com sucesso.");
@@ -1084,20 +899,11 @@ export function useBacklogApp() {
     setNotice("Meta removida.");
   };
 
-  // ── List CRUD ──
   const handleListCreate = async (name: string) => {
     const normalizedName = name.trim();
-    if (!normalizedName) {
-      setNotice("Informe um nome para a lista.");
-      return;
-    }
-    const existing = await db.lists
-      .filter((list) => list.name.trim().toLowerCase() === normalizedName.toLowerCase())
-      .first();
-    if (existing) {
-      setNotice("Essa lista já existe.");
-      return;
-    }
+    if (!normalizedName) return void setNotice("Informe um nome para a lista.");
+    const existing = await db.lists.filter((list) => list.name.trim().toLowerCase() === normalizedName.toLowerCase()).first();
+    if (existing) return void setNotice("Essa lista já existe.");
     await db.lists.add({ name: normalizedName, createdAt: new Date().toISOString() });
     await refreshData();
     setNotice("Lista criada com sucesso.");
@@ -1114,19 +920,61 @@ export function useBacklogApp() {
     setNotice("Lista removida.");
   };
 
-  // ── Settings ──
   const handleSettingSave = async (key: string, value: string) => {
-    const existing = await db.settings.where("key").equals(key).first();
-    if (existing?.id != null) {
-      await db.settings.update(existing.id, { value, updatedAt: new Date().toISOString() });
-    } else {
-      await db.settings.add({ key, value, updatedAt: new Date().toISOString() });
-    }
+    await upsertSettingsRows([{ key, value }]);
     await refreshData();
     setNotice("Configuração salva.");
   };
+  const handlePreferencesSave = async (draft: PreferencesDraft) => {
+    setSubmitting(true);
+    try {
+      const nextPreferences = normalizePreferencesDraft(draft);
+      await db.transaction("rw", db.settings, async () => {
+        await upsertSettingsRows(preferencesToSettingPairs(nextPreferences));
+      });
+      await refreshData();
+      setNotice("Preferências atualizadas.");
+    } catch (error) {
+      setNotice(`Falha ao salvar preferências: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  const handleOnboardingSubmit = async (payload: { draft: PreferencesDraft; starterLists: string[]; goalTemplateIds: string[] }) => {
+    setSubmitting(true);
+    try {
+      const nextPreferences = normalizePreferencesDraft(payload.draft);
+      const starterLists = Array.from(new Set(payload.starterLists.map((item) => item.trim()).filter(Boolean)));
+      const selectedTemplates = onboardingGoalTemplates.filter((template) => payload.goalTemplateIds.includes(template.id));
+      await db.transaction("rw", db.settings, db.lists, db.goals, async () => {
+        await upsertSettingsRows(preferencesToSettingPairs(nextPreferences));
+        const existingLists = new Map((await db.lists.toArray()).map((list) => [list.name.trim().toLowerCase(), list] as const));
+        for (const listName of starterLists) {
+          const key = listName.toLowerCase();
+          if (existingLists.has(key)) continue;
+          const createdList: DbList = { name: listName, createdAt: new Date().toISOString() };
+          await db.lists.add(createdList);
+          existingLists.set(key, createdList);
+        }
+        const existingGoals = new Map<string, DbGoal>((await db.goals.toArray()).map((goal) => [`${goal.type}::${goal.period}`, goal] as const));
+        for (const template of selectedTemplates) {
+          const key = `${template.type}::${template.period}`;
+          if (existingGoals.has(key)) continue;
+          const goal: DbGoal = { type: template.type, target: template.target, current: 0, period: template.period };
+          await db.goals.add(goal);
+          existingGoals.set(key, goal);
+        }
+      });
+      await refreshData();
+      setScreen("dashboard");
+      setNotice("Onboarding concluído. Preferências aplicadas ao sistema.");
+    } catch (error) {
+      setNotice(`Falha ao concluir onboarding: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  // ── Session delete ──
   const handleSessionDelete = async (sessionId: number) => {
     const confirmed = window.confirm("Excluir esta sessão?");
     if (!confirmed) return;
@@ -1135,41 +983,23 @@ export function useBacklogApp() {
     await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
       await db.playSessions.delete(sessionId);
       const entry = await db.libraryEntries.get(session.libraryEntryId);
-      if (entry?.id) {
-        await db.libraryEntries.update(entry.id, {
-          playtimeMinutes: Math.max(0, entry.playtimeMinutes - session.durationMinutes),
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      if (entry?.id) await db.libraryEntries.update(entry.id, { playtimeMinutes: Math.max(0, entry.playtimeMinutes - session.durationMinutes), updatedAt: new Date().toISOString() });
     });
     await refreshData();
     setNotice("Sessão excluída.");
   };
 
-  const openLibraryGame = (gameId?: number) => {
-    if (typeof gameId === "number" && gameId > 0) setSelectedGameId(gameId);
-    setScreen("library");
-  };
-
   return {
     screen, setScreen, query, setQuery, filter, setFilter, selectedListFilter, setSelectedListFilter, selectedGameId, setSelectedGameId,
-    loading, notice, submitting, heroCopy, games, libraryGames, selectedGame, selectedGamePage, monthlyProgress, platformData,
-    durationBuckets, visibleSessions, visiblePlannerQueue, continuePlayingGames, stats, goalProgress,
-    achievementCards, systemRules, findGame, gameModalMode, gameForm, sessionModalOpen, sessionForm,
-    sessionEditId, goalRows: resolvedGoalRows, listRows, listOptions, selectedGameLists, displayName,
-    goalModalMode, goalForm,
-    importModalOpen, importSource, importText, importFileName, importPreview, importPreviewSummary,
-    importFileInputRef, restoreModalOpen, restoreMode, restoreText, restoreFileName, restorePreview,
-    restorePreviewTotals, restoreFileInputRef, openCreateGameModal, openEditGameModal, closeGameModal,
-    openSessionModal, closeSessionModal, openEditSessionModal, openImportFlow, closeImportFlow, resetImportPreview,
-    openRestoreFlow, closeRestoreFlow, resetRestorePreview, handleGameFormChange, handleSessionFormChange,
-    handleImportSourceChange, handleImportTextChange, handleRestoreModeChange, handleRestoreTextChange,
-    handleImportPreviewActionChange, handleImportFileChange, handleRestoreFileChange, handleGameSubmit,
-    handleImportSubmit, handleExport, handleBackupExport, handleRestoreSubmit, handleSessionSubmit,
-    handleDeleteSelectedGame, handleResumeSelectedGame, handleFavoriteSelectedGame, handleGameReviewSave,
-    handleGameTagsSave, handleGameListsSave, handleSendSelectedToPlanner, openLibraryGame, openGamePage,
-    handleSessionDelete,
-    openCreateGoalModal, openEditGoalModal, closeGoalModal, handleGoalFormChange, handleGoalSubmit, handleGoalDelete,
-    handleListCreate, handleListDelete, handleSettingSave,
+    loading, notice, submitting, heroCopy, preferences, displayName, hasCompletedOnboarding, onboardingInitialDraft, onboardingInitialLists, onboardingInitialGoalIds,
+    games, libraryGames, selectedGame, selectedGamePage, monthlyProgress, platformData, durationBuckets, visibleSessions, visiblePlannerQueue, continuePlayingGames, stats, goalProgress, achievementCards, systemRules, findGame,
+    gameModalMode, gameForm, sessionModalOpen, sessionForm, sessionEditId, goalRows: resolvedGoalRows, listRows, listOptions, selectedGameLists, goalModalMode, goalForm,
+    importModalOpen: importState.importModalOpen, importSource: importState.importSource, importText: importState.importText, importFileName: importState.importFileName, importPreview: importState.importPreview, importPreviewSummary: importState.importPreviewSummary, importFileInputRef: importState.importFileInputRef,
+    restoreModalOpen: importState.restoreModalOpen, restoreMode: importState.restoreMode, restoreText: importState.restoreText, restoreFileName: importState.restoreFileName, restorePreview: importState.restorePreview, restorePreviewTotals: importState.restorePreviewTotals, restoreFileInputRef: importState.restoreFileInputRef,
+    openCreateGameModal, openEditGameModal, closeGameModal, openSessionModal, closeSessionModal, openEditSessionModal, openImportFlow: importState.openImportFlow, closeImportFlow: importState.closeImportFlow, resetImportPreview: importState.resetImportPreview, openRestoreFlow: importState.openRestoreFlow, closeRestoreFlow: importState.closeRestoreFlow, resetRestorePreview: importState.resetRestorePreview,
+    handleGameFormChange, handleSessionFormChange, handleGoalFormChange, handleImportSourceChange: importState.handleImportSourceChange, handleImportTextChange: importState.handleImportTextChange, handleRestoreModeChange: importState.handleRestoreModeChange, handleRestoreTextChange: importState.handleRestoreTextChange, handleImportPreviewActionChange: importState.handleImportPreviewActionChange, handleImportPreviewMatchChange: importState.handleImportPreviewMatchChange, handleImportPreviewRawgChange: importState.handleImportPreviewRawgChange, handleImportFileChange: importState.handleImportFileChange, handleRestoreFileChange: importState.handleRestoreFileChange,
+    handleGameSubmit, handleImportSubmit, handleExport, handleBackupExport, handleRestoreSubmit, handleSessionSubmit, handleDeleteSelectedGame, handleResumeSelectedGame, handleFavoriteSelectedGame, handleGameReviewSave, handleGameTagsSave, handleGameListsSave, handleSendSelectedToPlanner, openLibraryGame, openGamePage, handleSessionDelete,
+    openCreateGoalModal, openEditGoalModal, closeGoalModal, handleGoalSubmit, handleGoalDelete,
+    handleListCreate, handleListDelete, handleSettingSave, handlePreferencesSave, handleOnboardingSubmit,
   };
 }

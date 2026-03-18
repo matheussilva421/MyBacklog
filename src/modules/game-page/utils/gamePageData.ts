@@ -2,6 +2,7 @@ import { buildPlannerFit, buildPlannerReason, computePlannerScore } from "../../
 import type { PlannerGoalSignals } from "../../planner/utils/goals";
 import type { Game, LibraryRecord } from "../../../backlog/shared";
 import type { Goal as DbGoal, List, PlaySession, Review, Tag } from "../../../core/types";
+import type { AppPreferences } from "../../settings/utils/preferences";
 
 export type GamePageGoal = {
   id: string;
@@ -63,14 +64,15 @@ export function buildGamePageData(input: {
   lists: List[];
   goals: DbGoal[];
   goalSignals: PlannerGoalSignals;
+  preferences: AppPreferences;
 }): GamePageData {
   const sessions = [...input.sessions].sort((left, right) => right.date.localeCompare(left.date));
   const totalSessionMinutes = sessions.reduce((total, session) => total + session.durationMinutes, 0);
   const totalSessions = sessions.length;
   const averageSessionMinutes = totalSessions > 0 ? Math.round(totalSessionMinutes / totalSessions) : 0;
-  const plannerScore = computePlannerScore(input.game, input.goalSignals);
-  const plannerReason = buildPlannerReason(input.game, input.goalSignals);
-  const plannerFit = buildPlannerFit(input.game, input.goalSignals);
+  const plannerScore = computePlannerScore(input.game, input.goalSignals, input.preferences);
+  const plannerReason = buildPlannerReason(input.game, input.goalSignals, input.preferences);
+  const plannerFit = buildPlannerFit(input.game, input.goalSignals, input.preferences);
 
   return {
     game: input.game,

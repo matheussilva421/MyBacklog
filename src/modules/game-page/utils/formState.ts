@@ -1,11 +1,17 @@
 import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../../../core/types";
-import { statusToDbStatus, priorityToDbPriority, normalizeGameTitle, mergePlatformList } from "../../../backlog/shared";
+import { mergePlatformList, normalizeGameTitle, priorityToDbPriority, statusToDbStatus } from "../../../backlog/shared";
 import type { Game, GameFormState } from "../../../backlog/shared";
 
-export function createGameFormState(game?: Game): GameFormState {
+type GameFormDefaults = {
+  platform?: string;
+  sourceStore?: string;
+};
+
+export function createGameFormState(game?: Game, defaults?: GameFormDefaults): GameFormState {
   return {
     title: game?.title ?? "",
-    platform: game?.platform ?? "PC",
+    platform: game?.platform ?? defaults?.platform ?? "PC",
+    sourceStore: game?.sourceStore ?? defaults?.sourceStore ?? "Manual",
     genre: game?.genre ?? "",
     status: game?.status ?? "Backlog",
     priority: game?.priority ?? "Média",
@@ -49,7 +55,7 @@ export function createDbGameFromForm(form: GameFormState, current?: { game: DbGa
       id: current?.libraryEntry.id,
       gameId: current?.game.id as number,
       platform,
-      sourceStore: current?.libraryEntry.sourceStore || "Manual",
+      sourceStore: form.sourceStore.trim() || current?.libraryEntry.sourceStore || "Manual",
       edition: current?.libraryEntry.edition,
       format: current?.libraryEntry.format || "digital",
       ownershipStatus: form.status === "Wishlist" ? "wishlist" : "owned",
