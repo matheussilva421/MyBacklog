@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { VerticalBarChart } from "../../../charts";
 import { formatDuration, priorityTone, statusTone } from "../../../backlog/shared";
+import { formatDatePtBr } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
 import {
   ChartFrame,
@@ -184,9 +185,7 @@ export function GamePageScreen({
               <div className="detail-stat">
                 <span>Última sessão</span>
                 <strong>
-                  {data.lastSession
-                    ? new Date(data.lastSession.date).toLocaleDateString("pt-BR")
-                    : "--"}
+                  {data.lastSession ? formatDatePtBr(data.lastSession.date) : "--"}
                 </strong>
               </div>
               <div className="detail-stat">
@@ -308,7 +307,7 @@ export function GamePageScreen({
                 >
                   <div>
                     <div className="session-card__title">
-                      <h3>{new Date(session.date).toLocaleDateString("pt-BR")}</h3>
+                      <h3>{formatDatePtBr(session.date)}</h3>
                       <Pill tone="neutral">{session.platform}</Pill>
                       <div className="session-card__actions">
                         <NotchButton variant="ghost" onClick={() => onEditSession(session)}>
@@ -353,7 +352,7 @@ export function GamePageScreen({
                   key={`note-${session.id ?? `${session.date}-${session.durationMinutes}`}`}
                 >
                   <span className="detail-note__eyebrow">
-                    {new Date(session.date).toLocaleDateString("pt-BR")} •{" "}
+                    {formatDatePtBr(session.date)} •{" "}
                     {formatDuration(session.durationMinutes)}
                   </span>
                   <p>{session.note}</p>

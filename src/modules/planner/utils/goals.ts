@@ -1,4 +1,5 @@
 import type { Goal as GoalCard } from "../../../backlog/shared";
+import { parseDateInput } from "../../../core/utils";
 import type { Goal as DbGoal, LibraryEntry as DbLibraryEntry, PlaySession as DbPlaySession } from "../../../core/types";
 
 export type GoalTone = "sunset" | "cyan" | "violet" | "yellow";
@@ -44,7 +45,7 @@ function isWithinPeriod(dateValue: string | undefined, period: DbGoal["period"],
   if (!dateValue) return period === "total";
   if (period === "total") return true;
 
-  const date = new Date(dateValue);
+  const date = parseDateInput(dateValue);
   if (Number.isNaN(date.getTime())) return false;
 
   if (period === "monthly") {

@@ -1,4 +1,5 @@
 import type { BarPoint, Game, Status } from "../../../backlog/shared";
+import { formatMonthLabel, parseDateInput, startOfLocalDay } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
 
 export type SessionPeriod = "7d" | "30d" | "90d" | "all";
@@ -36,24 +37,16 @@ export type SessionOverview = {
   notedSessions: number;
 };
 
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function startOfWeek(date: Date): Date {
-  const value = startOfDay(date);
-  const day = value.getDay();
+function startOfWeek(value: string | Date): Date {
+  const date = startOfLocalDay(value);
+  const day = date.getDay();
   const diff = (day + 6) % 7;
-  value.setDate(value.getDate() - diff);
-  return value;
-}
-
-function formatMonthLabel(date: Date): string {
-  return date.toLocaleString("pt-BR", { month: "short" }).replace(".", "").replace(/^\w/, (value) => value.toUpperCase());
+  date.setDate(date.getDate() - diff);
+  return date;
 }
 
 function getPeriodStart(period: SessionPeriod, now: Date): Date | null {
-  const end = startOfDay(now);
+  const end = startOfLocalDay(now);
   if (period === "all") return null;
   const date = new Date(end);
   if (period === "7d") date.setDate(date.getDate() - 6);
@@ -63,19 +56,19 @@ function getPeriodStart(period: SessionPeriod, now: Date): Date | null {
 }
 
 function getDaysSince(dateValue: string, now: Date): number {
-  const target = startOfDay(new Date(dateValue));
-  const today = startOfDay(now);
+  const target = startOfLocalDay(dateValue);
+  const today = startOfLocalDay(now);
   return Math.max(0, Math.floor((today.getTime() - target.getTime()) / 86400000));
 }
 
-function buildWeekKey(date: Date): string {
-  const weekStart = startOfWeek(date);
+function buildWeekKey(value: string | Date): string {
+  const weekStart = startOfWeek(value);
   return `${weekStart.getFullYear()}-${weekStart.getMonth()}-${weekStart.getDate()}`;
 }
 
 function countWeeklyStreak(sessions: PlaySession[], now: Date): number {
   if (sessions.length === 0) return 0;
-  const weekKeys = new Set(sessions.map((session) => buildWeekKey(new Date(session.date))));
+  const weekKeys = new Set(sessions.map((session) => buildWeekKey(session.date)));
   let streak = 0;
   let cursor = startOfWeek(now);
   while (weekKeys.has(buildWeekKey(cursor))) {
@@ -89,33 +82,24 @@ function countWeeklyStreak(sessions: PlaySession[], now: Date): number {
 export function buildSessionCadence(sessions: PlaySession[], now = new Date()): SessionCadence {
   const sorted = [...sessions].sort((left, right) => right.date.localeCompare(left.date));
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const sessions7d = sorted.filter((session) => {
-    const days = getDaysSince(session.date, now);
-    return days <= 6;
-  });
-  const sessions30d = sorted.filter((session) => {
-    const days = getDaysSince(session.date, now);
-    return days <= 29;
-  });
-  const sessions90d = sorted.filter((session) => {
-    const days = getDaysSince(session.date, now);
-    return days <= 89;
-  });
+  const sessions7d = sorted.filter((session) => getDaysSince(session.date, now) <= 6);
+  const sessions30d = sorted.filter((session) => getDaysSince(session.date, now) <= 29);
+  const sessions90d = sorted.filter((session) => getDaysSince(session.date, now) <= 89);
   const activeDays30d = new Set(sessions30d.map((session) => session.date)).size;
   const minutes7d = sessions7d.reduce((total, session) => total + session.durationMinutes, 0);
   const minutes30d = sessions30d.reduce((total, session) => total + session.durationMinutes, 0);
   const minutesThisMonth = sorted
-    .filter((session) => new Date(session.date) >= monthStart)
+    .filter((session) => parseDateInput(session.date) >= monthStart)
     .reduce((total, session) => total + session.durationMinutes, 0);
   const lastSessionAt = sorted[0]?.date;
   const daysSinceLastSession = lastSessionAt ? getDaysSince(lastSessionAt, now) : null;
   const streakWeeks = countWeeklyStreak(sorted, now);
   const isDormant = daysSinceLastSession != null && daysSinceLastSession > 45;
 
-  let label = "Sem historico recente";
+  let label = "Sem histórico recente";
   let tone: SessionCadenceTone = "magenta";
   if (daysSinceLastSession == null) {
-    label = "Sem sessoes";
+    label = "Sem sessões";
   } else if (sessions7d.length >= 2 || minutes7d >= 180) {
     label = "Ritmo quente";
     tone = "emerald";
@@ -171,7 +155,7 @@ export function buildSessionMonthlyHours(sessions: PlaySession[], months = 6, no
   });
   const bucketMap = new Map(buckets.map((bucket) => [bucket.key, bucket]));
   for (const session of sessions) {
-    const date = new Date(session.date);
+    const date = parseDateInput(session.date);
     const key = `${date.getFullYear()}-${date.getMonth()}`;
     const bucket = bucketMap.get(key);
     if (!bucket) continue;
@@ -184,7 +168,7 @@ export function filterSessionsByPeriod(sessions: PlaySession[], period: SessionP
   const start = getPeriodStart(period, now);
   if (!start) return [...sessions];
   const startTime = start.getTime();
-  return sessions.filter((session) => startOfDay(new Date(session.date)).getTime() >= startTime);
+  return sessions.filter((session) => startOfLocalDay(session.date).getTime() >= startTime);
 }
 
 export function buildSessionHistoryGroups(

@@ -138,7 +138,7 @@ export function buildPlannerReason(
   const etaHours = parseEtaHours(game.eta);
 
   if (goalSignals?.finishPressure && goalSignals.finishPressure >= 0.35 && game.progress > 0) {
-    reasons.push("Empurra a meta de conclusao com progresso ja acumulado.");
+    reasons.push("Empurra a meta de conclusão com progresso já acumulado.");
   }
   if (goalSignals?.startPressure && goalSignals.startPressure >= 0.35 && game.status === "Backlog" && game.progress === 0) {
     reasons.push("Ajuda a meta de iniciar jogos sem abrir um projeto longo demais.");
@@ -147,26 +147,26 @@ export function buildPlannerReason(
     reasons.push("Contribui direto para a meta de horas com baixo atrito.");
   }
   if (goalSignals?.backlogPressure && goalSignals.backlogPressure >= 0.35 && game.status !== "Wishlist" && game.status !== "Terminado") {
-    reasons.push("Reduz backlog parado ao transformar fila em avanco real.");
+    reasons.push("Reduz backlog parado ao transformar fila em avanço real.");
   }
   if (preferences && normalizeTokens(preferences.primaryPlatforms).has(game.platform.toLowerCase())) {
     reasons.push("Roda na sua plataforma principal, com baixo atrito operacional.");
   }
   if (preferences && normalizeTokens(preferences.defaultStores).has(game.sourceStore.toLowerCase())) {
-    reasons.push("Esta dentro das suas fontes padrao e entra facil no fluxo atual.");
+    reasons.push("Está dentro das suas fontes padrão e entra fácil no fluxo atual.");
   }
   if (cadence?.sessions30d && cadence.sessions30d >= 3) {
-    reasons.push("Ja existe cadencia recente, entao o custo de continuar e baixo.");
+    reasons.push("Já existe cadência recente, então o custo de continuar é baixo.");
   }
   if (cadence?.streakWeeks && cadence.streakWeeks >= 2) {
-    reasons.push("O historico mostra consistencia semanal que vale manter.");
+    reasons.push("O histórico mostra consistência semanal que vale manter.");
   }
   if (cadence?.isDormant && game.status === "Pausado") {
-    reasons.push("Ficou frio demais e pede uma decisao clara de retomada.");
+    reasons.push("Ficou frio demais e pede uma decisão clara de retomada.");
   }
-  if (game.progress > 0) reasons.push("Ja existe progresso e o atrito de retorno e baixo.");
-  if (etaHours <= 12) reasons.push("Cabe em bloco curto e ajuda a limpar backlog rapido.");
-  if (game.priority === "Alta") reasons.push("Prioridade manual alta mantem o jogo no topo.");
+  if (game.progress > 0) reasons.push("Já existe progresso e o atrito de retorno é baixo.");
+  if (etaHours <= 12) reasons.push("Cabe em bloco curto e ajuda a limpar backlog rápido.");
+  if (game.priority === "Alta") reasons.push("Prioridade manual alta mantém o jogo no topo.");
   if (reasons.length === 0) reasons.push("Bom encaixe para manter o backlog em movimento.");
 
   return reasons.join(" ");
@@ -181,16 +181,16 @@ export function buildPlannerFit(
   const etaHours = parseEtaHours(game.eta);
 
   if (cadence?.sessions30d && cadence.sessions30d >= 4) {
-    return "Cadencia viva";
+    return "Cadência viva";
   }
   if (cadence?.streakWeeks && cadence.streakWeeks >= 2) {
     return "Manter streak";
   }
   if (goalSignals?.finishPressure && goalSignals.finishPressure >= 0.35 && game.progress > 0) {
-    return "Fechamento tatico";
+    return "Fechamento tático";
   }
   if (goalSignals?.startPressure && goalSignals.startPressure >= 0.35 && game.status === "Backlog" && game.progress === 0) {
-    return "Meta de inicio";
+    return "Meta de início";
   }
   if (goalSignals?.playtimePressure && goalSignals.playtimePressure >= 0.35 && game.status !== "Backlog") {
     return "Sessão útil";

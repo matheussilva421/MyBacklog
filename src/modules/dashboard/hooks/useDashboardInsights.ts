@@ -7,6 +7,7 @@ import {
   type Game,
   type PiePoint,
 } from "../../../backlog/shared";
+import { parseDateInput } from "../../../core/utils";
 import type { LibraryEntry as DbLibraryEntry, PlaySession as DbPlaySession } from "../../../core/types";
 import type { PlannerGoalSignals } from "../../planner/utils/goals";
 import { computePlannerScore } from "../../planner/utils/scoring";
@@ -15,7 +16,8 @@ import { buildSessionCadenceMap } from "../../sessions/utils/sessionAnalytics";
 import { buildMonthlyRecap } from "../utils/monthlyRecap";
 import { buildPersonalBadges } from "../utils/personalBadges";
 
-function isSameMonth(date: Date, target: Date) {
+function isSameMonth(value: string | Date, target: Date) {
+  const date = parseDateInput(value);
   return date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth();
 }
 
@@ -65,14 +67,14 @@ export function useDashboardInsights({
     const monthMap = new Map(months.map((entry) => [entry.key, entry]));
 
     for (const entry of libraryEntryRows) {
-      const createdAt = new Date(entry.createdAt);
+      const createdAt = parseDateInput(entry.createdAt);
       const createdBucket = monthMap.get(`${createdAt.getFullYear()}-${createdAt.getMonth()}`);
       if (createdBucket && entry.ownershipStatus !== "wishlist") {
         createdBucket.started += 1;
       }
 
       if (entry.progressStatus === "finished" || entry.progressStatus === "completed_100") {
-        const finishedAt = new Date(entry.updatedAt);
+        const finishedAt = parseDateInput(entry.updatedAt);
         const finishedBucket = monthMap.get(`${finishedAt.getFullYear()}-${finishedAt.getMonth()}`);
         if (finishedBucket) finishedBucket.finished += 1;
       }
@@ -131,17 +133,17 @@ export function useDashboardInsights({
     }).length;
     const finished = games.filter((game) => game.status === "Terminado").length;
     const hours = Math.round(sessionRows.reduce((totalMinutes, session) => totalMinutes + session.durationMinutes, 0) / 60);
-    const addedThisMonth = libraryEntryRows.filter((entry) => isSameMonth(new Date(entry.createdAt), now)).length;
+    const addedThisMonth = libraryEntryRows.filter((entry) => isSameMonth(entry.createdAt, now)).length;
     const dormantBacklog = games.filter((game) => game.status === "Backlog" && sessionCadenceMap.get(game.id)?.isDormant).length;
     const activeGames7d = games.filter((game) => (sessionCadenceMap.get(game.id)?.sessions7d || 0) > 0).length;
     const recentHours = Math.round(
       sessionRows
-        .filter((session) => new Date(session.date).getTime() >= weekAgo)
+        .filter((session) => parseDateInput(session.date).getTime() >= weekAgo)
         .reduce((totalMinutes, session) => totalMinutes + session.durationMinutes, 0) / 60,
     );
     const finishedThisYear = libraryEntryRows.filter((entry) => {
       if (entry.progressStatus !== "finished" && entry.progressStatus !== "completed_100") return false;
-      return new Date(entry.updatedAt).getFullYear() === now.getFullYear();
+      return parseDateInput(entry.updatedAt).getFullYear() === now.getFullYear();
     }).length;
 
     return {

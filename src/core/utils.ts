@@ -31,6 +31,33 @@ export function formatDuration(durationMinutes: number): string {
   return `${hours}h ${minutes}m`;
 }
 
+export function parseDateInput(value: string | Date): Date {
+  if (value instanceof Date) return new Date(value.getTime());
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const [, year, month, day] = match;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+  return new Date(trimmed);
+}
+
+export function startOfLocalDay(value: string | Date): Date {
+  const date = parseDateInput(value);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+export function formatDatePtBr(value: string | Date): string {
+  return parseDateInput(value).toLocaleDateString("pt-BR");
+}
+
+export function getTodayDateInputValue(now = new Date()): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function formatRemainingEta(raw: string, progressPercent: number, loggedHours = 0): string {
   const etaHours = parseEtaHours(raw);
   if (!Number.isFinite(etaHours)) return "Sem ETA";

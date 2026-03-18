@@ -35,7 +35,7 @@ async function readEntrySessionSnapshot(libraryEntryId: number) {
 export async function savePlaySession(input: SessionMutationInput): Promise<{ libraryEntryId: number; mode: "create" | "edit" }> {
   const currentEntry = await db.libraryEntries.get(input.libraryEntryId);
   if (!currentEntry?.id) {
-    throw new Error("Jogo da sessao nao encontrado.");
+    throw new Error("Jogo da sessão não encontrado.");
   }
 
   const durationMinutes = Math.max(1, Math.round(input.durationMinutes));

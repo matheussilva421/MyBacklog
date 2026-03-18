@@ -1,9 +1,9 @@
 import type { BarPoint, Game, LibraryRecord } from "../../../backlog/shared";
 import type { Goal as DbGoal, List, PlaySession, Review, Tag } from "../../../core/types";
 import type { AppPreferences } from "../../settings/utils/preferences";
-import { buildSessionCadence, buildSessionMonthlyHours, type SessionCadence } from "../../sessions/utils/sessionAnalytics";
 import { buildPlannerFit, buildPlannerReason, computePlannerScore } from "../../planner/utils/scoring";
 import type { PlannerGoalSignals } from "../../planner/utils/goals";
+import { buildSessionCadence, buildSessionMonthlyHours, type SessionCadence } from "../../sessions/utils/sessionAnalytics";
 
 export type GamePageGoal = {
   id: string;
@@ -44,7 +44,7 @@ function formatGoalLabel(goal: DbGoal): string {
   if (goal.type === "finished") return "Concluir jogos";
   if (goal.type === "started") return "Iniciar jogos";
   if (goal.type === "playtime") return "Horas registradas";
-  return "Reducao de backlog";
+  return "Redução de backlog";
 }
 
 function mapGoalTone(goal: DbGoal): GamePageGoal["tone"] {
@@ -110,8 +110,8 @@ export function buildGamePageData(input: {
     cadence,
     frequencyLabel:
       cadence.sessions30d > 0
-        ? `${cadence.sessions30d} sessoes em 30 dias`
-        : "Sem sessoes nos ultimos 30 dias",
+        ? `${cadence.sessions30d} sessões em 30 dias`
+        : "Sem sessões nos últimos 30 dias",
     streakLabel: cadence.streakWeeks > 0 ? `${cadence.streakWeeks} semana(s)` : "Sem streak",
     hoursThisMonthLabel: formatDurationHours(cadence.minutesThisMonth),
     hoursPerMonth,

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { VerticalBarChart } from "../../../charts";
 import { formatDuration, type Game, type Status } from "../../../backlog/shared";
+import { formatDatePtBr } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
 import {
   ChartFrame,
@@ -325,7 +326,7 @@ export function SessionsScreen({
                     <Pill tone="neutral">{formatDuration(group.totalMinutes)}</Pill>
                     {group.cadence.lastSessionAt ? (
                       <Pill tone="cyan">
-                        {new Date(group.cadence.lastSessionAt).toLocaleDateString("pt-BR")}
+                        {formatDatePtBr(group.cadence.lastSessionAt)}
                       </Pill>
                     ) : null}
                   </div>
@@ -358,7 +359,7 @@ export function SessionsScreen({
                     >
                       <div>
                         <div className="session-card__title">
-                          <h3>{new Date(session.date).toLocaleDateString("pt-BR")}</h3>
+                          <h3>{formatDatePtBr(session.date)}</h3>
                           <Pill tone="neutral">{session.platform}</Pill>
                           <div className="session-card__actions">
                             <NotchButton variant="ghost" onClick={() => onEditSession(session)}>

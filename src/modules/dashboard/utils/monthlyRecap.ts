@@ -1,7 +1,9 @@
+import { parseDateInput } from "../../../core/utils";
 import type { Game, MonthlyRecap } from "../../../backlog/shared";
 import type { LibraryEntry, PlaySession } from "../../../core/types";
 
-function isSameMonth(date: Date, target: Date) {
+function isSameMonth(value: string | Date, target: Date) {
+  const date = parseDateInput(value);
   return date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth();
 }
 
@@ -17,7 +19,7 @@ export function buildMonthlyRecap(
   sessionRows: PlaySession[],
   now = new Date(),
 ): MonthlyRecap {
-  const sessionsThisMonth = sessionRows.filter((session) => isSameMonth(new Date(session.date), now));
+  const sessionsThisMonth = sessionRows.filter((session) => isSameMonth(session.date, now));
   const totalMinutes = sessionsThisMonth.reduce((total, session) => total + session.durationMinutes, 0);
   const minutesByGame = new Map<number, number>();
   const activeDays = new Set<string>();
@@ -34,9 +36,9 @@ export function buildMonthlyRecap(
   const topGame = topGameEntry ? games.find((game) => game.id === topGameEntry[0]) : undefined;
   const completedGames = libraryEntryRows.filter((entry) => {
     if (entry.progressStatus !== "finished" && entry.progressStatus !== "completed_100") return false;
-    return isSameMonth(new Date(entry.updatedAt), now);
+    return isSameMonth(entry.updatedAt, now);
   }).length;
-  const addedGames = libraryEntryRows.filter((entry) => isSameMonth(new Date(entry.createdAt), now)).length;
+  const addedGames = libraryEntryRows.filter((entry) => isSameMonth(entry.createdAt, now)).length;
   const activeGames = new Set(sessionsThisMonth.map((session) => session.libraryEntryId)).size;
   const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
 

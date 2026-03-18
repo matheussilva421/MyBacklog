@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { cx, formatDuration, formatRemainingEta, mergePlatformList, normalizeGameTitle, parseEtaHours } from "./utils";
+import {
+  cx,
+  formatDatePtBr,
+  formatDuration,
+  formatRemainingEta,
+  getTodayDateInputValue,
+  mergePlatformList,
+  normalizeGameTitle,
+  parseDateInput,
+  parseEtaHours,
+  startOfLocalDay,
+} from "./utils";
 
 describe("core/utils", () => {
   describe("normalizeGameTitle", () => {
@@ -83,6 +94,41 @@ describe("core/utils", () => {
 
     it("rounds fractional minutes", () => {
       expect(formatDuration(45.7)).toBe("46m");
+    });
+  });
+
+  describe("parseDateInput", () => {
+    it("parses date-only strings in local time without shifting the day", () => {
+      const parsed = parseDateInput("2026-03-18");
+      expect(parsed.getFullYear()).toBe(2026);
+      expect(parsed.getMonth()).toBe(2);
+      expect(parsed.getDate()).toBe(18);
+    });
+
+    it("keeps timestamps parseable", () => {
+      const parsed = parseDateInput("2026-03-18T15:30:00.000Z");
+      expect(Number.isNaN(parsed.getTime())).toBe(false);
+    });
+  });
+
+  describe("formatDatePtBr", () => {
+    it("formats a date-only string without timezone drift", () => {
+      expect(formatDatePtBr("2026-03-18")).toBe("18/03/2026");
+    });
+  });
+
+  describe("startOfLocalDay", () => {
+    it("normalizes timestamps to the local day boundary", () => {
+      const parsed = startOfLocalDay("2026-03-18T15:30:00.000Z");
+      expect(parsed.getHours()).toBe(0);
+      expect(parsed.getMinutes()).toBe(0);
+      expect(parsed.getSeconds()).toBe(0);
+    });
+  });
+
+  describe("getTodayDateInputValue", () => {
+    it("creates a YYYY-MM-DD value in local calendar format", () => {
+      expect(getTodayDateInputValue(new Date(2026, 2, 18, 23, 15))).toBe("2026-03-18");
     });
   });
 

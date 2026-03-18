@@ -1,5 +1,6 @@
 import { Activity, Clock3, LibraryBig, Sparkles, Trophy } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { parseDateInput } from "../../../core/utils";
 import type { Game, UserBadge } from "../../../backlog/shared";
 import type { LibraryEntry, PlaySession } from "../../../core/types";
 
@@ -25,8 +26,8 @@ type BadgeBlueprint = {
   resolve: (context: BadgeContext) => BadgeMetric;
 };
 
-function startOfWeek(date: Date) {
-  const clone = new Date(date);
+function startOfWeek(value: string | Date) {
+  const clone = parseDateInput(value);
   const day = clone.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   clone.setDate(clone.getDate() + diff);
@@ -38,7 +39,7 @@ function getMaxWeeklyHours(sessionRows: PlaySession[]) {
   const totals = new Map<string, number>();
 
   for (const session of sessionRows) {
-    const weekStart = startOfWeek(new Date(session.date)).toISOString().slice(0, 10);
+    const weekStart = startOfWeek(session.date).toISOString().slice(0, 10);
     totals.set(weekStart, (totals.get(weekStart) || 0) + session.durationMinutes);
   }
 
@@ -51,7 +52,7 @@ function getMaxFinishedInSevenDays(libraryEntryRows: LibraryEntry[]) {
       (entry) =>
         entry.progressStatus === "finished" || entry.progressStatus === "completed_100",
     )
-    .map((entry) => new Date(entry.updatedAt).getTime())
+    .map((entry) => parseDateInput(entry.updatedAt).getTime())
     .filter((value) => Number.isFinite(value))
     .sort((left, right) => left - right);
 
@@ -84,7 +85,7 @@ function getDistinctGenreCount(games: Game[]) {
 
 function getSessionsInLast30Days(sessionRows: PlaySession[]) {
   const threshold = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  return sessionRows.filter((session) => new Date(session.date).getTime() >= threshold).length;
+  return sessionRows.filter((session) => parseDateInput(session.date).getTime() >= threshold).length;
 }
 
 const badgeBlueprints: BadgeBlueprint[] = [

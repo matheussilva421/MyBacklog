@@ -1,10 +1,11 @@
-import type { PlaySession } from "../../../core/types";
 import { type SessionFormState } from "../../../backlog/shared";
+import { getTodayDateInputValue } from "../../../core/utils";
+import type { PlaySession } from "../../../core/types";
 
 export function createSessionFormState(gameId?: number): SessionFormState {
   return {
     gameId: gameId ? String(gameId) : "",
-    date: new Date().toISOString().slice(0, 10),
+    date: getTodayDateInputValue(),
     durationMinutes: "60",
     completionPercent: "",
     note: "",
@@ -16,7 +17,7 @@ export function defaultSessionToDbSession(session: Partial<PlaySession>): PlaySe
   if (!session.libraryEntryId) throw new Error("libraryEntryId é obrigatório para criar uma sessão.");
   return {
     libraryEntryId: session.libraryEntryId,
-    date: session.date ?? new Date().toISOString().slice(0, 10),
+    date: session.date ?? getTodayDateInputValue(),
     platform: session.platform ?? "PC",
     durationMinutes: session.durationMinutes ?? 0,
     completionPercent: session.completionPercent,
