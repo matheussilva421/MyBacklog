@@ -1,34 +1,7 @@
-import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry, PlaySession as DbPlaySession, Goal as DbGoal, List as DbList, Tag as DbTag, Review as DbReview, GameFormat, OwnershipStatus, Priority, ProgressStatus } from "../../../core/types";
+import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry, PlaySession as DbPlaySession, Goal as DbGoal, List as DbList, Tag as DbTag, Review as DbReview, OwnershipStatus, Priority, ProgressStatus } from "../../../core/types";
 import { normalizeGameTitle, mergePlatformList } from "../../../core/utils";
 import { composeLibraryRecords } from "../../library/utils";
-import type { BackupPayload, RestoreMode, ImportPreviewEntry, RestorePreview } from "../../../backlog/shared";
-
-export type ImportSource = "csv" | "steam" | "playnite";
-
-export type ImportPayload = {
-  title: string;
-  platform: string;
-  sourceStore: string;
-  format: GameFormat;
-  ownershipStatus: OwnershipStatus;
-  progressStatus: ProgressStatus;
-  playtimeMinutes: number;
-  completionPercent: number;
-  priority: Priority;
-  personalRating?: number;
-  notes?: string;
-  rawgId?: number;
-  genres?: string;
-  checklist?: string;
-  estimatedTime?: string;
-  mood?: string;
-  difficulty?: string;
-  releaseYear?: number;
-  favorite?: boolean;
-  coverUrl?: string;
-  developer?: string;
-  publisher?: string;
-};
+import type { BackupPayload, RestoreMode, ImportPreviewEntry, RestorePreview, ImportPayload, ImportSource } from "../../../backlog/shared";
 
 export function normalizeImportValue(value: string): string {
   return value.trim().toLowerCase();
@@ -414,7 +387,7 @@ export function createDbGameFromImport(item: ImportPayload, currentGame?: DbGame
     },
     libraryEntry: {
       id: currentEntry?.id,
-      gameId: currentGame?.id ?? 0,
+      gameId: currentGame?.id as number,
       platform: item.platform.trim() || currentEntry?.platform || "PC",
       sourceStore: item.sourceStore || currentEntry?.sourceStore || "Importado",
       edition: currentEntry?.edition,
@@ -645,7 +618,26 @@ export function buildRestorePreview(
 }
 export function parseBackupText(text: string): BackupPayload | null {
   try {
-    return JSON.parse(text);
+    const data = JSON.parse(text);
+    if (
+      typeof data !== "object" ||
+      data === null ||
+      typeof data.version !== "number" ||
+      typeof data.exportedAt !== "string" ||
+      !Array.isArray(data.games) ||
+      !Array.isArray(data.libraryEntries)
+    ) {
+      return null;
+    }
+    return {
+      ...data,
+      playSessions: Array.isArray(data.playSessions) ? data.playSessions : [],
+      reviews: Array.isArray(data.reviews) ? data.reviews : [],
+      lists: Array.isArray(data.lists) ? data.lists : [],
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      gameTags: Array.isArray(data.gameTags) ? data.gameTags : [],
+      goals: Array.isArray(data.goals) ? data.goals : [],
+    };
   } catch {
     return null;
   }

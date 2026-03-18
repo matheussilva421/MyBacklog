@@ -1485,3 +1485,56 @@ button {
     height: 260px;
   }
 }
+
+/* Goal row actions */
+.goal-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.goal-row__actions .cp-button {
+  padding: 2px 4px;
+  min-width: auto;
+}
+
+/* Session card actions */
+.session-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.session-card__actions .cp-button {
+  padding: 2px 4px;
+  min-width: auto;
+}
+
+/* List stack */
+.list-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(var(--bg-card-rgb), 0.4);
+}
+
+.list-row__info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.list-row__info strong {
+  color: var(--text);
+  font-size: 14px;
+}

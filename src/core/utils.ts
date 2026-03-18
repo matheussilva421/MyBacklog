@@ -34,7 +34,7 @@ export function formatRemainingEta(raw: string, progressPercent: number, loggedH
   if (!Number.isFinite(etaHours)) return "Sem ETA";
 
   const clampedProgress = Math.max(0, Math.min(100, Math.round(progressPercent)));
-  if (clampedProgress >= 100) return "Concluido";
+  if (clampedProgress >= 100) return "Concluído";
 
   let remainingHours = etaHours;
   if (clampedProgress > 0) {

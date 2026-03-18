@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { formatDuration, priorityTone, statusTone } from "../../../backlog/shared";
+import type { PlaySession } from "../../../core/types";
 import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
 import type { GamePageData } from "../utils/gamePageData";
 
@@ -30,6 +31,8 @@ type GamePageScreenProps = {
   onBack: () => void;
   onOpenEdit: () => void;
   onOpenSession: (gameId?: number) => void;
+  onEditSession: (session: PlaySession) => void;
+  onDeleteSession: (sessionId: number) => Promise<void>;
   onToggleFavorite: () => void;
   onSendToPlanner: () => void;
   onDelete: () => void;
@@ -54,6 +57,8 @@ export function GamePageScreen({
   onBack,
   onOpenEdit,
   onOpenSession,
+  onEditSession,
+  onDeleteSession,
   onToggleFavorite,
   onSendToPlanner,
   onDelete,
@@ -204,6 +209,14 @@ export function GamePageScreen({
                     <div className="session-card__title">
                       <h3>{new Date(session.date).toLocaleDateString("pt-BR")}</h3>
                       <Pill tone="neutral">{session.platform}</Pill>
+                      <div className="session-card__actions">
+                        <NotchButton variant="ghost" onClick={() => onEditSession(session)}>
+                          <Pencil size={12} />
+                        </NotchButton>
+                        <NotchButton variant="ghost" onClick={() => session.id != null && onDeleteSession(session.id)}>
+                          <Trash2 size={12} />
+                        </NotchButton>
+                      </div>
                     </div>
                     <p>{session.note || "Sessão registrada sem anotação adicional."}</p>
                   </div>

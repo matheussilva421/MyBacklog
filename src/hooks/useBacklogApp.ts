@@ -5,9 +5,13 @@ import type {
   Game as DbGameMetadata,
   GameTag as DbGameTag,
   Goal as DbGoal,
+  GoalType,
   LibraryEntry as DbLibraryEntry,
+  List as DbList,
+  Period,
   PlaySession as DbPlaySession,
   Review as DbReview,
+  Setting as DbSetting,
   Tag as DbTag,
 } from "../core/types";
 import { buildGamePageData } from "../modules/game-page/utils/gamePageData";
@@ -49,6 +53,7 @@ import {
   type BackupTables,
   type GameFormState,
   type Goal,
+  type GoalFormState,
   type ImportPreviewAction,
   type ImportPreviewEntry,
   type PiePoint,
@@ -91,12 +96,19 @@ export function useBacklogApp() {
   const [tagRows, setTagRows] = useState<DbTag[]>([]);
   const [gameTagRows, setGameTagRows] = useState<DbGameTag[]>([]);
   const [goalRows, setGoalRows] = useState<DbGoal[]>([]);
+  const [listRows, setListRows] = useState<DbList[]>([]);
+  const [settingRows, setSettingRows] = useState<DbSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [gameModalMode, setGameModalMode] = useState<"create" | "edit" | null>(null);
   const [gameForm, setGameForm] = useState<GameFormState>(() => createGameFormState());
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
   const [sessionForm, setSessionForm] = useState<SessionFormState>(() => createSessionFormState());
+  const [sessionEditId, setSessionEditId] = useState<number | null>(null);
+  const [goalModalMode, setGoalModalMode] = useState<"create" | "edit" | null>(null);
+  const [goalForm, setGoalForm] = useState<GoalFormState>({ type: "finished", target: "", period: "monthly" });
+  const [editingGoalId, setEditingGoalId] = useState<number | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importSource, setImportSource] = useState<ImportSource>("csv");
   const [importText, setImportText] = useState("");
@@ -125,13 +137,15 @@ export function useBacklogApp() {
       storedEntries = await db.libraryEntries.orderBy("updatedAt").reverse().toArray();
     }
 
-    const [storedGames, storedSessions, storedReviews, storedTags, storedGameTags, storedGoals] = await Promise.all([
+    const [storedGames, storedSessions, storedReviews, storedTags, storedGameTags, storedGoals, storedLists, storedSettings] = await Promise.all([
       db.games.toArray(),
       db.playSessions.orderBy("date").reverse().toArray(),
       db.reviews.toArray(),
       db.tags.toArray(),
       db.gameTags.toArray(),
       db.goals.toArray(),
+      db.lists.toArray(),
+      db.settings.toArray(),
     ]);
     setGameRows(sortByUpdatedAtDesc(storedGames));
     setLibraryEntryRows(storedEntries);
@@ -140,6 +154,8 @@ export function useBacklogApp() {
     setTagRows(storedTags);
     setGameTagRows(storedGameTags);
     setGoalRows(storedGoals);
+    setListRows(storedLists);
+    setSettingRows(storedSettings);
   };
 
   useEffect(() => {
@@ -160,7 +176,7 @@ export function useBacklogApp() {
 
   useEffect(() => {
     if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(null), 3600);
+    const timer = window.setTimeout(() => setNotice(null), 5000);
     return () => window.clearTimeout(timer);
   }, [notice]);
 
@@ -175,6 +191,11 @@ export function useBacklogApp() {
   );
   const tagById = useMemo(() => new Map(tagRows.map((tag) => [tag.id, tag] as const)), [tagRows]);
   const games = useMemo(() => records.map(dbGameToUiGame), [records]);
+  const displayName = useMemo(() => {
+    const setting = settingRows.find((s) => s.key === "displayName");
+    return setting?.value || "Backlog OS";
+  }, [settingRows]);
+
   const findRecord = (entryId: number) => recordsByEntryId.get(entryId);
   const findGame = (id: number) => games.find((game) => game.id === id);
 
@@ -264,7 +285,18 @@ export function useBacklogApp() {
     return values.some((value) => String(value).toLowerCase().includes(deferredQuery));
   };
 
-  const searchedGames = useMemo(() => games.filter((game) => matchesCollection([game.title, game.platform, game.genre, game.mood, game.notes, game.difficulty])), [deferredQuery, games]);
+  const tagNamesByEntryId = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const relation of gameTagRows) {
+      const tag = tagById.get(relation.tagId);
+      if (!tag) continue;
+      const current = map.get(relation.libraryEntryId) ?? "";
+      map.set(relation.libraryEntryId, current ? `${current}, ${tag.name}` : tag.name);
+    }
+    return map;
+  }, [gameTagRows, tagById]);
+
+  const searchedGames = useMemo(() => games.filter((game) => matchesCollection([game.title, game.platform, game.genre, game.mood, game.notes, game.difficulty, tagNamesByEntryId.get(game.id) ?? ""])), [deferredQuery, games, tagNamesByEntryId]);
   const libraryGames = useMemo(() => searchedGames.filter((game) => (filter === "Todos" ? true : game.status === filter)), [filter, searchedGames]);
 
   useEffect(() => {
@@ -380,9 +412,26 @@ export function useBacklogApp() {
     setGameForm(createGameFormState(selectedGame));
     setGameModalMode("edit");
   };
-  const closeSessionModal = () => setSessionModalOpen(false);
+  const closeSessionModal = () => {
+    setSessionModalOpen(false);
+    setSessionEditId(null);
+  };
   const openSessionModal = (gameId?: number) => {
+    setSessionEditId(null);
     setSessionForm(createSessionFormState(gameId));
+    setSessionModalOpen(true);
+  };
+  const openEditSessionModal = (session: DbPlaySession) => {
+    if (!session.id) return;
+    setSessionEditId(session.id);
+    setSessionForm({
+      gameId: String(session.libraryEntryId),
+      date: session.date,
+      durationMinutes: String(session.durationMinutes),
+      completionPercent: session.completionPercent != null ? String(session.completionPercent) : "",
+      mood: session.mood ?? "",
+      note: session.note ?? "",
+    });
     setSessionModalOpen(true);
   };
   const openGamePage = (gameId?: number) => {
@@ -460,9 +509,15 @@ export function useBacklogApp() {
     setImportPreview((current) => current?.map((entry) => (entry.id === entryId ? { ...entry, action } : entry)) ?? null);
   };
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
   const handleImportFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      setNotice("Arquivo muito grande. O limite é 10MB.");
+      return;
+    }
     try {
       const nextText = await file.text();
       setImportPreview(null);
@@ -477,6 +532,10 @@ export function useBacklogApp() {
   const handleRestoreFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      setNotice("Arquivo muito grande. O limite é 10MB.");
+      return;
+    }
     try {
       const nextText = await file.text();
       setRestorePreview(null);
@@ -490,10 +549,12 @@ export function useBacklogApp() {
 
   const handleGameSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitting) return;
     if (!gameForm.title.trim()) {
-      setNotice("Informe um titulo para o jogo.");
+      setNotice("Informe um título para o jogo.");
       return;
     }
+    setSubmitting(true);
 
     const current = gameModalMode === "edit" ? selectedRecord : undefined;
     const payload = createDbGameFromForm(gameForm, current);
@@ -521,15 +582,18 @@ export function useBacklogApp() {
     });
 
     await refreshData();
+    setSubmitting(false);
     setGameModalMode(null);
     setSelectedGameId(entryId ?? selectedGameId);
     setScreen("library");
-    setNotice(gameModalMode === "edit" ? "Jogo atualizado no catalogo." : "Jogo adicionado ao catalogo.");
+    setNotice(gameModalMode === "edit" ? "Jogo atualizado no catálogo." : "Jogo adicionado ao catálogo.");
   };
 
   const handleImportSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitting) return;
     try {
+      setSubmitting(true);
       if (!importPreview) {
         const parsed = parseImportText(importSource, importText);
         if (parsed.length === 0) {
@@ -538,7 +602,7 @@ export function useBacklogApp() {
         }
         const preview = buildImportPreview(parsed, records);
         if (preview.length === 0) {
-          setNotice("Nenhum item novo ou atualizavel foi encontrado.");
+          setNotice("Nenhum item novo ou atualizável foi encontrado.");
           return;
         }
         setImportPreview(preview);
@@ -595,14 +659,16 @@ export function useBacklogApp() {
       closeImportFlow();
       setScreen("library");
       setNotice(`${created} criados, ${updated} atualizados e ${ignored} ignorados na importação.`);
-    } catch {
-      setNotice("Falha ao processar o arquivo de importação.");
+    } catch (error) {
+      setNotice(`Falha ao processar importação: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleExport = async () => {
     if (records.length === 0) {
-      setNotice("A biblioteca esta vazia para exportar.");
+      setNotice("A biblioteca está vazia para exportar.");
       return;
     }
     downloadText(`arsenal-gamer-${new Date().toISOString().slice(0, 10)}.csv`, gamesToCsv(records.map(recordToImportPayload)), "text/csv;charset=utf-8");
@@ -613,7 +679,7 @@ export function useBacklogApp() {
     const tables = await readBackupTables();
     const totalRecords = tables.games.length + tables.libraryEntries.length + tables.playSessions.length + tables.reviews.length + tables.lists.length + tables.tags.length + tables.gameTags.length + tables.goals.length;
     if (totalRecords === 0) {
-      setNotice("A base local esta vazia para backup.");
+      setNotice("A base local está vazia para backup.");
       return;
     }
     const payload: BackupPayload = { version: 2, exportedAt: new Date().toISOString(), source: "mybacklog", ...tables };
@@ -623,18 +689,25 @@ export function useBacklogApp() {
 
   const handleRestoreSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitting) return;
     try {
+      setSubmitting(true);
       if (!restorePreview) {
         const payload = parseBackupText(restoreText);
         if (!payload) {
-          setNotice("Arquivo de backup invalido.");
+          setNotice("Arquivo de backup inválido.");
           return;
         }
         const preview = buildRestorePreview(payload, restoreMode, await readBackupTables());
         
-        setRestorePreview(preview as any);
+        setRestorePreview(preview);
         setNotice(`Preview de restore pronto para ${payload.libraryEntries.length} itens da biblioteca.`);
         return;
+      }
+
+      if (restorePreview.mode === "replace") {
+        const confirmed = window.confirm("Modo replace: toda a base local será apagada antes de restaurar. Deseja continuar?");
+        if (!confirmed) return;
       }
 
       const payload = restorePreview.payload;
@@ -780,37 +853,75 @@ export function useBacklogApp() {
       closeRestoreFlow();
       setScreen("library");
       setNotice(restorePreview.mode === "replace" ? "Backup restaurado com substituição total da base local." : "Backup mesclado com a base local.");
-    } catch {
-      setNotice("Falha ao restaurar o backup.");
+    } catch (error) {
+      setNotice(`Falha ao restaurar o backup: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleSessionSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitting) return;
     const libraryEntryId = Number(sessionForm.gameId);
-    const durationMinutes = Math.max(1, Number(sessionForm.durationMinutes) || 0);
+    const rawDuration = Number(sessionForm.durationMinutes) || 0;
     const currentEntry = libraryEntryRows.find((row) => row.id === libraryEntryId);
-    if (!libraryEntryId || !currentEntry || durationMinutes <= 0) {
-    setNotice("Preencha um jogo e uma duração válida para a sessão.");
+    if (!libraryEntryId || !currentEntry || rawDuration < 1) {
+      setNotice("Preencha um jogo e uma duração válida para a sessão.");
       return;
     }
+    const durationMinutes = Math.max(1, Math.round(rawDuration));
     const nextCompletion = sessionForm.completionPercent ? Math.max(0, Math.min(100, Number(sessionForm.completionPercent))) : undefined;
-    await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
-      await db.playSessions.add({ libraryEntryId, date: sessionForm.date, platform: currentEntry.platform, durationMinutes, completionPercent: nextCompletion, mood: sessionForm.mood || currentEntry.mood, note: sessionForm.note.trim() || undefined });
-      await db.libraryEntries.update(libraryEntryId, {
-        ownershipStatus: currentEntry.ownershipStatus === "wishlist" ? "owned" : currentEntry.ownershipStatus,
-        progressStatus: nextCompletion === 100 ? "finished" : "playing",
-        completionPercent: nextCompletion ?? currentEntry.completionPercent,
-        playtimeMinutes: currentEntry.playtimeMinutes + durationMinutes,
-        mood: sessionForm.mood.trim() || currentEntry.mood,
-        lastSessionAt: sessionForm.date,
-        updatedAt: new Date().toISOString(),
-      });
-    });
-    await refreshData();
-    setSessionModalOpen(false);
-    setSelectedGameId(libraryEntryId);
-    setNotice("Sessão registrada com sucesso.");
+    setSubmitting(true);
+    try {
+      if (sessionEditId != null) {
+        const oldSession = await db.playSessions.get(sessionEditId);
+        await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
+          await db.playSessions.update(sessionEditId, {
+            date: sessionForm.date,
+            durationMinutes,
+            completionPercent: nextCompletion,
+            mood: sessionForm.mood.trim() || undefined,
+            note: sessionForm.note.trim() || undefined,
+          });
+          if (oldSession && currentEntry.id) {
+            const timeDiff = durationMinutes - oldSession.durationMinutes;
+            await db.libraryEntries.update(currentEntry.id, {
+              playtimeMinutes: Math.max(0, currentEntry.playtimeMinutes + timeDiff),
+              completionPercent: nextCompletion ?? currentEntry.completionPercent,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        });
+      } else {
+        const nextProgressStatus = nextCompletion === 100
+          ? "finished"
+          : currentEntry.progressStatus === "not_started" || currentEntry.progressStatus === "paused"
+            ? "playing"
+            : currentEntry.progressStatus;
+        await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
+          await db.playSessions.add({ libraryEntryId, date: sessionForm.date, platform: currentEntry.platform, durationMinutes, completionPercent: nextCompletion, mood: sessionForm.mood || currentEntry.mood, note: sessionForm.note.trim() || undefined });
+          await db.libraryEntries.update(libraryEntryId, {
+            ownershipStatus: currentEntry.ownershipStatus === "wishlist" ? "owned" : currentEntry.ownershipStatus,
+            progressStatus: nextProgressStatus,
+            completionPercent: nextCompletion ?? currentEntry.completionPercent,
+            playtimeMinutes: currentEntry.playtimeMinutes + durationMinutes,
+            mood: sessionForm.mood.trim() || currentEntry.mood,
+            lastSessionAt: sessionForm.date,
+            updatedAt: new Date().toISOString(),
+          });
+        });
+      }
+      await refreshData();
+      setSessionModalOpen(false);
+      setSessionEditId(null);
+      setSelectedGameId(libraryEntryId);
+      setNotice(sessionEditId != null ? "Sessão atualizada." : "Sessão registrada com sucesso.");
+    } catch (error) {
+      setNotice(`Falha ao salvar sessão: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleGameReviewSave = async (payload: {
@@ -931,6 +1042,11 @@ export function useBacklogApp() {
 
   const handleResumeSelectedGame = async () => {
     if (!selectedRecord?.libraryEntry.id || !selectedGame) return;
+    const currentStatus = selectedRecord.libraryEntry.progressStatus;
+    if (currentStatus === "finished" || currentStatus === "completed_100") {
+      const confirmed = window.confirm(`${selectedGame.title} já está concluído. Deseja realmente retomar como "Jogando"?`);
+      if (!confirmed) return;
+    }
     await db.libraryEntries.update(selectedRecord.libraryEntry.id, { ownershipStatus: "owned", progressStatus: "playing", updatedAt: new Date().toISOString() });
     await refreshData();
     setNotice(`${selectedGame.title} voltou para a fila ativa.`);
@@ -956,6 +1072,104 @@ export function useBacklogApp() {
     setNotice(`${selectedGame.title} recebeu prioridade alta no planner.`);
   };
 
+  // ── Goal CRUD ──
+  const closeGoalModal = () => setGoalModalMode(null);
+  const openCreateGoalModal = () => {
+    setGoalForm({ type: "finished", target: "", period: "monthly" });
+    setEditingGoalId(null);
+    setGoalModalMode("create");
+  };
+  const openEditGoalModal = (goal: DbGoal) => {
+    setGoalForm({ type: goal.type, target: String(goal.target), period: goal.period });
+    setEditingGoalId(goal.id ?? null);
+    setGoalModalMode("edit");
+  };
+  const handleGoalFormChange = <K extends keyof GoalFormState>(field: K, value: GoalFormState[K]) => {
+    setGoalForm((current) => ({ ...current, [field]: value }));
+  };
+  const handleGoalSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submitting) return;
+    const target = Number(goalForm.target);
+    if (!target || target <= 0) {
+      setNotice("Informe um valor alvo maior que zero.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const goalData = { type: goalForm.type as GoalType, target, current: 0, period: goalForm.period as Period };
+      if (editingGoalId != null) {
+        await db.goals.update(editingGoalId, { type: goalData.type, target: goalData.target, period: goalData.period });
+      } else {
+        await db.goals.add(goalData);
+      }
+      await refreshData();
+      setGoalModalMode(null);
+      setNotice(editingGoalId != null ? "Meta atualizada." : "Meta criada com sucesso.");
+    } catch (error) {
+      setNotice(`Falha ao salvar meta: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  const handleGoalDelete = async (goalId: number) => {
+    const confirmed = window.confirm("Excluir esta meta?");
+    if (!confirmed) return;
+    await db.goals.delete(goalId);
+    await refreshData();
+    setNotice("Meta removida.");
+  };
+
+  // ── List CRUD ──
+  const handleListCreate = async (name: string) => {
+    if (!name.trim()) {
+      setNotice("Informe um nome para a lista.");
+      return;
+    }
+    await db.lists.add({ name: name.trim(), createdAt: new Date().toISOString() });
+    await refreshData();
+    setNotice("Lista criada com sucesso.");
+  };
+  const handleListDelete = async (listId: number) => {
+    const confirmed = window.confirm("Excluir esta lista?");
+    if (!confirmed) return;
+    await db.lists.delete(listId);
+    await refreshData();
+    setNotice("Lista removida.");
+  };
+
+  // ── Settings ──
+  const handleSettingSave = async (key: string, value: string) => {
+    const existing = await db.settings.where("key").equals(key).first();
+    if (existing?.id != null) {
+      await db.settings.update(existing.id, { value, updatedAt: new Date().toISOString() });
+    } else {
+      await db.settings.add({ key, value, updatedAt: new Date().toISOString() });
+    }
+    await refreshData();
+    setNotice("Configuração salva.");
+  };
+
+  // ── Session delete ──
+  const handleSessionDelete = async (sessionId: number) => {
+    const confirmed = window.confirm("Excluir esta sessão?");
+    if (!confirmed) return;
+    const session = await db.playSessions.get(sessionId);
+    if (!session) return;
+    await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
+      await db.playSessions.delete(sessionId);
+      const entry = await db.libraryEntries.get(session.libraryEntryId);
+      if (entry?.id) {
+        await db.libraryEntries.update(entry.id, {
+          playtimeMinutes: Math.max(0, entry.playtimeMinutes - session.durationMinutes),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+    await refreshData();
+    setNotice("Sessão excluída.");
+  };
+
   const openLibraryGame = (gameId?: number) => {
     if (typeof gameId === "number" && gameId > 0) setSelectedGameId(gameId);
     setScreen("library");
@@ -963,18 +1177,23 @@ export function useBacklogApp() {
 
   return {
     screen, setScreen, query, setQuery, filter, setFilter, selectedGameId, setSelectedGameId,
-    loading, notice, heroCopy, games, libraryGames, selectedGame, selectedGamePage, monthlyProgress, platformData,
+    loading, notice, submitting, heroCopy, games, libraryGames, selectedGame, selectedGamePage, monthlyProgress, platformData,
     durationBuckets, visibleSessions, visiblePlannerQueue, continuePlayingGames, stats, goalProgress,
     achievementCards, systemRules, findGame, gameModalMode, gameForm, sessionModalOpen, sessionForm,
+    sessionEditId, goalRows, listRows, displayName,
+    goalModalMode, goalForm,
     importModalOpen, importSource, importText, importFileName, importPreview, importPreviewSummary,
     importFileInputRef, restoreModalOpen, restoreMode, restoreText, restoreFileName, restorePreview,
     restorePreviewTotals, restoreFileInputRef, openCreateGameModal, openEditGameModal, closeGameModal,
-    openSessionModal, closeSessionModal, openImportFlow, closeImportFlow, resetImportPreview,
+    openSessionModal, closeSessionModal, openEditSessionModal, openImportFlow, closeImportFlow, resetImportPreview,
     openRestoreFlow, closeRestoreFlow, resetRestorePreview, handleGameFormChange, handleSessionFormChange,
     handleImportSourceChange, handleImportTextChange, handleRestoreModeChange, handleRestoreTextChange,
     handleImportPreviewActionChange, handleImportFileChange, handleRestoreFileChange, handleGameSubmit,
     handleImportSubmit, handleExport, handleBackupExport, handleRestoreSubmit, handleSessionSubmit,
     handleDeleteSelectedGame, handleResumeSelectedGame, handleFavoriteSelectedGame, handleGameReviewSave,
     handleGameTagsSave, handleSendSelectedToPlanner, openLibraryGame, openGamePage,
+    handleSessionDelete,
+    openCreateGoalModal, openEditGoalModal, closeGoalModal, handleGoalFormChange, handleGoalSubmit, handleGoalDelete,
+    handleListCreate, handleListDelete, handleSettingSave,
   };
 }

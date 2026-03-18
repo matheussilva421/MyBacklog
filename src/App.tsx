@@ -1,6 +1,6 @@
 import { CalendarDays, Cpu, Download, Orbit, Plus, Search, Upload, Zap } from "lucide-react";
 import { navigationItems } from "./backlog/shared";
-import { GameModal, ImportModal, RestoreModal, SessionModal } from "./components/backlog-modals";
+import { GameModal, GoalModal, ImportModal, RestoreModal, SessionModal } from "./components/backlog-modals";
 import { NotchButton, Panel, SectionHeader, SidebarItem, Tag } from "./components/cyberpunk-ui";
 import { useBacklogApp } from "./hooks/useBacklogApp";
 import { DashboardScreen } from "./modules/dashboard/components/DashboardScreen";
@@ -55,9 +55,13 @@ export default function App() {
       <PlannerScreen
         visiblePlannerQueue={app.visiblePlannerQueue}
         goalProgress={app.goalProgress}
+        goalRows={app.goalRows}
         systemRules={app.systemRules}
         findGame={app.findGame}
         onOpenGamePage={app.openGamePage}
+        onCreateGoal={app.openCreateGoalModal}
+        onEditGoal={app.openEditGoalModal}
+        onDeleteGoal={app.handleGoalDelete}
       />
     );
   } else if (app.screen === "stats") {
@@ -66,10 +70,23 @@ export default function App() {
         durationBuckets={app.durationBuckets}
         visibleSessions={app.visibleSessions}
         findGame={app.findGame}
+        onEditSession={app.openEditSessionModal}
+        onDeleteSession={app.handleSessionDelete}
       />
     );
   } else if (app.screen === "profile") {
-    screenContent = <ProfileScreen achievementCards={app.achievementCards} />;
+    screenContent = (
+      <ProfileScreen
+        achievementCards={app.achievementCards}
+        totalGames={app.stats.total}
+        totalHours={app.stats.hours}
+        displayName={app.displayName}
+        listRows={app.listRows}
+        onSettingSave={app.handleSettingSave}
+        onListCreate={app.handleListCreate}
+        onListDelete={app.handleListDelete}
+      />
+    );
   } else if (app.screen === "game") {
     screenContent = app.selectedGamePage ? (
       <GamePageScreen
@@ -77,6 +94,8 @@ export default function App() {
         onBack={() => app.openLibraryGame(app.selectedGamePage?.game.id)}
         onOpenEdit={app.openEditGameModal}
         onOpenSession={app.openSessionModal}
+        onEditSession={app.openEditSessionModal}
+        onDeleteSession={app.handleSessionDelete}
         onToggleFavorite={app.handleFavoriteSelectedGame}
         onSendToPlanner={app.handleSendSelectedToPlanner}
         onDelete={app.handleDeleteSelectedGame}
@@ -233,11 +252,20 @@ export default function App() {
 
       <SessionModal
         open={app.sessionModalOpen}
+        mode={app.sessionEditId != null ? "edit" : "create"}
         form={app.sessionForm}
         libraryGames={app.games}
         onClose={app.closeSessionModal}
         onChange={app.handleSessionFormChange}
         onSubmit={app.handleSessionSubmit}
+      />
+
+      <GoalModal
+        mode={app.goalModalMode}
+        form={app.goalForm}
+        onClose={app.closeGoalModal}
+        onChange={app.handleGoalFormChange}
+        onSubmit={app.handleGoalSubmit}
       />
 
       <ImportModal

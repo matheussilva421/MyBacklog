@@ -12,9 +12,10 @@ export function createSessionFormState(gameId?: number): SessionFormState {
   };
 }
 
-export function defaultSessionToDbSession(session: Partial<PlaySession>, _index: number): PlaySession {
+export function defaultSessionToDbSession(session: Partial<PlaySession>): PlaySession {
+  if (!session.libraryEntryId) throw new Error("libraryEntryId é obrigatório para criar uma sessão.");
   return {
-    libraryEntryId: session.libraryEntryId ?? 1,
+    libraryEntryId: session.libraryEntryId,
     date: session.date ?? new Date().toISOString().slice(0, 10),
     platform: session.platform ?? "PC",
     durationMinutes: session.durationMinutes ?? 0,

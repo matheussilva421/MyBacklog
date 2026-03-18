@@ -4,9 +4,12 @@ import {
   cx,
   gamePriorities,
   gameStatuses,
+  goalPeriodOptions,
+  goalTypeOptions,
   importSources,
   type Game,
   type GameFormState,
+  type GoalFormState,
   type ImportPreviewAction,
   type ImportPreviewEntry,
   type RestoreMode,
@@ -415,6 +418,7 @@ export function RestoreModal({
 
 export function SessionModal({
   open,
+  mode = "create",
   form,
   libraryGames,
   onChange,
@@ -422,6 +426,7 @@ export function SessionModal({
   onClose,
 }: {
   open: boolean;
+  mode?: "create" | "edit";
   form: SessionFormState;
   libraryGames: Game[];
   onChange: <K extends keyof SessionFormState>(field: K, value: SessionFormState[K]) => void;
@@ -432,15 +437,15 @@ export function SessionModal({
 
   return (
     <Modal
-      title="Registrar sessão"
-      description="Atualize o diário de jogo e alimente as estatísticas do sistema."
+      title={mode === "edit" ? "Editar sessão" : "Registrar sessão"}
+      description={mode === "edit" ? "Altere os dados desta sessão de jogo." : "Atualize o diário de jogo e alimente as estatísticas do sistema."}
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={onSubmit}>
         <div className="form-grid">
           <label className="field field--wide">
             <span>Jogo</span>
-            <select value={form.gameId} onChange={(event) => onChange("gameId", event.target.value)}>
+            <select value={form.gameId} onChange={(event) => onChange("gameId", event.target.value)} disabled={mode === "edit"}>
               <option value="">Selecione...</option>
               {libraryGames.map((game) => <option key={game.id} value={game.id}>{game.title}</option>)}
             </select>
@@ -468,7 +473,56 @@ export function SessionModal({
         </div>
         <div className="modal-actions">
           <NotchButton variant="ghost" type="button" onClick={onClose}>Cancelar</NotchButton>
-          <NotchButton variant="primary" type="submit">Salvar sessão</NotchButton>
+          <NotchButton variant="primary" type="submit">{mode === "edit" ? "Salvar alterações" : "Salvar sessão"}</NotchButton>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+export function GoalModal({
+  mode,
+  form,
+  onChange,
+  onSubmit,
+  onClose,
+}: {
+  mode: "create" | "edit" | null;
+  form: GoalFormState;
+  onChange: <K extends keyof GoalFormState>(field: K, value: GoalFormState[K]) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onClose: () => void;
+}) {
+  if (!mode) return null;
+
+  return (
+    <Modal
+      title={mode === "edit" ? "Editar meta" : "Nova meta"}
+      description="Defina um objetivo para acompanhar seu progresso no backlog."
+      onClose={onClose}
+    >
+      <form className="modal-form" onSubmit={onSubmit}>
+        <div className="form-grid">
+          <label className="field">
+            <span>Tipo</span>
+            <select value={form.type} onChange={(event) => onChange("type", event.target.value)}>
+              {goalTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>Período</span>
+            <select value={form.period} onChange={(event) => onChange("period", event.target.value)}>
+              {goalPeriodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>Alvo</span>
+            <input type="number" min="1" value={form.target} onChange={(event) => onChange("target", event.target.value)} />
+          </label>
+        </div>
+        <div className="modal-actions">
+          <NotchButton variant="ghost" type="button" onClick={onClose}>Cancelar</NotchButton>
+          <NotchButton variant="primary" type="submit">{mode === "edit" ? "Salvar alterações" : "Criar meta"}</NotchButton>
         </div>
       </form>
     </Modal>
