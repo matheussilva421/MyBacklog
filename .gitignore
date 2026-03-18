@@ -4,3 +4,10 @@ dist/
 .env
 output/
 .codex_preview_pid
+.claude/
+.eslintrc.json
+AGENTES_SETUP.md
+CLAUDE.md
+app-current-state
+dashboard-hero-validation
+src/modules/library/utils/

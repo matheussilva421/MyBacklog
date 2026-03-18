@@ -7,6 +7,12 @@
     "dev": "vite --host 0.0.0.0 --port 4173",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "generate:component": "node scripts/generate-component.js",
+    "generate:hook": "node scripts/generate-hook.js",
+    "generate:module": "node scripts/generate-module.js",
     "cf:deploy": "npm run build && wrangler deploy",
     "cf:dev": "wrangler dev"
   },
@@ -18,14 +24,18 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.27",
+    "jsdom": "^27.0.1",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
+    "vitest": "^3.2.4",
     "wrangler": "^4.75.0"
   }
 }

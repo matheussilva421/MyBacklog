@@ -200,7 +200,16 @@ export const gameStatuses: Status[] = ["Backlog", "Jogando", "Pausado", "Termina
 export const gamePriorities: Priority[] = ["Alta", "Média", "Baixa"];
 export const importSources: ImportSource[] = ["csv", "steam", "playnite"];
 
-export { cx, downloadText, formatDuration, formatMonthLabel, mergePlatformList, normalizeGameTitle, parseEtaHours } from "../core/utils";
+export {
+  cx,
+  downloadText,
+  formatDuration,
+  formatMonthLabel,
+  formatRemainingEta,
+  mergePlatformList,
+  normalizeGameTitle,
+  parseEtaHours,
+} from "../core/utils";
 
 export function statusToDbStatus(status: Status): DbProgressStatus {
   if (status === "Jogando") return "playing";

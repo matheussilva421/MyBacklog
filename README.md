@@ -72,6 +72,20 @@ Dev server: `http://127.0.0.1:4173`
 npm run build
 ```
 
+## Testes e geradores
+```bash
+npm run test:run
+npm run typecheck
+npm run generate:component GameCard
+npm run generate:hook useLibraryFilters
+npm run generate:module lists-tags-goals
+```
+
+O repositorio agora inclui:
+- Vitest + Testing Library para testes utilitarios e de componentes
+- setup compartilhado em `src/test/setup.ts`
+- geradores simples em `scripts/` para componente, hook e modulo
+
 ## Deploy Cloudflare
 O projeto agora tem configuracao manual para Cloudflare Workers Assets em `wrangler.jsonc`, sem depender do assistente automatico do `wrangler`.
 

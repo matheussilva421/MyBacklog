@@ -29,6 +29,26 @@ export function formatDuration(durationMinutes: number): string {
   return `${hours}h ${minutes}m`;
 }
 
+export function formatRemainingEta(raw: string, progressPercent: number, loggedHours = 0): string {
+  const etaHours = parseEtaHours(raw);
+  if (!Number.isFinite(etaHours)) return "Sem ETA";
+
+  const clampedProgress = Math.max(0, Math.min(100, Math.round(progressPercent)));
+  if (clampedProgress >= 100) return "Concluido";
+
+  let remainingHours = etaHours;
+  if (clampedProgress > 0) {
+    remainingHours = etaHours * ((100 - clampedProgress) / 100);
+  } else if (loggedHours > 0) {
+    remainingHours = etaHours - loggedHours;
+  }
+
+  if (remainingHours <= 0.5) return "<1h restante";
+
+  const roundedHours = Math.ceil(remainingHours);
+  return `${roundedHours}h restante${roundedHours === 1 ? "" : "s"}`;
+}
+
 export function formatMonthLabel(date: Date): string {
   return date.toLocaleString("pt-BR", { month: "short" }).replace(".", "").replace(/^\w/, (value) => value.toUpperCase());
 }

@@ -1,7 +1,6 @@
 import { Activity, Clock3, Flame, Gamepad2, ListTodo, Monitor, Target, Trophy } from "lucide-react";
 import { DonutChart, TrendLineChart } from "../../../charts";
-import type { Game, PiePoint, PlannerEntry } from "../../../backlog/shared";
-import { pieColors } from "../../../backlog/shared";
+import { formatRemainingEta, pieColors, type Game, type PiePoint, type PlannerEntry } from "../../../backlog/shared";
 import {
   ChartFrame,
   EmptyState,
@@ -156,7 +155,7 @@ export function DashboardScreen({
                       </p>
                     </div>
                     <div className="continue-card__actions">
-                      <Pill tone="magenta">{game.eta} restantes</Pill>
+                      <Pill tone="magenta">{formatRemainingEta(game.eta, game.progress, game.hours)}</Pill>
                       <NotchButton variant="primary" onClick={() => onOpenGamePage(game.id)}>
                         Detalhes
                       </NotchButton>
