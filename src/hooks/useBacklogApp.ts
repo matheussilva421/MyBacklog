@@ -20,7 +20,6 @@ import {
   buildImportPreview,
   buildRestorePreview,
   composeLibraryRecords,
-  computePlannerScore,
   createDbGameFromForm,
   createDbGameFromImport,
   createGameFormState,
@@ -68,6 +67,8 @@ import { useLibraryState } from "../modules/library/hooks/useLibraryState";
 import { usePlannerInsights } from "../modules/planner/hooks/usePlannerInsights";
 import { useAppPreferences } from "../modules/settings/hooks/useAppPreferences";
 import type { PreferencesDraft } from "../modules/settings/utils/preferences";
+import { buildSessionCadenceMap } from "../modules/sessions/utils/sessionAnalytics";
+import { savePlaySession } from "../modules/sessions/utils/sessionMutations";
 
 function normalizeTitle(title: string) {
   return title.trim().toLowerCase();
@@ -226,7 +227,7 @@ export function useBacklogApp() {
   }, [goalRows]);
 
   const findGame = (id: number) => games.find((game) => game.id === id);
-  const { monthlyProgress, platformData, durationBuckets, stats, achievementCards } = useDashboardInsights({ games, libraryEntryRows, sessionRows });
+  const sessionCadenceMap = useMemo(() => buildSessionCadenceMap(sessionRows), [sessionRows]);
   const { resolvedGoalRows, plannerGoalSignals, computedPlannerQueue, goalProgress } = usePlannerInsights({
     games,
     libraryEntryRows,
@@ -234,7 +235,17 @@ export function useBacklogApp() {
     goalRows,
     fallbackGoalProgress: tacticalGoals,
     preferences,
+    sessionCadenceMap,
   });
+  const { monthlyProgress, platformData, durationBuckets, stats, achievementCards, continuePlayingGames } =
+    useDashboardInsights({
+      games,
+      libraryEntryRows,
+      sessionRows,
+      plannerGoalSignals,
+      preferences,
+      query: deferredQuery,
+    });
   const matchesQuery = (values: Array<string | number>) => !deferredQuery || values.some((value) => String(value).toLowerCase().includes(deferredQuery));
   const { listOptions, searchedGames, libraryGames, selectedGame, selectedRecord, selectedGameLists } = useLibraryState({
     games,
@@ -272,7 +283,6 @@ export function useBacklogApp() {
     preferences,
   });
 
-  const continuePlayingGames = useMemo(() => games.filter((game) => game.status === "Jogando" || game.status === "Pausado").sort((left, right) => computePlannerScore(right, plannerGoalSignals, preferences) - computePlannerScore(left, plannerGoalSignals, preferences)).slice(0, 3).filter((game) => matchesQuery([game.title, game.genre, game.platform, game.notes])), [games, plannerGoalSignals, preferences, deferredQuery]);
   const visiblePlannerQueue = useMemo(() => computedPlannerQueue.filter((entry) => { const game = findGame(entry.gameId); return matchesQuery([game?.title ?? "", entry.reason, entry.fit, entry.eta]); }), [computedPlannerQueue, deferredQuery, games]);
   const visibleSessions = useMemo(() => sessionRows.filter((entry) => { const game = findGame(entry.libraryEntryId); return matchesQuery([game?.title ?? "", game?.platform ?? "", entry.note ?? "", formatDuration(entry.durationMinutes)]); }), [deferredQuery, games, sessionRows]);
   const heroCopy = screenMeta[screen];
@@ -334,6 +344,21 @@ export function useBacklogApp() {
   const handleGameFormChange = <K extends keyof GameFormState>(field: K, value: GameFormState[K]) => setGameForm((current) => ({ ...current, [field]: value }));
   const handleSessionFormChange = <K extends keyof SessionFormState>(field: K, value: SessionFormState[K]) => setSessionForm((current) => ({ ...current, [field]: value }));
   const handleGoalFormChange = <K extends keyof GoalFormState>(field: K, value: GoalFormState[K]) => setGoalForm((current) => ({ ...current, [field]: value }));
+
+  const persistSession = async (payload: {
+    sessionId?: number | null;
+    libraryEntryId: number;
+    date: string;
+    durationMinutes: number;
+    completionPercent?: number;
+    mood?: string;
+    note?: string;
+  }) => {
+    const result = await savePlaySession(payload);
+    await refreshData();
+    setSelectedGameId(result.libraryEntryId);
+    return result;
+  };
 
   const handleGameSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -738,6 +763,26 @@ export function useBacklogApp() {
     }
   };
 
+  const handleQuickSessionCreate = async (payload: {
+    libraryEntryId: number;
+    date: string;
+    durationMinutes: number;
+    completionPercent?: number;
+    mood?: string;
+    note?: string;
+  }) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await persistSession(payload);
+      setNotice("Sessao rapida registrada.");
+    } catch (error) {
+      setNotice(`Falha ao registrar sessao: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleGameReviewSave = async (payload: { score: string; recommend: "" | "yes" | "no"; shortReview: string; longReview: string; pros: string; cons: string; hasSpoiler: boolean }) => {
     if (!selectedRecord?.libraryEntry.id) return;
     const libraryEntryId = selectedRecord.libraryEntry.id;
@@ -990,15 +1035,15 @@ export function useBacklogApp() {
   };
 
   return {
-    screen, setScreen, query, setQuery, filter, setFilter, selectedListFilter, setSelectedListFilter, selectedGameId, setSelectedGameId,
+    screen, setScreen, query, setQuery, deferredQuery, filter, setFilter, selectedListFilter, setSelectedListFilter, selectedGameId, setSelectedGameId,
     loading, notice, submitting, heroCopy, preferences, displayName, hasCompletedOnboarding, onboardingInitialDraft, onboardingInitialLists, onboardingInitialGoalIds,
-    games, libraryGames, selectedGame, selectedGamePage, monthlyProgress, platformData, durationBuckets, visibleSessions, visiblePlannerQueue, continuePlayingGames, stats, goalProgress, achievementCards, systemRules, findGame,
+    games, sessionRows, libraryGames, selectedGame, selectedGamePage, monthlyProgress, platformData, durationBuckets, visibleSessions, visiblePlannerQueue, continuePlayingGames, stats, goalProgress, achievementCards, systemRules, findGame,
     gameModalMode, gameForm, sessionModalOpen, sessionForm, sessionEditId, goalRows: resolvedGoalRows, listRows, listOptions, selectedGameLists, goalModalMode, goalForm,
     importModalOpen: importState.importModalOpen, importSource: importState.importSource, importText: importState.importText, importFileName: importState.importFileName, importPreview: importState.importPreview, importPreviewSummary: importState.importPreviewSummary, importFileInputRef: importState.importFileInputRef,
     restoreModalOpen: importState.restoreModalOpen, restoreMode: importState.restoreMode, restoreText: importState.restoreText, restoreFileName: importState.restoreFileName, restorePreview: importState.restorePreview, restorePreviewTotals: importState.restorePreviewTotals, restoreFileInputRef: importState.restoreFileInputRef,
     openCreateGameModal, openEditGameModal, closeGameModal, openSessionModal, closeSessionModal, openEditSessionModal, openImportFlow: importState.openImportFlow, closeImportFlow: importState.closeImportFlow, resetImportPreview: importState.resetImportPreview, openRestoreFlow: importState.openRestoreFlow, closeRestoreFlow: importState.closeRestoreFlow, resetRestorePreview: importState.resetRestorePreview,
     handleGameFormChange, handleSessionFormChange, handleGoalFormChange, handleImportSourceChange: importState.handleImportSourceChange, handleImportTextChange: importState.handleImportTextChange, handleRestoreModeChange: importState.handleRestoreModeChange, handleRestoreTextChange: importState.handleRestoreTextChange, handleImportPreviewActionChange: importState.handleImportPreviewActionChange, handleImportPreviewMatchChange: importState.handleImportPreviewMatchChange, handleImportPreviewRawgChange: importState.handleImportPreviewRawgChange, handleImportFileChange: importState.handleImportFileChange, handleRestoreFileChange: importState.handleRestoreFileChange,
-    handleGameSubmit, handleImportSubmit, handleExport, handleBackupExport, handleRestoreSubmit, handleSessionSubmit, handleDeleteSelectedGame, handleResumeSelectedGame, handleFavoriteSelectedGame, handleGameReviewSave, handleGameTagsSave, handleGameListsSave, handleSendSelectedToPlanner, openLibraryGame, openGamePage, handleSessionDelete,
+    handleGameSubmit, handleImportSubmit, handleExport, handleBackupExport, handleRestoreSubmit, handleSessionSubmit, handleQuickSessionCreate, handleDeleteSelectedGame, handleResumeSelectedGame, handleFavoriteSelectedGame, handleGameReviewSave, handleGameTagsSave, handleGameListsSave, handleSendSelectedToPlanner, openLibraryGame, openGamePage, handleSessionDelete,
     openCreateGoalModal, openEditGoalModal, closeGoalModal, handleGoalSubmit, handleGoalDelete,
     handleListCreate, handleListDelete, handleSettingSave, handlePreferencesSave, handleOnboardingSubmit,
   };

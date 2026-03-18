@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildImportPreview, buildRestorePreview, parseImportText } from "./importExport";
+import { applyRawgMetadataToImportPayload } from "./rawg";
 import type { BackupPayload } from "../../../backlog/shared";
 import type { Game, LibraryEntry, LibraryEntryList, List, Setting } from "../../../core/types";
 
@@ -133,5 +134,37 @@ describe("importExport", () => {
 
     expect(settingsRow).toEqual({ label: "Configurações", create: 0, update: 1, skip: 0 });
     expect(listRelationRow).toEqual({ label: "Relações de lista", create: 1, update: 0, skip: 0 });
+  });
+
+  it("applies RAWG enrichment without overwriting manual metadata", () => {
+    const payload = {
+      title: "Hades",
+      platform: "PC",
+      sourceStore: "Steam",
+      format: "digital" as const,
+      ownershipStatus: "owned" as const,
+      progressStatus: "playing" as const,
+      playtimeMinutes: 120,
+      completionPercent: 35,
+      priority: "high" as const,
+      genres: "Roguelike",
+      developer: "Supergiant Games",
+    };
+
+    const enriched = applyRawgMetadataToImportPayload(payload, {
+      rawgId: 123,
+      coverUrl: "https://example.com/hades.jpg",
+      genres: "Action, Roguelike",
+      releaseYear: 2020,
+      platforms: "PC, Switch",
+      developer: "RAWG Dev",
+      publisher: "RAWG Pub",
+    });
+
+    expect(enriched.rawgId).toBe(123);
+    expect(enriched.coverUrl).toBe("https://example.com/hades.jpg");
+    expect(enriched.genres).toBe("Roguelike");
+    expect(enriched.developer).toBe("Supergiant Games");
+    expect(enriched.publisher).toBe("RAWG Pub");
   });
 });

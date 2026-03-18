@@ -133,6 +133,12 @@ button {
   gap: 20px;
 }
 
+.sessions-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+  gap: 20px;
+}
+
 .profile-layout {
   display: grid;
   grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.28fr);
@@ -863,7 +869,9 @@ button {
 }
 
 .priority-stack,
-.planner-list {
+.planner-list,
+.session-history-stack,
+.game-page-notes {
   display: grid;
   gap: 14px;
 }
@@ -1091,6 +1099,66 @@ button {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.sessions-console,
+.sessions-console__timer,
+.sessions-filters,
+.session-group {
+  display: grid;
+  gap: 14px;
+}
+
+.sessions-console__timer-actions,
+.sessions-filters__row,
+.session-group__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sessions-console__timer-actions .cp-button {
+  min-width: 128px;
+}
+
+.chart-area--sessions {
+  height: 240px;
+}
+
+.session-group {
+  padding: 16px;
+  border: 1px solid var(--line-soft);
+  background: rgba(7, 9, 13, 0.82);
+}
+
+.session-group__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.session-group__head p {
+  margin: 6px 0 0;
+  color: var(--text-soft);
+  font-size: 15px;
+}
+
+.session-group__title {
+  border: 0;
+  padding: 0;
+  color: var(--text);
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.session-group__insights {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .game-page-tag-list {
@@ -1424,6 +1492,7 @@ button {
 @media (max-width: 1480px) {
   .library-layout,
   .planner-layout,
+  .sessions-layout,
   .stats-layout,
   .profile-layout,
   .game-page-layout {
@@ -1486,6 +1555,7 @@ button {
   .profile-card__meta,
   .achievement-grid,
   .hero-panel__action-grid,
+  .session-group__insights,
   .game-page-stat-grid,
   .game-page-session-metrics,
   .game-page-action-grid,

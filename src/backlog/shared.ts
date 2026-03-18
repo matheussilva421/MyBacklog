@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   LayoutDashboard,
   Library,
   FolderKanban,
@@ -54,13 +55,14 @@ export type ImportPayload = {
   publisher?: string;
 };
 
-export type ScreenKey = "dashboard" | "library" | "planner" | "stats" | "profile" | "game";
+export type ScreenKey = "dashboard" | "library" | "sessions" | "planner" | "stats" | "profile" | "game";
 
 type NavigationScreenKey = Exclude<ScreenKey, "game">;
 
 export const navigationItems: Array<{ key: NavigationScreenKey; label: string; icon: LucideIcon }> = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "library", label: "Biblioteca", icon: Library },
+  { key: "sessions", label: "Sessoes", icon: CalendarDays },
   { key: "planner", label: "Planner", icon: FolderKanban },
   { key: "stats", label: "Estatísticas", icon: BarChart3 },
   { key: "profile", label: "Perfil", icon: User },

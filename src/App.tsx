@@ -8,6 +8,7 @@ import { GamePageScreen } from "./modules/game-page/components/GamePageScreen";
 import { OnboardingScreen } from "./modules/onboarding/components/OnboardingScreen";
 import { LibraryScreen } from "./modules/library/components/LibraryScreen";
 import { PlannerScreen } from "./modules/planner/components/PlannerScreen";
+import { SessionsScreen } from "./modules/sessions/components/SessionsScreen";
 import { ProfileScreen } from "./modules/settings/components/ProfileScreen";
 import { StatsScreen } from "./modules/stats/components/StatsScreen";
 
@@ -95,6 +96,18 @@ export default function App() {
         onCreateGoal={app.openCreateGoalModal}
         onEditGoal={app.openEditGoalModal}
         onDeleteGoal={app.handleGoalDelete}
+      />
+    );
+  } else if (app.screen === "sessions") {
+    screenContent = (
+      <SessionsScreen
+        games={app.games}
+        sessions={app.sessionRows}
+        query={app.deferredQuery}
+        onQuickRegister={app.handleQuickSessionCreate}
+        onEditSession={app.openEditSessionModal}
+        onDeleteSession={app.handleSessionDelete}
+        onOpenGamePage={app.openGamePage}
       />
     );
   } else if (app.screen === "stats") {

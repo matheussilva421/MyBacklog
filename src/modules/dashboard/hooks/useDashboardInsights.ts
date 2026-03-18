@@ -8,9 +8,12 @@ import {
   type Achievement,
   type Game,
   type PiePoint,
-  yearlyEvolution,
 } from "../../../backlog/shared";
 import type { LibraryEntry as DbLibraryEntry, PlaySession as DbPlaySession } from "../../../core/types";
+import type { PlannerGoalSignals } from "../../planner/utils/goals";
+import { computePlannerScore } from "../../planner/utils/scoring";
+import type { AppPreferences } from "../../settings/utils/preferences";
+import { buildSessionCadenceMap } from "../../sessions/utils/sessionAnalytics";
 
 function isSameMonth(date: Date, target: Date): boolean {
   return date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth();
@@ -24,30 +27,50 @@ type UseDashboardInsightsArgs = {
   games: Game[];
   libraryEntryRows: DbLibraryEntry[];
   sessionRows: DbPlaySession[];
+  plannerGoalSignals: PlannerGoalSignals;
+  preferences: AppPreferences;
+  query: string;
 };
 
-export function useDashboardInsights({ games, libraryEntryRows, sessionRows }: UseDashboardInsightsArgs) {
+export function useDashboardInsights({
+  games,
+  libraryEntryRows,
+  sessionRows,
+  plannerGoalSignals,
+  preferences,
+  query,
+}: UseDashboardInsightsArgs) {
+  const sessionCadenceMap = useMemo(() => buildSessionCadenceMap(sessionRows), [sessionRows]);
+
   const monthlyProgress = useMemo(() => {
-    if (libraryEntryRows.length === 0) return yearlyEvolution;
+    if (libraryEntryRows.length === 0) return backlogByDuration.map((entry) => ({ month: entry.name, started: 0, finished: 0 }));
     const months = Array.from({ length: 6 }, (_, index) => {
       const date = new Date();
       date.setDate(1);
       date.setMonth(date.getMonth() - (5 - index));
-      return { month: formatMonthLabel(date), key: `${date.getFullYear()}-${date.getMonth()}`, started: 0, finished: 0 };
+      return {
+        month: formatMonthLabel(date),
+        key: `${date.getFullYear()}-${date.getMonth()}`,
+        started: 0,
+        finished: 0,
+      };
     });
     const monthMap = new Map(months.map((entry) => [entry.key, entry]));
+
     for (const entry of libraryEntryRows) {
-      const createdKey = `${new Date(entry.createdAt).getFullYear()}-${new Date(entry.createdAt).getMonth()}`;
-      if (entry.ownershipStatus !== "wishlist") {
-        const createdBucket = monthMap.get(createdKey);
-        if (createdBucket) createdBucket.started += 1;
+      const createdAt = new Date(entry.createdAt);
+      const createdBucket = monthMap.get(`${createdAt.getFullYear()}-${createdAt.getMonth()}`);
+      if (createdBucket && entry.ownershipStatus !== "wishlist") {
+        createdBucket.started += 1;
       }
+
       if (entry.progressStatus === "finished" || entry.progressStatus === "completed_100") {
         const finishedAt = new Date(entry.updatedAt);
         const finishedBucket = monthMap.get(`${finishedAt.getFullYear()}-${finishedAt.getMonth()}`);
         if (finishedBucket) finishedBucket.finished += 1;
       }
     }
+
     return months.map(({ month, started, finished }) => ({ month, started, finished }));
   }, [libraryEntryRows]);
 
@@ -64,7 +87,13 @@ export function useDashboardInsights({ games, libraryEntryRows, sessionRows }: U
 
   const durationBuckets = useMemo(() => {
     if (games.length === 0) return backlogByDuration;
-    const buckets = [{ name: "Até 10h", total: 0 }, { name: "10-25h", total: 0 }, { name: "25-50h", total: 0 }, { name: "50h+", total: 0 }];
+    const buckets = [
+      { name: "Ate 10h", total: 0 },
+      { name: "10-25h", total: 0 },
+      { name: "25-50h", total: 0 },
+      { name: "50h+", total: 0 },
+    ];
+
     for (const game of games) {
       if (game.status === "Terminado" || game.status === "Wishlist") continue;
       const etaHours = parseEtaHours(game.eta);
@@ -73,6 +102,7 @@ export function useDashboardInsights({ games, libraryEntryRows, sessionRows }: U
       else if (etaHours > 10) buckets[1].total += 1;
       else buckets[0].total += 1;
     }
+
     return buckets;
   }, [games]);
 
@@ -81,67 +111,99 @@ export function useDashboardInsights({ games, libraryEntryRows, sessionRows }: U
     const weekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
     const total = games.length;
     const backlog = games.filter((game) => game.status === "Backlog").length;
-    const playing = games.filter((game) => game.status === "Jogando").length;
+    const activeNow = games.filter((game) => {
+      const cadence = sessionCadenceMap.get(game.id);
+      return game.status !== "Terminado" && game.status !== "Wishlist" && Boolean(cadence && cadence.sessions30d > 0);
+    }).length;
     const finished = games.filter((game) => game.status === "Terminado").length;
-    const hours = games.reduce((totalHours, game) => totalHours + game.hours, 0);
+    const hours = Math.round(sessionRows.reduce((totalMinutes, session) => totalMinutes + session.durationMinutes, 0) / 60);
     const addedThisMonth = libraryEntryRows.filter((entry) => isSameMonth(new Date(entry.createdAt), now)).length;
-    const highPriorityBacklog = games.filter((game) => game.status === "Backlog" && game.priority === "Alta").length;
-    const sessionsThisWeek = sessionRows.filter((session) => new Date(session.date).getTime() >= weekAgo).length;
+    const dormantBacklog = games.filter((game) => {
+      if (game.status !== "Backlog") return false;
+      return sessionCadenceMap.get(game.id)?.isDormant;
+    }).length;
+    const activeGames7d = games.filter((game) => (sessionCadenceMap.get(game.id)?.sessions7d || 0) > 0).length;
     const recentHours = Math.round(
       sessionRows
         .filter((session) => new Date(session.date).getTime() >= weekAgo)
         .reduce((totalMinutes, session) => totalMinutes + session.durationMinutes, 0) / 60,
     );
-    const completionRate = total > 0 ? Math.round((finished / total) * 100) : 0;
+    const finishedThisYear = libraryEntryRows.filter((entry) => {
+      if (entry.progressStatus !== "finished" && entry.progressStatus !== "completed_100") return false;
+      return new Date(entry.updatedAt).getFullYear() === now.getFullYear();
+    }).length;
 
     return {
       total,
       backlog,
-      playing,
+      playing: activeNow,
       finished,
       hours,
-      totalDelta: addedThisMonth > 0 ? `+${addedThisMonth} este mês` : "sem novos este mês",
-      backlogDelta: highPriorityBacklog > 0 ? `${highPriorityBacklog} alta prioridade` : "sem pressão tática",
-      playingDelta: sessionsThisWeek > 0 ? `${sessionsThisWeek} sessões na semana` : "sem sessões recentes",
-      finishedDelta: `${completionRate}% de conclusão`,
+      totalDelta: addedThisMonth > 0 ? `+${addedThisMonth} este mes` : "sem novos este mes",
+      backlogDelta: dormantBacklog > 0 ? `${dormantBacklog} frios` : "fila aquecida",
+      playingDelta: activeGames7d > 0 ? `${activeGames7d} ativos em 7 dias` : "sem ritmo recente",
+      finishedDelta: finishedThisYear > 0 ? `+${finishedThisYear} no ano` : "sem fechamentos no ano",
       hoursDelta: formatPositiveHours(recentHours),
     };
-  }, [games, libraryEntryRows, sessionRows]);
+  }, [games, libraryEntryRows, sessionCadenceMap, sessionRows]);
 
   const achievementCards = useMemo<Achievement[]>(() => {
     if (games.length === 0) return profileAchievements;
-    const largestBucket = durationBuckets.reduce(
-      (current, entry) => (entry.total > current.total ? entry : current),
-      durationBuckets[0] || { name: "Até 10h", total: 0 },
-    );
+    const activeGames = games.filter((game) => (sessionCadenceMap.get(game.id)?.sessions30d || 0) > 0).length;
+    const bestStreak = Math.max(0, ...Array.from(sessionCadenceMap.values()).map((cadence) => cadence.streakWeeks));
+    const hottestGame = games.find((game) => sessionCadenceMap.get(game.id)?.label === "Ritmo quente");
+    const dormantCount = games.filter((game) => sessionCadenceMap.get(game.id)?.isDormant).length;
 
     return [
       {
         icon: profileAchievements[0].icon,
         tone: "emerald",
         title: `${games.filter((game) => game.status === "Terminado").length} jogos finalizados`,
-        description: "Histórico sólido e biblioteca viva.",
+        description: "Historico consolidado alimentado por sessoes reais.",
       },
       {
         icon: profileAchievements[1].icon,
         tone: "cyan",
-        title: "Radar de progresso ativo",
-        description: `${games.filter((game) => game.status === "Jogando").length} jogos com acompanhamento contínuo.`,
+        title: "Radar de atividade",
+        description: `${activeGames} jogos com sessoes no ultimos 30 dias.`,
       },
       {
         icon: profileAchievements[2].icon,
         tone: "magenta",
-        title: `${games.filter((game) => game.status === "Pausado").length} jogos pausados`,
-        description: "Baixo atrito para retomar e gerar avanço real.",
+        title: bestStreak > 0 ? `${bestStreak} semanas em streak` : "Sem streak ativa",
+        description: hottestGame ? `${hottestGame.title} esta puxando o ritmo recente.` : "Nenhum jogo aqueceu o suficiente ainda.",
       },
       {
         icon: profileAchievements[3].icon,
         tone: "yellow",
-        title: "Gargalo de médio porte",
-        description: `${largestBucket?.name || "Até 10h"} segue como principal bloco do backlog.`,
+        title: dormantCount > 0 ? `${dormantCount} itens esfriando` : "Backlog aquecido",
+        description: dormantCount > 0 ? "O motor detecta backlog sem sessoes ha mais de 45 dias." : "Sem gargalos frios relevantes no momento.",
       },
     ];
-  }, [durationBuckets, games]);
+  }, [games, sessionCadenceMap]);
+
+  const continuePlayingGames = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return games
+      .filter((game) => {
+        const cadence = sessionCadenceMap.get(game.id);
+        const isOperational = game.status === "Jogando" || game.status === "Pausado" || Boolean(cadence && cadence.sessions30d > 0);
+        if (!isOperational || game.status === "Terminado" || game.status === "Wishlist") return false;
+        if (!normalizedQuery) return true;
+        return [game.title, game.genre, game.platform, game.notes].some((value) =>
+          value.toLowerCase().includes(normalizedQuery),
+        );
+      })
+      .sort((left, right) => {
+        const rightCadence = sessionCadenceMap.get(right.id);
+        const leftCadence = sessionCadenceMap.get(left.id);
+        return (
+          computePlannerScore(right, plannerGoalSignals, preferences, rightCadence) -
+          computePlannerScore(left, plannerGoalSignals, preferences, leftCadence)
+        );
+      })
+      .slice(0, 3);
+  }, [games, plannerGoalSignals, preferences, query, sessionCadenceMap]);
 
   return {
     monthlyProgress,
@@ -149,5 +211,7 @@ export function useDashboardInsights({ games, libraryEntryRows, sessionRows }: U
     durationBuckets,
     stats,
     achievementCards,
+    continuePlayingGames,
+    sessionCadenceMap,
   };
 }

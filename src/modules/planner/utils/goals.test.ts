@@ -111,4 +111,43 @@ describe("planner goals", () => {
       defaultStores: ["Steam"],
     })).toContain("plataforma principal");
   });
+
+  it("prefers games with live cadence over cold paused items", () => {
+    const liveGame = createGame({ id: 3, status: "Jogando", progress: 32 });
+    const coldGame = createGame({ id: 4, status: "Pausado", progress: 32, platform: "PS5", sourceStore: "PS Store" });
+
+    const liveScore = computePlannerScore(liveGame, undefined, undefined, {
+      sessions7d: 2,
+      sessions30d: 4,
+      sessions90d: 5,
+      minutes7d: 210,
+      minutes30d: 380,
+      minutesThisMonth: 380,
+      activeDays30d: 4,
+      streakWeeks: 3,
+      daysSinceLastSession: 2,
+      lastSessionAt: "2026-03-16",
+      label: "Ritmo quente",
+      tone: "emerald",
+      isDormant: false,
+    });
+
+    const coldScore = computePlannerScore(coldGame, undefined, undefined, {
+      sessions7d: 0,
+      sessions30d: 0,
+      sessions90d: 1,
+      minutes7d: 0,
+      minutes30d: 0,
+      minutesThisMonth: 0,
+      activeDays30d: 0,
+      streakWeeks: 0,
+      daysSinceLastSession: 75,
+      lastSessionAt: "2025-12-31",
+      label: "Sem historico recente",
+      tone: "magenta",
+      isDormant: true,
+    });
+
+    expect(liveScore).toBeGreaterThan(coldScore);
+  });
 });

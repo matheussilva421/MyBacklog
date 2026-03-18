@@ -1,6 +1,7 @@
 import type { Game } from "../../../backlog/shared";
 import { parseEtaHours } from "../../../core/utils";
 import type { PlannerPreference } from "../../settings/utils/preferences";
+import type { SessionCadence } from "../../sessions/utils/sessionAnalytics";
 import type { PlannerGoalSignals } from "./goals";
 
 export type PlannerPreferenceContext = {
@@ -44,10 +45,33 @@ function getPreferenceBoost(game: Game, preferences?: PlannerPreferenceContext):
   return boost;
 }
 
+function getCadenceBoost(game: Game, cadence?: SessionCadence): number {
+  if (!cadence) return 0;
+
+  let boost = 0;
+  if (cadence.daysSinceLastSession != null) {
+    if (cadence.daysSinceLastSession <= 3) boost += 12;
+    else if (cadence.daysSinceLastSession <= 7) boost += 8;
+    else if (cadence.daysSinceLastSession <= 14) boost += 4;
+    else if (cadence.daysSinceLastSession > 60 && game.status === "Pausado") boost -= 10;
+    else if (cadence.daysSinceLastSession > 45) boost -= 6;
+  }
+
+  if (cadence.sessions30d >= 4) boost += 10;
+  else if (cadence.sessions30d >= 2) boost += 6;
+
+  if (cadence.streakWeeks >= 3) boost += Math.min(10, cadence.streakWeeks * 2);
+  if (cadence.minutes7d >= 180) boost += 6;
+  if (cadence.isDormant && game.status === "Backlog") boost -= 8;
+
+  return boost;
+}
+
 export function computePlannerScore(
   game: Game,
   goalSignals?: PlannerGoalSignals,
   preferences?: PlannerPreferenceContext,
+  cadence?: SessionCadence,
 ): number {
   let score = 0;
   const etaHours = parseEtaHours(game.eta);
@@ -56,7 +80,7 @@ export function computePlannerScore(
   if (game.status === "Jogando") score += 28;
   if (game.status === "Backlog") score += 12;
   if (game.priority === "Alta") score += 26;
-  if (game.priority === "Média") score += 14;
+  if (game.priority !== "Alta" && game.priority !== "Baixa") score += 14;
   if (game.progress > 0) score += Math.min(22, Math.round(game.progress / 4));
 
   if (etaHours <= 5) score += 18;
@@ -97,6 +121,7 @@ export function computePlannerScore(
   }
 
   score += getPreferenceBoost(game, preferences);
+  score += getCadenceBoost(game, cadence);
 
   if (game.status === "Wishlist") score = -999;
   if (game.status === "Terminado") score = -999;
@@ -107,12 +132,13 @@ export function buildPlannerReason(
   game: Game,
   goalSignals?: PlannerGoalSignals,
   preferences?: PlannerPreferenceContext,
+  cadence?: SessionCadence,
 ): string {
   const reasons: string[] = [];
   const etaHours = parseEtaHours(game.eta);
 
   if (goalSignals?.finishPressure && goalSignals.finishPressure >= 0.35 && game.progress > 0) {
-    reasons.push("Empurra a meta de conclusão com progresso já acumulado.");
+    reasons.push("Empurra a meta de conclusao com progresso ja acumulado.");
   }
   if (goalSignals?.startPressure && goalSignals.startPressure >= 0.35 && game.status === "Backlog" && game.progress === 0) {
     reasons.push("Ajuda a meta de iniciar jogos sem abrir um projeto longo demais.");
@@ -121,17 +147,26 @@ export function buildPlannerReason(
     reasons.push("Contribui direto para a meta de horas com baixo atrito.");
   }
   if (goalSignals?.backlogPressure && goalSignals.backlogPressure >= 0.35 && game.status !== "Wishlist" && game.status !== "Terminado") {
-    reasons.push("Reduz backlog parado ao transformar fila em avanço real.");
+    reasons.push("Reduz backlog parado ao transformar fila em avanco real.");
   }
   if (preferences && normalizeTokens(preferences.primaryPlatforms).has(game.platform.toLowerCase())) {
     reasons.push("Roda na sua plataforma principal, com baixo atrito operacional.");
   }
   if (preferences && normalizeTokens(preferences.defaultStores).has(game.sourceStore.toLowerCase())) {
-    reasons.push("Está dentro das suas fontes padrão e entra fácil no fluxo atual.");
+    reasons.push("Esta dentro das suas fontes padrao e entra facil no fluxo atual.");
   }
-  if (game.progress > 0) reasons.push("Já existe progresso e o atrito de retorno é baixo.");
-  if (etaHours <= 12) reasons.push("Cabe em bloco curto e ajuda a limpar backlog rápido.");
-  if (game.priority === "Alta") reasons.push("Prioridade manual alta mantém o jogo no topo.");
+  if (cadence?.sessions30d && cadence.sessions30d >= 3) {
+    reasons.push("Ja existe cadencia recente, entao o custo de continuar e baixo.");
+  }
+  if (cadence?.streakWeeks && cadence.streakWeeks >= 2) {
+    reasons.push("O historico mostra consistencia semanal que vale manter.");
+  }
+  if (cadence?.isDormant && game.status === "Pausado") {
+    reasons.push("Ficou frio demais e pede uma decisao clara de retomada.");
+  }
+  if (game.progress > 0) reasons.push("Ja existe progresso e o atrito de retorno e baixo.");
+  if (etaHours <= 12) reasons.push("Cabe em bloco curto e ajuda a limpar backlog rapido.");
+  if (game.priority === "Alta") reasons.push("Prioridade manual alta mantem o jogo no topo.");
   if (reasons.length === 0) reasons.push("Bom encaixe para manter o backlog em movimento.");
 
   return reasons.join(" ");
@@ -141,17 +176,24 @@ export function buildPlannerFit(
   game: Game,
   goalSignals?: PlannerGoalSignals,
   preferences?: PlannerPreferenceContext,
+  cadence?: SessionCadence,
 ): string {
   const etaHours = parseEtaHours(game.eta);
 
+  if (cadence?.sessions30d && cadence.sessions30d >= 4) {
+    return "Cadencia viva";
+  }
+  if (cadence?.streakWeeks && cadence.streakWeeks >= 2) {
+    return "Manter streak";
+  }
   if (goalSignals?.finishPressure && goalSignals.finishPressure >= 0.35 && game.progress > 0) {
-    return "Fechamento tático";
+    return "Fechamento tatico";
   }
   if (goalSignals?.startPressure && goalSignals.startPressure >= 0.35 && game.status === "Backlog" && game.progress === 0) {
-    return "Meta de início";
+    return "Meta de inicio";
   }
   if (goalSignals?.playtimePressure && goalSignals.playtimePressure >= 0.35 && game.status !== "Backlog") {
-    return "Sessão útil";
+    return "Sessao util";
   }
   if (preferences?.plannerPreference === "finish_active" && (game.status === "Jogando" || game.status === "Pausado")) {
     return "Fechar ativos";
@@ -160,8 +202,8 @@ export function buildPlannerFit(
     return "Limpeza de backlog";
   }
   if (etaHours <= 3) return "Fim de semana curto";
-  if (etaHours <= 12) return "Bloco médio";
+  if (etaHours <= 12) return "Bloco medio";
   if (game.status === "Pausado") return "Retorno imediato";
   if (game.mood.toLowerCase().includes("energia")) return "Noites com energia";
-  return "Sessões longas";
+  return "Sessoes longas";
 }
