@@ -60,7 +60,12 @@ type GamePageScreenProps = {
 
 function createReviewFormState(data: GamePageData): ReviewFormState {
   return {
-    score: data.review?.score != null ? String(data.review.score) : data.game.score > 0 ? String(data.game.score) : "",
+    score:
+      data.review?.score != null
+        ? String(data.review.score)
+        : data.game.score > 0
+          ? String(data.game.score)
+          : "",
     recommend: data.review?.recommend ?? "",
     shortReview: data.review?.shortReview ?? "",
     longReview: data.review?.longReview ?? "",
@@ -94,7 +99,9 @@ export function GamePageScreen({
   useEffect(() => {
     setReviewForm(createReviewFormState(data));
     setTagsValue(data.tags.map((tag) => tag.name).join(", "));
-    setSelectedListIds(data.lists.map((list) => list.id).filter((listId): listId is number => listId != null));
+    setSelectedListIds(
+      data.lists.map((list) => list.id).filter((listId): listId is number => listId != null),
+    );
   }, [data]);
 
   const handleReviewSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -125,7 +132,7 @@ export function GamePageScreen({
           <SectionHeader
             icon={Sparkles}
             title={data.game.title}
-            description="Pagina dedicada do jogo com relacao do usuario, sessoes e leitura tatica."
+            description="Página dedicada do jogo com relação do usuário, sessões e leitura tática."
             action={
               <div className="panel-toolbar">
                 <NotchButton variant="ghost" onClick={onBack}>
@@ -147,7 +154,7 @@ export function GamePageScreen({
           <div className="game-page-hero">
             <div className="game-page-hero__copy">
               <div className="game-page-hero__top">
-                <span className="detail-panel__eyebrow">Instancia ativa</span>
+                <span className="detail-panel__eyebrow">Instância ativa</span>
                 <div className="detail-panel__badges">
                   <Pill tone={statusTone[data.game.status]}>{data.game.status}</Pill>
                   <Pill tone={priorityTone[data.game.priority]}>{data.game.priority}</Pill>
@@ -175,11 +182,15 @@ export function GamePageScreen({
                 <strong>{data.game.eta}</strong>
               </div>
               <div className="detail-stat">
-                <span>Ultima sessao</span>
-                <strong>{data.lastSession ? new Date(data.lastSession.date).toLocaleDateString("pt-BR") : "--"}</strong>
+                <span>Última sessão</span>
+                <strong>
+                  {data.lastSession
+                    ? new Date(data.lastSession.date).toLocaleDateString("pt-BR")
+                    : "--"}
+                </strong>
               </div>
               <div className="detail-stat">
-                <span>Frequencia</span>
+                <span>Frequência</span>
                 <strong>{data.frequencyLabel}</strong>
               </div>
               <div className="detail-stat">
@@ -191,7 +202,7 @@ export function GamePageScreen({
 
           <div className="detail-progress">
             <div className="detail-progress__head">
-              <span>Barra de avanço</span>
+              <span>Barra de avanço</span>
               <strong>{data.game.progress}%</strong>
             </div>
             <ProgressBar value={data.game.progress} tone="sunset" />
@@ -213,7 +224,7 @@ export function GamePageScreen({
               <strong>{data.record.libraryEntry.format}</strong>
             </div>
             <div className="detail-stat">
-              <span>Estudio</span>
+              <span>Estúdio</span>
               <strong>{data.record.game.developer || "--"}</strong>
             </div>
             <div className="detail-stat">
@@ -233,7 +244,7 @@ export function GamePageScreen({
           <div className="game-page-action-grid">
             <NotchButton variant="primary" onClick={() => onOpenSession(data.game.id)}>
               <Clock3 size={14} />
-              Registrar sessao
+              Registrar sessão
             </NotchButton>
             <NotchButton variant="secondary" onClick={onSendToPlanner}>
               <FolderKanban size={14} />
@@ -249,8 +260,8 @@ export function GamePageScreen({
         <Panel>
           <SectionHeader
             icon={Clock3}
-            title="Timeline de sessoes"
-            description="Cadencia, horas por mes e notas rapidas da execucao real."
+            title="Timeline de sessões"
+            description="Cadência, horas por mês e notas rápidas da execução real."
           />
 
           <div className="game-page-session-metrics">
@@ -259,11 +270,11 @@ export function GamePageScreen({
               <strong>{formatDuration(data.totalSessionMinutes)}</strong>
             </div>
             <div className="detail-stat">
-              <span>Duracao media</span>
+              <span>Duração média</span>
               <strong>{formatDuration(data.averageSessionMinutes)}</strong>
             </div>
             <div className="detail-stat">
-              <span>Horas no mes</span>
+              <span>Horas no mês</span>
               <strong>{data.hoursThisMonthLabel}</strong>
             </div>
             <div className="detail-stat">
@@ -271,7 +282,7 @@ export function GamePageScreen({
               <strong>{data.cadence.activeDays30d}</strong>
             </div>
             <div className="detail-stat">
-              <span>Sessoes (30d)</span>
+              <span>Sessões (30d)</span>
               <strong>{data.cadence.sessions30d}</strong>
             </div>
             <div className="detail-stat">
@@ -281,15 +292,20 @@ export function GamePageScreen({
           </div>
 
           <ChartFrame className="chart-area--bar chart-area--sessions">
-            {({ width, height }) => <VerticalBarChart width={width} height={height} data={data.hoursPerMonth} color="#ff57c9" />}
+            {({ width, height }) => (
+              <VerticalBarChart width={width} height={height} data={data.hoursPerMonth} color="#ff57c9" />
+            )}
           </ChartFrame>
 
           <div className="session-list">
             {data.sessions.length === 0 ? (
-              <EmptyState message="Nenhuma sessao registrada para este jogo ainda." />
+              <EmptyState message="Nenhuma sessão registrada para este jogo ainda." />
             ) : (
               data.sessions.map((session) => (
-                <article className="session-card" key={session.id ?? `${session.libraryEntryId}-${session.date}-${session.durationMinutes}`}>
+                <article
+                  className="session-card"
+                  key={session.id ?? `${session.libraryEntryId}-${session.date}-${session.durationMinutes}`}
+                >
                   <div>
                     <div className="session-card__title">
                       <h3>{new Date(session.date).toLocaleDateString("pt-BR")}</h3>
@@ -298,12 +314,15 @@ export function GamePageScreen({
                         <NotchButton variant="ghost" onClick={() => onEditSession(session)}>
                           <Pencil size={12} />
                         </NotchButton>
-                        <NotchButton variant="ghost" onClick={() => session.id != null && onDeleteSession(session.id)}>
+                        <NotchButton
+                          variant="ghost"
+                          onClick={() => session.id != null && onDeleteSession(session.id)}
+                        >
                           <Trash2 size={12} />
                         </NotchButton>
                       </div>
                     </div>
-                    <p>{session.note || "Sessao registrada sem anotacao adicional."}</p>
+                    <p>{session.note || "Sessão registrada sem anotação adicional."}</p>
                   </div>
                   <div className="session-card__meta">
                     <span>
@@ -320,18 +339,22 @@ export function GamePageScreen({
         <Panel>
           <SectionHeader
             icon={MessageSquareQuote}
-            title="Notas rapidas e review"
-            description="Leitura curta por sessao e consolidacao critica do jogo."
+            title="Notas rápidas e review"
+            description="Leitura curta por sessão e consolidação crítica do jogo."
           />
 
           <div className="game-page-notes">
             {data.notedSessions.length === 0 ? (
-              <EmptyState message="Nenhuma anotacao rapida foi registrada nas sessoes deste jogo." />
+              <EmptyState message="Nenhuma anotação rápida foi registrada nas sessões deste jogo." />
             ) : (
               data.notedSessions.map((session) => (
-                <article className="detail-note" key={`note-${session.id ?? `${session.date}-${session.durationMinutes}`}`}>
+                <article
+                  className="detail-note"
+                  key={`note-${session.id ?? `${session.date}-${session.durationMinutes}`}`}
+                >
                   <span className="detail-note__eyebrow">
-                    {new Date(session.date).toLocaleDateString("pt-BR")} • {formatDuration(session.durationMinutes)}
+                    {new Date(session.date).toLocaleDateString("pt-BR")} •{" "}
+                    {formatDuration(session.durationMinutes)}
                   </span>
                   <p>{session.note}</p>
                 </article>
@@ -349,11 +372,13 @@ export function GamePageScreen({
                   max="10"
                   step="0.1"
                   value={reviewForm.score}
-                  onChange={(event) => setReviewForm((current) => ({ ...current, score: event.target.value }))}
+                  onChange={(event) =>
+                    setReviewForm((current) => ({ ...current, score: event.target.value }))
+                  }
                 />
               </label>
               <label className="field">
-                <span>Recomendacao</span>
+                <span>Recomendação</span>
                 <select
                   value={reviewForm.recommend}
                   onChange={(event) =>
@@ -363,25 +388,29 @@ export function GamePageScreen({
                     }))
                   }
                 >
-                  <option value="">Sem posicao</option>
+                  <option value="">Sem posição</option>
                   <option value="yes">Recomendo</option>
-                  <option value="no">Nao recomendo</option>
+                  <option value="no">Não recomendo</option>
                 </select>
               </label>
               <label className="field field--wide">
-                <span>Resumo rapido</span>
+                <span>Resumo rápido</span>
                 <textarea
                   rows={3}
                   value={reviewForm.shortReview}
-                  onChange={(event) => setReviewForm((current) => ({ ...current, shortReview: event.target.value }))}
+                  onChange={(event) =>
+                    setReviewForm((current) => ({ ...current, shortReview: event.target.value }))
+                  }
                 />
               </label>
               <label className="field">
-                <span>Pros</span>
+                <span>Prós</span>
                 <textarea
                   rows={4}
                   value={reviewForm.pros}
-                  onChange={(event) => setReviewForm((current) => ({ ...current, pros: event.target.value }))}
+                  onChange={(event) =>
+                    setReviewForm((current) => ({ ...current, pros: event.target.value }))
+                  }
                 />
               </label>
               <label className="field">
@@ -389,7 +418,9 @@ export function GamePageScreen({
                 <textarea
                   rows={4}
                   value={reviewForm.cons}
-                  onChange={(event) => setReviewForm((current) => ({ ...current, cons: event.target.value }))}
+                  onChange={(event) =>
+                    setReviewForm((current) => ({ ...current, cons: event.target.value }))
+                  }
                 />
               </label>
               <label className="field field--wide">
@@ -397,7 +428,9 @@ export function GamePageScreen({
                 <textarea
                   rows={6}
                   value={reviewForm.longReview}
-                  onChange={(event) => setReviewForm((current) => ({ ...current, longReview: event.target.value }))}
+                  onChange={(event) =>
+                    setReviewForm((current) => ({ ...current, longReview: event.target.value }))
+                  }
                 />
               </label>
             </div>
@@ -406,7 +439,9 @@ export function GamePageScreen({
               <input
                 type="checkbox"
                 checked={reviewForm.hasSpoiler}
-                onChange={(event) => setReviewForm((current) => ({ ...current, hasSpoiler: event.target.checked }))}
+                onChange={(event) =>
+                  setReviewForm((current) => ({ ...current, hasSpoiler: event.target.checked }))
+                }
               />
               <span>Marcar review como contendo spoiler</span>
             </label>
@@ -425,8 +460,8 @@ export function GamePageScreen({
         <Panel>
           <SectionHeader
             icon={FolderKanban}
-            title="Leitura tatica"
-            description="Como o motor esta interpretando este item hoje."
+            title="Leitura tática"
+            description="Como o motor está interpretando este item hoje."
           />
 
           <div className="game-page-insights">
@@ -449,7 +484,7 @@ export function GamePageScreen({
           <SectionHeader
             icon={Tags}
             title="Tags e listas"
-            description="Organizacao pessoal do jogo para filtros, recortes e rotinas."
+            description="Organização pessoal do jogo para filtros, recortes e rotinas."
           />
 
           <div className="game-page-tag-list">
@@ -466,7 +501,7 @@ export function GamePageScreen({
 
           <form className="modal-form" onSubmit={handleTagsSubmit}>
             <label className="field">
-              <span>Tags separadas por virgula</span>
+              <span>Tags separadas por vírgula</span>
               <textarea rows={4} value={tagsValue} onChange={(event) => setTagsValue(event.target.value)} />
             </label>
             <div className="modal-actions">
@@ -480,12 +515,12 @@ export function GamePageScreen({
           <form className="modal-form" onSubmit={handleListsSubmit}>
             <SectionHeader
               icon={ListChecks}
-              title="Adicionar a lista"
-              description="Atribua este item as listas persistidas do seu perfil."
+              title="Adicionar à lista"
+              description="Atribua este item às listas persistidas do seu perfil."
             />
 
             {availableLists.length === 0 ? (
-              <EmptyState message="Crie uma lista no perfil para comecar a organizar seus jogos." />
+              <EmptyState message="Crie uma lista no perfil para começar a organizar seus jogos." />
             ) : (
               <>
                 <div className="filter-bar filter-bar--dense">

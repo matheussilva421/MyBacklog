@@ -1,12 +1,24 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, List, Plus, Save, Settings, User } from "lucide-react";
-import type { Achievement, DbList } from "../../../backlog/shared";
-import { createPreferencesDraft, cx, type AppPreferences, type PreferencesDraft } from "../../../backlog/shared";
-import { EmptyState, NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
+import type { DbList, UserBadge } from "../../../backlog/shared";
+import {
+  createPreferencesDraft,
+  cx,
+  type AppPreferences,
+  type PreferencesDraft,
+} from "../../../backlog/shared";
+import {
+  EmptyState,
+  NotchButton,
+  Panel,
+  Pill,
+  ProgressBar,
+  SectionHeader,
+} from "../../../components/cyberpunk-ui";
 import { PreferencesFields } from "./PreferencesFields";
 
 type ProfileScreenProps = {
-  achievementCards: Achievement[];
+  personalBadges: UserBadge[];
   totalGames: number;
   totalHours: number;
   preferences: AppPreferences;
@@ -17,7 +29,7 @@ type ProfileScreenProps = {
 };
 
 export function ProfileScreen({
-  achievementCards,
+  personalBadges,
   totalGames,
   totalHours,
   preferences,
@@ -46,7 +58,11 @@ export function ProfileScreen({
   return (
     <div className="profile-layout">
       <Panel>
-        <SectionHeader icon={User} title="Perfil" description="Sua camada pessoal dentro do backlog OS" />
+        <SectionHeader
+          icon={User}
+          title="Perfil"
+          description="Sua camada pessoal dentro do backlog OS"
+        />
         <div className="profile-card">
           <div className="profile-card__main">
             <span>Operador</span>
@@ -75,7 +91,11 @@ export function ProfileScreen({
       </Panel>
 
       <Panel>
-        <SectionHeader icon={Settings} title="Configurações" description="Preferências reais que afetam criação, importação e planner" />
+        <SectionHeader
+          icon={Settings}
+          title="Configurações"
+          description="Preferências reais que afetam criação, importação e planner"
+        />
         <div className="modal-form">
           <PreferencesFields
             draft={draft}
@@ -91,13 +111,21 @@ export function ProfileScreen({
       </Panel>
 
       <Panel>
-        <SectionHeader icon={List} title="Listas" description="Organize jogos em coleções personalizadas" />
+        <SectionHeader
+          icon={List}
+          title="Listas"
+          description="Organize jogos em coleções personalizadas"
+        />
         <div className="modal-form">
           <div className="form-grid">
             <label className="field field--wide">
               <span>Nova lista</span>
               <div className="field__aux">
-                <input value={newListName} onChange={(event) => setNewListName(event.target.value)} placeholder="Nome da lista..." />
+                <input
+                  value={newListName}
+                  onChange={(event) => setNewListName(event.target.value)}
+                  placeholder="Nome da lista..."
+                />
                 <NotchButton variant="secondary" onClick={handleListAdd}>
                   <Plus size={14} />
                   Criar
@@ -126,15 +154,36 @@ export function ProfileScreen({
       </Panel>
 
       <Panel>
-        <SectionHeader icon={CheckCircle2} title="Conquistas do sistema" description="Resumo de hábitos, padrões e sinalizações" />
-        <div className="achievement-grid">
-          {achievementCards.map((achievement) => {
-            const Icon = achievement.icon;
+        <SectionHeader
+          icon={CheckCircle2}
+          title="Conquistas pessoais"
+          description="Badges operacionais que gamificam sua disciplina no catálogo."
+        />
+        <div className="badge-grid">
+          {personalBadges.map((badge) => {
+            const Icon = badge.icon;
+            const progressPercent =
+              badge.target > 0 ? Math.max(0, Math.min(100, (badge.progress / badge.target) * 100)) : 0;
+
             return (
-              <article className={cx("achievement-card", `achievement-card--${achievement.tone}`)} key={achievement.title}>
-                <Icon size={18} />
-                <h3>{achievement.title}</h3>
-                <p>{achievement.description}</p>
+              <article
+                className={cx("badge-card", !badge.unlocked && "badge-card--locked")}
+                key={badge.key}
+              >
+                <div className="badge-card__head">
+                  <div className="badge-card__title">
+                    <Icon size={18} />
+                    <h3>{badge.title}</h3>
+                  </div>
+                  <Pill tone={badge.unlocked ? badge.tone : "neutral"}>
+                    {badge.unlocked ? "Desbloqueado" : "Em progresso"}
+                  </Pill>
+                </div>
+                <p>{badge.description}</p>
+                <div className="badge-card__progress">
+                  <span>{badge.progressLabel}</span>
+                  <ProgressBar value={progressPercent} tone={badge.unlocked ? "yellow" : "cyan"} thin />
+                </div>
               </article>
             );
           })}

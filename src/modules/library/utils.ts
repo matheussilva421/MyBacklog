@@ -1,11 +1,11 @@
-import {
-  dbPriorityToPriority,
-  dbStatusToStatus,
-} from "../../backlog/shared";
+import { dbPriorityToPriority, dbStatusToStatus } from "../../backlog/shared";
 import type { Game, LibraryRecord } from "../../backlog/shared";
 import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../../core/types";
 
-export function composeLibraryRecords(games: DbGameMetadata[], libraryEntries: DbLibraryEntry[]): LibraryRecord[] {
+export function composeLibraryRecords(
+  games: DbGameMetadata[],
+  libraryEntries: DbLibraryEntry[],
+): LibraryRecord[] {
   const gameMap = new Map(games.map((game) => [game.id, game]));
   return libraryEntries
     .map((libraryEntry) => {
@@ -19,6 +19,7 @@ export function composeLibraryRecords(games: DbGameMetadata[], libraryEntries: D
 export function dbGameToUiGame(record: LibraryRecord): Game {
   const { game, libraryEntry } = record;
   const genre = game.genres?.split(",")[0]?.trim() || game.genres || "Catálogo tático";
+
   return {
     id: libraryEntry.id ?? Date.now(),
     title: game.title,
@@ -31,7 +32,8 @@ export function dbGameToUiGame(record: LibraryRecord): Game {
     eta: game.estimatedTime || "Sem dado",
     priority: dbPriorityToPriority(libraryEntry.priority),
     mood: libraryEntry.mood || "Tático",
-    score: typeof libraryEntry.personalRating === "number" ? Number(libraryEntry.personalRating) : 0,
+    score:
+      typeof libraryEntry.personalRating === "number" ? Number(libraryEntry.personalRating) : 0,
     year: game.releaseYear || new Date(game.createdAt || Date.now()).getFullYear(),
     notes: libraryEntry.notes || "Sem leitura registrada no sistema.",
     difficulty: game.difficulty || "Média",

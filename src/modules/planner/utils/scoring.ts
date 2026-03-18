@@ -193,7 +193,7 @@ export function buildPlannerFit(
     return "Meta de inicio";
   }
   if (goalSignals?.playtimePressure && goalSignals.playtimePressure >= 0.35 && game.status !== "Backlog") {
-    return "Sessao util";
+    return "Sessão útil";
   }
   if (preferences?.plannerPreference === "finish_active" && (game.status === "Jogando" || game.status === "Pausado")) {
     return "Fechar ativos";
@@ -202,8 +202,8 @@ export function buildPlannerFit(
     return "Limpeza de backlog";
   }
   if (etaHours <= 3) return "Fim de semana curto";
-  if (etaHours <= 12) return "Bloco medio";
+  if (etaHours <= 12) return "Bloco médio";
   if (game.status === "Pausado") return "Retorno imediato";
   if (game.mood.toLowerCase().includes("energia")) return "Noites com energia";
-  return "Sessoes longas";
+  return "Sessões longas";
 }

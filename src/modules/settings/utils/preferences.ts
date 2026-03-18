@@ -1,6 +1,10 @@
 import type { GoalType, Period, Setting as DbSetting } from "../../../core/types";
 
-export type PlannerPreference = "balanced" | "clear_backlog" | "finish_active" | "maximize_playtime";
+export type PlannerPreference =
+  | "balanced"
+  | "clear_backlog"
+  | "finish_active"
+  | "maximize_playtime";
 
 export type AppPreferences = {
   onboardingCompleted: boolean;
@@ -66,7 +70,11 @@ export const suggestedStarterLists = [
   "Run infinita",
 ] as const;
 
-export const plannerPreferenceOptions: Array<{ value: PlannerPreference; label: string; description: string }> = [
+export const plannerPreferenceOptions: Array<{
+  value: PlannerPreference;
+  label: string;
+  description: string;
+}> = [
   {
     value: "balanced",
     label: "Balanceado",
@@ -173,15 +181,23 @@ export function parseAppPreferences(settingRows: DbSetting[]): AppPreferences {
     readSetting(settingRows, settingsKeys.displayName)?.trim() ||
     defaultPreferences.operatorName;
   const plannerPreferenceRaw = readSetting(settingRows, settingsKeys.plannerPreference);
-  const plannerPreference = plannerPreferenceOptions.some((option) => option.value === plannerPreferenceRaw)
+  const plannerPreference = plannerPreferenceOptions.some(
+    (option) => option.value === plannerPreferenceRaw,
+  )
     ? (plannerPreferenceRaw as PlannerPreference)
     : defaultPreferences.plannerPreference;
 
   return {
     onboardingCompleted: parseBoolean(readSetting(settingRows, settingsKeys.onboardingCompleted)),
     operatorName,
-    primaryPlatforms: parseListValue(readSetting(settingRows, settingsKeys.primaryPlatforms), defaultPreferences.primaryPlatforms),
-    defaultStores: parseListValue(readSetting(settingRows, settingsKeys.defaultStores), defaultPreferences.defaultStores),
+    primaryPlatforms: parseListValue(
+      readSetting(settingRows, settingsKeys.primaryPlatforms),
+      defaultPreferences.primaryPlatforms,
+    ),
+    defaultStores: parseListValue(
+      readSetting(settingRows, settingsKeys.defaultStores),
+      defaultPreferences.defaultStores,
+    ),
     rawgApiKey: readSetting(settingRows, settingsKeys.rawgApiKey)?.trim() || "",
     plannerPreference,
   };
@@ -201,19 +217,34 @@ export function normalizePreferencesDraft(draft: PreferencesDraft): AppPreferenc
   return {
     onboardingCompleted: true,
     operatorName: draft.operatorName.trim() || defaultPreferences.operatorName,
-    primaryPlatforms: normalizeTokenList(draft.primaryPlatforms || defaultPreferences.primaryPlatforms.join(",")),
-    defaultStores: normalizeTokenList(draft.defaultStores || defaultPreferences.defaultStores.join(",")),
+    primaryPlatforms: normalizeTokenList(
+      draft.primaryPlatforms || defaultPreferences.primaryPlatforms.join(","),
+    ),
+    defaultStores: normalizeTokenList(
+      draft.defaultStores || defaultPreferences.defaultStores.join(","),
+    ),
     rawgApiKey: draft.rawgApiKey.trim(),
     plannerPreference: draft.plannerPreference,
   };
 }
 
-export function preferencesToSettingPairs(preferences: AppPreferences): Array<{ key: string; value: string }> {
+export function preferencesToSettingPairs(
+  preferences: AppPreferences,
+): Array<{ key: string; value: string }> {
   return [
     { key: settingsKeys.displayName, value: preferences.operatorName },
-    { key: settingsKeys.onboardingCompleted, value: String(preferences.onboardingCompleted) },
-    { key: settingsKeys.primaryPlatforms, value: JSON.stringify(preferences.primaryPlatforms) },
-    { key: settingsKeys.defaultStores, value: JSON.stringify(preferences.defaultStores) },
+    {
+      key: settingsKeys.onboardingCompleted,
+      value: String(preferences.onboardingCompleted),
+    },
+    {
+      key: settingsKeys.primaryPlatforms,
+      value: JSON.stringify(preferences.primaryPlatforms),
+    },
+    {
+      key: settingsKeys.defaultStores,
+      value: JSON.stringify(preferences.defaultStores),
+    },
     { key: settingsKeys.rawgApiKey, value: preferences.rawgApiKey },
     { key: settingsKeys.plannerPreference, value: preferences.plannerPreference },
   ];
@@ -221,7 +252,9 @@ export function preferencesToSettingPairs(preferences: AppPreferences): Array<{ 
 
 export function toggleTokenInText(currentValue: string, token: string): string {
   const normalizedCurrent = normalizeTokenList(currentValue);
-  const exists = normalizedCurrent.some((currentToken) => currentToken.toLowerCase() === token.toLowerCase());
+  const exists = normalizedCurrent.some(
+    (currentToken) => currentToken.toLowerCase() === token.toLowerCase(),
+  );
   const next = exists
     ? normalizedCurrent.filter((currentToken) => currentToken.toLowerCase() !== token.toLowerCase())
     : [...normalizedCurrent, token];
@@ -230,7 +263,9 @@ export function toggleTokenInText(currentValue: string, token: string): string {
 }
 
 export function isTokenSelected(currentValue: string, token: string): boolean {
-  return normalizeTokenList(currentValue).some((value) => value.toLowerCase() === token.toLowerCase());
+  return normalizeTokenList(currentValue).some(
+    (value) => value.toLowerCase() === token.toLowerCase(),
+  );
 }
 
 export function getDefaultPreferences(): AppPreferences {

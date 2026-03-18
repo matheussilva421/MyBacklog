@@ -14,7 +14,9 @@ export function mergePlatformList(current: string | undefined, platform: string)
 
 export function parseEtaHours(raw: string): number {
   const cleaned = raw.trim().toLowerCase();
-  if (!cleaned || cleaned.includes("sem data") || cleaned.includes("infinito")) return Number.POSITIVE_INFINITY;
+  if (!cleaned || cleaned.includes("sem data") || cleaned.includes("infinito")) {
+    return Number.POSITIVE_INFINITY;
+  }
   const match = cleaned.match(/(\d+[.,]?\d*)/);
   if (!match) return Number.POSITIVE_INFINITY;
   return Number(match[1].replace(",", "."));
@@ -50,7 +52,10 @@ export function formatRemainingEta(raw: string, progressPercent: number, loggedH
 }
 
 export function formatMonthLabel(date: Date): string {
-  return date.toLocaleString("pt-BR", { month: "short" }).replace(".", "").replace(/^\w/, (value) => value.toUpperCase());
+  return date
+    .toLocaleString("pt-BR", { month: "short" })
+    .replace(".", "")
+    .replace(/^\w/, (value) => value.toUpperCase());
 }
 
 export function downloadText(filename: string, content: string, mimeType: string) {

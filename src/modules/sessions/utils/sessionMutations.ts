@@ -48,7 +48,7 @@ export async function savePlaySession(input: SessionMutationInput): Promise<{ li
   if (mode === "edit") {
     const oldSession = await db.playSessions.get(input.sessionId!);
     if (!oldSession?.id) {
-      throw new Error("Sessao nao encontrada para edicao.");
+      throw new Error("Sessão não encontrada para edição.");
     }
 
     await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {

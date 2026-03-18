@@ -1,12 +1,18 @@
 import { CalendarDays, Cpu, Download, Orbit, Plus, Search, Upload, Zap } from "lucide-react";
 import { navigationItems } from "./backlog/shared";
-import { GameModal, GoalModal, ImportModal, RestoreModal, SessionModal } from "./components/backlog-modals";
+import {
+  GameModal,
+  GoalModal,
+  ImportModal,
+  RestoreModal,
+  SessionModal,
+} from "./components/backlog-modals";
 import { NotchButton, Panel, SectionHeader, SidebarItem, Tag } from "./components/cyberpunk-ui";
 import { useBacklogApp } from "./hooks/useBacklogApp";
 import { DashboardScreen } from "./modules/dashboard/components/DashboardScreen";
 import { GamePageScreen } from "./modules/game-page/components/GamePageScreen";
-import { OnboardingScreen } from "./modules/onboarding/components/OnboardingScreen";
 import { LibraryScreen } from "./modules/library/components/LibraryScreen";
+import { OnboardingScreen } from "./modules/onboarding/components/OnboardingScreen";
 import { PlannerScreen } from "./modules/planner/components/PlannerScreen";
 import { SessionsScreen } from "./modules/sessions/components/SessionsScreen";
 import { ProfileScreen } from "./modules/settings/components/ProfileScreen";
@@ -53,6 +59,8 @@ export default function App() {
         platformData={app.platformData}
         continuePlayingGames={app.continuePlayingGames}
         visiblePlannerQueue={app.visiblePlannerQueue}
+        personalBadges={app.personalBadges}
+        monthlyRecap={app.monthlyRecap}
         findGame={app.findGame}
         onOpenLibrary={app.openLibraryGame}
         onOpenGamePage={app.openGamePage}
@@ -123,7 +131,7 @@ export default function App() {
   } else if (app.screen === "profile") {
     screenContent = (
       <ProfileScreen
-        achievementCards={app.achievementCards}
+        personalBadges={app.personalBadges}
         totalGames={app.stats.total}
         totalHours={app.stats.hours}
         preferences={app.preferences}

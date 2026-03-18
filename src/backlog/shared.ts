@@ -1,11 +1,11 @@
 import {
+  BarChart3,
   CalendarDays,
+  FolderKanban,
   LayoutDashboard,
   Library,
-  FolderKanban,
-  BarChart3,
   User,
-  type LucideIcon
+  type LucideIcon,
 } from "lucide-react";
 import type {
   Game as DbGameMetadata,
@@ -26,7 +26,7 @@ import type {
   Tag as DbTag,
 } from "../core/types";
 
-export type { GoalType, Period, DbGoal, DbLibraryEntryList, DbList, DbSetting };
+export type { DbGoal, DbLibraryEntryList, DbList, DbSetting, GoalType, Period };
 
 export type ImportSource = "csv" | "steam" | "playnite";
 
@@ -55,14 +55,25 @@ export type ImportPayload = {
   publisher?: string;
 };
 
-export type ScreenKey = "dashboard" | "library" | "sessions" | "planner" | "stats" | "profile" | "game";
+export type ScreenKey =
+  | "dashboard"
+  | "library"
+  | "sessions"
+  | "planner"
+  | "stats"
+  | "profile"
+  | "game";
 
 type NavigationScreenKey = Exclude<ScreenKey, "game">;
 
-export const navigationItems: Array<{ key: NavigationScreenKey; label: string; icon: LucideIcon }> = [
+export const navigationItems: Array<{
+  key: NavigationScreenKey;
+  label: string;
+  icon: LucideIcon;
+}> = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "library", label: "Biblioteca", icon: Library },
-  { key: "sessions", label: "Sessoes", icon: CalendarDays },
+  { key: "sessions", label: "Sessões", icon: CalendarDays },
   { key: "planner", label: "Planner", icon: FolderKanban },
   { key: "stats", label: "Estatísticas", icon: BarChart3 },
   { key: "profile", label: "Perfil", icon: User },
@@ -145,6 +156,33 @@ export type Achievement = {
   title: string;
   description: string;
   tone: "emerald" | "cyan" | "magenta" | "yellow";
+};
+
+export type UserBadge = {
+  key: string;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  tone: "emerald" | "cyan" | "magenta" | "yellow";
+  unlocked: boolean;
+  progress: number;
+  target: number;
+  progressLabel: string;
+};
+
+export type MonthlyRecap = {
+  title: string;
+  periodLabel: string;
+  isMonthEnd: boolean;
+  totalHours: number;
+  totalSessions: number;
+  activeGames: number;
+  activeDays: number;
+  topGameTitle: string | null;
+  topGameHours: number;
+  completedGames: number;
+  addedGames: number;
+  summary: string;
 };
 
 export type GameFormState = {
@@ -276,7 +314,14 @@ export const priorityTone: Record<Priority, string> = {
   Baixa: "neutral",
 };
 
-export const filterOptions: StatusFilter[] = ["Todos", "Backlog", "Jogando", "Pausado", "Terminado", "Wishlist"];
+export const filterOptions: StatusFilter[] = [
+  "Todos",
+  "Backlog",
+  "Jogando",
+  "Pausado",
+  "Terminado",
+  "Wishlist",
+];
 export const gameStatuses: Status[] = ["Backlog", "Jogando", "Pausado", "Terminado", "Wishlist"];
 export const gamePriorities: Priority[] = ["Alta", "Média", "Baixa"];
 export const importSources: ImportSource[] = ["csv", "steam", "playnite"];
@@ -292,47 +337,61 @@ export {
   parseEtaHours,
 } from "../core/utils";
 
-/** Maps UI status label → DB progressStatus. "Wishlist" handled separately via ownershipStatus. */
+/** Maps UI status label to DB progressStatus. "Wishlist" handled separately via ownershipStatus. */
 export function statusToDbStatus(status: Status): DbProgressStatus {
   switch (status) {
-    case "Jogando": return "playing";
-    case "Pausado": return "paused";
-    case "Terminado": return "finished";
+    case "Jogando":
+      return "playing";
+    case "Pausado":
+      return "paused";
+    case "Terminado":
+      return "finished";
     case "Backlog":
     case "Wishlist":
-    default: return "not_started";
+    default:
+      return "not_started";
   }
 }
 
-/** Maps UI priority label → DB priority enum. */
+/** Maps UI priority label to DB priority enum. */
 export function priorityToDbPriority(priority: Priority): DbPriority {
   switch (priority) {
-    case "Alta": return "high";
-    case "Baixa": return "low";
+    case "Alta":
+      return "high";
+    case "Baixa":
+      return "low";
     case "Média":
-    default: return "medium";
+    default:
+      return "medium";
   }
 }
 
-/** Maps DB entry → UI status label. Considers both ownershipStatus and progressStatus. */
+/** Maps DB entry to UI status label. Considers both ownershipStatus and progressStatus. */
 export function dbStatusToStatus(entry: DbLibraryEntry): Status {
   if (entry.ownershipStatus === "wishlist") return "Wishlist";
   switch (entry.progressStatus) {
-    case "playing": return "Jogando";
-    case "paused": return "Pausado";
+    case "playing":
+      return "Jogando";
+    case "paused":
+      return "Pausado";
     case "finished":
-    case "completed_100": return "Terminado";
-    default: return "Backlog";
+    case "completed_100":
+      return "Terminado";
+    default:
+      return "Backlog";
   }
 }
 
-/** Maps DB priority enum → UI priority label. */
+/** Maps DB priority enum to UI priority label. */
 export function dbPriorityToPriority(priority: DbPriority): Priority {
   switch (priority) {
-    case "high": return "Alta";
-    case "low": return "Baixa";
+    case "high":
+      return "Alta";
+    case "low":
+      return "Baixa";
     case "medium":
-    default: return "Média";
+    default:
+      return "Média";
   }
 }
 
@@ -344,16 +403,15 @@ export {
   attachRawgCandidatesToPreview,
   buildImportPreview,
   buildRestorePreview,
-  recordToImportPayload,
-  parseBackupText,
   gamesToCsv,
+  parseBackupText,
   parseImportText,
+  recordToImportPayload,
 } from "../modules/import-export/utils/importExport";
 export { backlogByDuration, platformDistribution, yearlyEvolution } from "../modules/dashboard/utils/dashboardData";
-export { plannerQueue, tacticalGoals, systemRules } from "../modules/planner/utils/plannerData";
+export { plannerQueue, systemRules, tacticalGoals } from "../modules/planner/utils/plannerData";
 export { screenMeta } from "../modules/dashboard/utils/navigationData";
-export { profileAchievements } from "../modules/settings/utils/profileData";
-export { defaultGames, defaultSessions, defaultGameToDbGame, defaultGameToDbLibraryEntry } from "../core/defaults";
+export { defaultGameToDbGame, defaultGameToDbLibraryEntry, defaultGames, defaultSessions } from "../core/defaults";
 export { createDbGameFromImport, mergeImportedGame } from "../modules/import-export/utils/importExport";
 export {
   createPreferencesDraft,

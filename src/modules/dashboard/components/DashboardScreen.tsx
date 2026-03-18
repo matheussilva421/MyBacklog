@@ -1,6 +1,24 @@
-import { Activity, Clock3, Flame, Gamepad2, ListTodo, Monitor, Target, Trophy } from "lucide-react";
+import {
+  Activity,
+  Clock3,
+  Flame,
+  Gamepad2,
+  LibraryBig,
+  ListTodo,
+  Monitor,
+  Target,
+  Trophy,
+} from "lucide-react";
 import { DonutChart, TrendLineChart } from "../../../charts";
-import { formatRemainingEta, pieColors, type Game, type PiePoint, type PlannerEntry } from "../../../backlog/shared";
+import {
+  formatRemainingEta,
+  pieColors,
+  type Game,
+  type MonthlyRecap,
+  type PiePoint,
+  type PlannerEntry,
+  type UserBadge,
+} from "../../../backlog/shared";
 import {
   ChartFrame,
   EmptyState,
@@ -37,6 +55,8 @@ type DashboardScreenProps = {
   platformData: PiePoint[];
   continuePlayingGames: Game[];
   visiblePlannerQueue: PlannerEntry[];
+  personalBadges: UserBadge[];
+  monthlyRecap: MonthlyRecap;
   findGame: (id: number) => Game | undefined;
   onOpenLibrary: (gameId?: number) => void;
   onOpenGamePage: (gameId?: number) => void;
@@ -49,6 +69,8 @@ export function DashboardScreen({
   platformData,
   continuePlayingGames,
   visiblePlannerQueue,
+  personalBadges,
+  monthlyRecap,
   findGame,
   onOpenLibrary,
   onOpenGamePage,
@@ -102,14 +124,22 @@ export function DashboardScreen({
             description="Jogos iniciados vs. finalizados por mês"
           />
           <ChartFrame className="chart-area--line">
-            {({ width, height }) => <TrendLineChart width={width} height={height} data={monthlyProgress} />}
+            {({ width, height }) => (
+              <TrendLineChart width={width} height={height} data={monthlyProgress} />
+            )}
           </ChartFrame>
         </Panel>
 
         <Panel>
-          <SectionHeader icon={Monitor} title="Plataformas" description="Distribuição da sua coleção" />
+          <SectionHeader
+            icon={Monitor}
+            title="Plataformas"
+            description="Distribuição da sua coleção"
+          />
           <ChartFrame className="chart-area--pie">
-            {({ width, height }) => <DonutChart width={width} height={height} data={platformData} colors={pieColors} />}
+            {({ width, height }) => (
+              <DonutChart width={width} height={height} data={platformData} colors={pieColors} />
+            )}
           </ChartFrame>
           <div className="legend-grid">
             {platformData.map((entry, index) => (
@@ -155,7 +185,9 @@ export function DashboardScreen({
                       </p>
                     </div>
                     <div className="continue-card__actions">
-                      <Pill tone="magenta">{formatRemainingEta(game.eta, game.progress, game.hours)}</Pill>
+                      <Pill tone="magenta">
+                        {formatRemainingEta(game.eta, game.progress, game.hours)}
+                      </Pill>
                       <NotchButton variant="primary" onClick={() => onOpenGamePage(game.id)}>
                         Detalhes
                       </NotchButton>
@@ -175,7 +207,11 @@ export function DashboardScreen({
         </Panel>
 
         <Panel>
-          <SectionHeader icon={Target} title="Radar de prioridade" description="O sistema sugere sua fila ideal" />
+          <SectionHeader
+            icon={Target}
+            title="Radar de prioridade"
+            description="O sistema sugere sua fila ideal"
+          />
           <div className="priority-stack">
             {visiblePlannerQueue.slice(0, 3).map((entry) => {
               const game = findGame(entry.gameId);
@@ -201,6 +237,96 @@ export function DashboardScreen({
           <NotchButton className="priority-button" variant="primary" onClick={onOpenPlanner}>
             Abrir planner
           </NotchButton>
+        </Panel>
+      </div>
+
+      <div className="dashboard-grid dashboard-grid--extras">
+        <Panel>
+          <SectionHeader
+            icon={LibraryBig}
+            title={monthlyRecap.title}
+            description={
+              monthlyRecap.isMonthEnd
+                ? `Fechamento oficial de ${monthlyRecap.periodLabel}`
+                : `Parcial operacional de ${monthlyRecap.periodLabel}`
+            }
+          />
+          <div className="recap-card">
+            <p className="recap-card__summary">{monthlyRecap.summary}</p>
+            <div className="recap-grid">
+              <div className="detail-stat">
+                <span>Tempo total</span>
+                <strong>{monthlyRecap.totalHours}h</strong>
+              </div>
+              <div className="detail-stat">
+                <span>Sessões</span>
+                <strong>{monthlyRecap.totalSessions}</strong>
+              </div>
+              <div className="detail-stat">
+                <span>Jogos ativos</span>
+                <strong>{monthlyRecap.activeGames}</strong>
+              </div>
+              <div className="detail-stat">
+                <span>Dias ativos</span>
+                <strong>{monthlyRecap.activeDays}</strong>
+              </div>
+              <div className="detail-stat">
+                <span>Jogo mais jogado</span>
+                <strong>{monthlyRecap.topGameTitle ?? "--"}</strong>
+              </div>
+              <div className="detail-stat">
+                <span>Horas do destaque</span>
+                <strong>{monthlyRecap.topGameHours}h</strong>
+              </div>
+              <div className="detail-stat">
+                <span>Zerados no mês</span>
+                <strong>{monthlyRecap.completedGames}</strong>
+              </div>
+              <div className="detail-stat">
+                <span>Novos registros</span>
+                <strong>{monthlyRecap.addedGames}</strong>
+              </div>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel>
+          <SectionHeader
+            icon={Trophy}
+            title="Conquistas pessoais"
+            description="Badges desbloqueados por ritmo real de uso e rigor no catálogo."
+          />
+          <div className="badge-grid">
+            {personalBadges.map((badge) => {
+              const Icon = badge.icon;
+              const progressPercent =
+                badge.target > 0 ? Math.max(0, Math.min(100, (badge.progress / badge.target) * 100)) : 0;
+
+              return (
+                <article
+                  className={`badge-card ${badge.unlocked ? "" : "badge-card--locked"}`}
+                  key={badge.key}
+                >
+                  <div className="badge-card__head">
+                    <div className="badge-card__title">
+                      <Icon size={18} />
+                      <h3>{badge.title}</h3>
+                    </div>
+                    <Pill tone={badge.unlocked ? badge.tone : "neutral"}>
+                      {badge.unlocked ? "Desbloqueado" : "Em progresso"}
+                    </Pill>
+                  </div>
+                  <p>{badge.description}</p>
+                  <div className="badge-card__progress">
+                    <div className="badge-card__progress-head">
+                      <span>{badge.progressLabel}</span>
+                    </div>
+                    <ProgressBar value={progressPercent} tone={badge.unlocked ? "yellow" : "cyan"} thin />
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </Panel>
       </div>
     </div>

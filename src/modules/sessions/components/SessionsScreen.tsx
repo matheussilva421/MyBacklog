@@ -1,9 +1,27 @@
 import type { FormEvent } from "react";
-import { BarChart3, CalendarDays, Clock3, Pause, Pencil, Play, RotateCcw, Save, Timer, Trash2 } from "lucide-react";
+import {
+  BarChart3,
+  CalendarDays,
+  Clock3,
+  Pause,
+  Pencil,
+  Play,
+  RotateCcw,
+  Save,
+  Timer,
+  Trash2,
+} from "lucide-react";
 import { VerticalBarChart } from "../../../charts";
 import { formatDuration, type Game, type Status } from "../../../backlog/shared";
 import type { PlaySession } from "../../../core/types";
-import { ChartFrame, EmptyState, NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
+import {
+  ChartFrame,
+  EmptyState,
+  NotchButton,
+  Panel,
+  Pill,
+  SectionHeader,
+} from "../../../components/cyberpunk-ui";
 import { useSessionsScreenState } from "../hooks/useSessionsScreenState";
 import type { SessionPeriod } from "../utils/sessionAnalytics";
 
@@ -74,6 +92,7 @@ export function SessionsScreen({
     event.preventDefault();
     const libraryEntryId = Number(draft.gameId);
     if (!libraryEntryId) return;
+
     await onQuickRegister({
       libraryEntryId,
       date: draft.date,
@@ -91,8 +110,8 @@ export function SessionsScreen({
         <Panel>
           <SectionHeader
             icon={Timer}
-            title="Registro rapido"
-            description="Cadastre uma sessao com cronometro opcional e alimente o sistema em tempo real."
+            title="Registro rápido"
+            description="Cadastre uma sessão com cronômetro opcional e alimente o sistema em tempo real."
           />
 
           <form className="modal-form" onSubmit={handleQuickSubmit}>
@@ -121,7 +140,10 @@ export function SessionsScreen({
               <div className="form-grid">
                 <label className="field field--wide">
                   <span>Jogo</span>
-                  <select value={draft.gameId} onChange={(event) => setDraft((current) => ({ ...current, gameId: event.target.value }))}>
+                  <select
+                    value={draft.gameId}
+                    onChange={(event) => setDraft((current) => ({ ...current, gameId: event.target.value }))}
+                  >
                     <option value="">Selecione...</option>
                     {games.map((game) => (
                       <option key={game.id} value={game.id}>
@@ -139,7 +161,7 @@ export function SessionsScreen({
                   />
                 </label>
                 <label className="field">
-                  <span>Duracao (min)</span>
+                  <span>Duração (min)</span>
                   <input
                     type="number"
                     min="1"
@@ -148,7 +170,7 @@ export function SessionsScreen({
                   />
                 </label>
                 <label className="field">
-                  <span>Progresso apos a sessao</span>
+                  <span>Progresso após a sessão</span>
                   <input
                     type="number"
                     min="0"
@@ -167,7 +189,7 @@ export function SessionsScreen({
                   />
                 </label>
                 <label className="field field--wide">
-                  <span>Nota rapida</span>
+                  <span>Nota rápida</span>
                   <textarea
                     rows={4}
                     value={draft.note}
@@ -183,7 +205,7 @@ export function SessionsScreen({
               </NotchButton>
               <NotchButton variant="primary" type="submit">
                 <Save size={14} />
-                Registrar sessao
+                Registrar sessão
               </NotchButton>
             </div>
           </form>
@@ -192,13 +214,13 @@ export function SessionsScreen({
         <Panel>
           <SectionHeader
             icon={BarChart3}
-            title="Pulso das sessoes"
+            title="Pulso das sessões"
             description="Recorte operacional da telemetria mais recente do backlog."
           />
 
           <div className="game-page-stat-grid">
             <div className="detail-stat">
-              <span>Sessoes filtradas</span>
+              <span>Sessões filtradas</span>
               <strong>{overview.totalSessions}</strong>
             </div>
             <div className="detail-stat">
@@ -210,7 +232,7 @@ export function SessionsScreen({
               <strong>{overview.activeGames}</strong>
             </div>
             <div className="detail-stat">
-              <span>Media por sessao</span>
+              <span>Média por sessão</span>
               <strong>{formatDuration(overview.averageMinutes)}</strong>
             </div>
             <div className="detail-stat">
@@ -225,7 +247,7 @@ export function SessionsScreen({
 
           <div className="sessions-filters">
             <div className="filter-group">
-              <span className="filter-group__label">Periodo</span>
+              <span className="filter-group__label">Período</span>
               <div className="filter-bar">
                 {periodOptions.map((option) => (
                   <button
@@ -265,7 +287,9 @@ export function SessionsScreen({
           </div>
 
           <ChartFrame className="chart-area--bar chart-area--sessions">
-            {({ width, height }) => <VerticalBarChart width={width} height={height} data={monthlyHours} color="#26d8ff" />}
+            {({ width, height }) => (
+              <VerticalBarChart width={width} height={height} data={monthlyHours} color="#26d8ff" />
+            )}
           </ChartFrame>
         </Panel>
       </div>
@@ -273,38 +297,44 @@ export function SessionsScreen({
       <Panel>
         <SectionHeader
           icon={CalendarDays}
-          title="Historico por jogo"
-          description="Cada grupo mostra cadencia, ultima sessao e notas do diario operacional."
+          title="Histórico por jogo"
+          description="Cada grupo mostra cadência, última sessão e notas do diário operacional."
         />
 
         <div className="session-history-stack">
           {filteredGroups.length === 0 ? (
-            <EmptyState message="Nenhuma sessao corresponde aos filtros e a busca global." />
+            <EmptyState message="Nenhuma sessão corresponde aos filtros e à busca global." />
           ) : (
             filteredGroups.map((group) => (
               <article className="session-group" key={group.game.id}>
                 <div className="session-group__head">
                   <div>
-                    <button type="button" className="session-group__title" onClick={() => onOpenGamePage(group.game.id)}>
+                    <button
+                      type="button"
+                      className="session-group__title"
+                      onClick={() => onOpenGamePage(group.game.id)}
+                    >
                       {group.game.title}
                     </button>
                     <p>
-                      {group.game.platform} • {group.game.status} • {group.sessions.length} sessoes
+                      {group.game.platform} • {group.game.status} • {group.sessions.length} sessões
                     </p>
                   </div>
                   <div className="session-group__meta">
                     <Pill tone={group.cadence.tone}>{group.cadence.label}</Pill>
                     <Pill tone="neutral">{formatDuration(group.totalMinutes)}</Pill>
                     {group.cadence.lastSessionAt ? (
-                      <Pill tone="cyan">{new Date(group.cadence.lastSessionAt).toLocaleDateString("pt-BR")}</Pill>
+                      <Pill tone="cyan">
+                        {new Date(group.cadence.lastSessionAt).toLocaleDateString("pt-BR")}
+                      </Pill>
                     ) : null}
                   </div>
                 </div>
 
                 <div className="session-group__insights">
                   <div className="detail-stat">
-                    <span>Ultimos 30 dias</span>
-                    <strong>{group.cadence.sessions30d} sessoes</strong>
+                    <span>Últimos 30 dias</span>
+                    <strong>{group.cadence.sessions30d} sessões</strong>
                   </div>
                   <div className="detail-stat">
                     <span>Streak</span>
@@ -322,7 +352,10 @@ export function SessionsScreen({
 
                 <div className="session-list">
                   {group.sessions.slice(0, 6).map((session) => (
-                    <article className="session-card" key={session.id ?? `${session.libraryEntryId}-${session.date}-${session.durationMinutes}`}>
+                    <article
+                      className="session-card"
+                      key={session.id ?? `${session.libraryEntryId}-${session.date}-${session.durationMinutes}`}
+                    >
                       <div>
                         <div className="session-card__title">
                           <h3>{new Date(session.date).toLocaleDateString("pt-BR")}</h3>
@@ -331,12 +364,15 @@ export function SessionsScreen({
                             <NotchButton variant="ghost" onClick={() => onEditSession(session)}>
                               <Pencil size={12} />
                             </NotchButton>
-                            <NotchButton variant="ghost" onClick={() => session.id != null && onDeleteSession(session.id)}>
+                            <NotchButton
+                              variant="ghost"
+                              onClick={() => session.id != null && onDeleteSession(session.id)}
+                            >
                               <Trash2 size={12} />
                             </NotchButton>
                           </div>
                         </div>
-                        <p>{session.note || "Sessao sem anotacao rapida."}</p>
+                        <p>{session.note || "Sessão sem anotação rápida."}</p>
                       </div>
                       <div className="session-card__meta">
                         <span>
