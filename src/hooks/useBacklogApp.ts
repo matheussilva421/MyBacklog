@@ -71,6 +71,14 @@ function sortByUpdatedAtDesc<T extends { updatedAt: string }>(rows: T[]): T[] {
   return [...rows].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
+function isSameMonth(date: Date, target: Date): boolean {
+  return date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth();
+}
+
+function formatPositiveHours(hours: number): string {
+  return `+${hours}h em 7 dias`;
+}
+
 export function useBacklogApp() {
   const [screen, setScreen] = useState<ScreenKey>("dashboard");
   const [query, setQuery] = useState("");
@@ -306,13 +314,41 @@ export function useBacklogApp() {
   }, [gameTagRows, goalRows, reviewByEntryId, selectedGame, selectedRecord, sessionRows, tagById]);
 
   const stats = useMemo(() => {
+    const now = new Date();
+    const weekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
     const total = games.length;
     const backlog = games.filter((game) => game.status === "Backlog").length;
     const playing = games.filter((game) => game.status === "Jogando").length;
     const finished = games.filter((game) => game.status === "Terminado").length;
     const hours = games.reduce((totalHours, game) => totalHours + game.hours, 0);
-    return { total, backlog, playing, finished, hours };
-  }, [games]);
+    const addedThisMonth = libraryEntryRows.filter((entry) => isSameMonth(new Date(entry.createdAt), now)).length;
+    const highPriorityBacklog = games.filter((game) => game.status === "Backlog" && game.priority === "Alta").length;
+    const sessionsThisWeek = sessionRows.filter((session) => new Date(session.date).getTime() >= weekAgo).length;
+    const recentHours = Math.round(
+      sessionRows
+        .filter((session) => new Date(session.date).getTime() >= weekAgo)
+        .reduce((totalMinutes, session) => totalMinutes + session.durationMinutes, 0) / 60,
+    );
+    const completionRate = total > 0 ? Math.round((finished / total) * 100) : 0;
+    return {
+      total,
+      backlog,
+      playing,
+      finished,
+      hours,
+      totalDelta: addedThisMonth > 0 ? `+${addedThisMonth} este mês` : "sem novos este mês",
+      backlogDelta:
+        highPriorityBacklog > 0
+          ? `${highPriorityBacklog} alta prioridade`
+          : "sem pressão tática",
+      playingDelta:
+        sessionsThisWeek > 0
+          ? `${sessionsThisWeek} sessões na semana`
+          : "sem sessões recentes",
+      finishedDelta: `${completionRate}% de conclusão`,
+      hoursDelta: formatPositiveHours(recentHours),
+    };
+  }, [games, libraryEntryRows, sessionRows]);
 
   const continuePlayingGames = useMemo(() => games.filter((game) => game.status === "Jogando" || game.status === "Pausado").sort((left, right) => computePlannerScore(right) - computePlannerScore(left)).slice(0, 3).filter((game) => matchesCollection([game.title, game.genre, game.platform, game.notes])), [deferredQuery, games]);
   const visiblePlannerQueue = useMemo(() => computedPlannerQueue.filter((entry) => { const game = findGame(entry.gameId); return matchesCollection([game?.title ?? "", entry.reason, entry.fit, entry.eta]); }), [computedPlannerQueue, deferredQuery, games]);

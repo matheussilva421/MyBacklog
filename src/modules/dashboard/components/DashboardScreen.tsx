@@ -19,6 +19,11 @@ type Stats = {
   playing: number;
   finished: number;
   hours: number;
+  totalDelta: string;
+  backlogDelta: string;
+  playingDelta: string;
+  finishedDelta: string;
+  hoursDelta: string;
 };
 
 type LinePoint = {
@@ -57,35 +62,35 @@ export function DashboardScreen({
           title="Total na biblioteca"
           value={String(stats.total)}
           hint="Entre PC, consoles e wishlist"
-          delta="+8 este mês"
+          delta={stats.totalDelta}
           icon={Gamepad2}
         />
         <MetricCard
           title="No backlog"
           value={String(stats.backlog)}
           hint="Ainda não iniciados"
-          delta="-3 na semana"
+          delta={stats.backlogDelta}
           icon={ListTodo}
         />
         <MetricCard
           title="Jogando agora"
           value={String(stats.playing)}
           hint="Fluxo atual"
-          delta="2 ativos"
+          delta={stats.playingDelta}
           icon={Flame}
         />
         <MetricCard
           title="Finalizados"
           value={String(stats.finished)}
           hint="Histórico consolidado"
-          delta="31% de conclusão"
+          delta={stats.finishedDelta}
           icon={Trophy}
         />
         <MetricCard
           title="Horas registradas"
           value={`${stats.hours}h`}
           hint="Telemetria manual"
-          delta="+17h em 7 dias"
+          delta={stats.hoursDelta}
           icon={Clock3}
         />
       </div>
