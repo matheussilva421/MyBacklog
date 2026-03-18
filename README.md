@@ -72,6 +72,23 @@ Dev server: `http://127.0.0.1:4173`
 npm run build
 ```
 
+## Deploy Cloudflare
+O projeto agora tem configuracao manual para Cloudflare Workers Assets em `wrangler.jsonc`, sem depender do assistente automatico do `wrangler`.
+
+Comandos:
+
+```bash
+npm run cf:deploy
+npm run cf:dev
+```
+
+O deploy usa:
+- `wrangler@4.75.0` fixado em `devDependencies`
+- assets servidos de `./dist`
+- `not_found_handling: "single-page-application"` para o roteamento da SPA
+
+Isso evita o problema em que `npx wrangler deploy` tentava configurar o projeto sozinho e instalar `@cloudflare/vite-plugin`, que conflita com o Vite 5 usado neste app.
+
 ## RAWG opcional
 Crie um arquivo `.env` com:
 
