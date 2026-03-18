@@ -23,7 +23,7 @@ export async function searchRawgGames(query: string): Promise<RawgGameResult[]> 
 
   const params = new URLSearchParams({ key: apiKey, page_size: '8', search: query.trim() })
   const res = await fetch(`https://api.rawg.io/api/games?${params.toString()}`)
-  if (!res.ok) throw new Error('Falha ao buscar na RAWG')
+  if (!res.ok) return []
 
   const data = (await res.json()) as RawgResponse
   return data.results ?? []

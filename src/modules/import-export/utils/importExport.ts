@@ -414,7 +414,7 @@ export function createDbGameFromImport(item: ImportPayload, currentGame?: DbGame
     },
     libraryEntry: {
       id: currentEntry?.id,
-      gameId: currentGame?.id ?? 0,
+      gameId: currentGame?.id as number,
       platform: item.platform.trim() || currentEntry?.platform || "PC",
       sourceStore: item.sourceStore || currentEntry?.sourceStore || "Importado",
       edition: currentEntry?.edition,
@@ -645,7 +645,26 @@ export function buildRestorePreview(
 }
 export function parseBackupText(text: string): BackupPayload | null {
   try {
-    return JSON.parse(text);
+    const data = JSON.parse(text);
+    if (
+      typeof data !== "object" ||
+      data === null ||
+      typeof data.version !== "number" ||
+      typeof data.exportedAt !== "string" ||
+      !Array.isArray(data.games) ||
+      !Array.isArray(data.libraryEntries)
+    ) {
+      return null;
+    }
+    return {
+      ...data,
+      playSessions: Array.isArray(data.playSessions) ? data.playSessions : [],
+      reviews: Array.isArray(data.reviews) ? data.reviews : [],
+      lists: Array.isArray(data.lists) ? data.lists : [],
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      gameTags: Array.isArray(data.gameTags) ? data.gameTags : [],
+      goals: Array.isArray(data.goals) ? data.goals : [],
+    };
   } catch {
     return null;
   }

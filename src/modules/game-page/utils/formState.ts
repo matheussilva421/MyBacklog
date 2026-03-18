@@ -47,7 +47,7 @@ export function createDbGameFromForm(form: GameFormState, current?: { game: DbGa
     },
     libraryEntry: {
       id: current?.libraryEntry.id,
-      gameId: current?.game.id ?? 0,
+      gameId: current?.game.id as number,
       platform,
       sourceStore: current?.libraryEntry.sourceStore || "Manual",
       edition: current?.libraryEntry.edition,
