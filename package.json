@@ -13,6 +13,10 @@
     "generate:component": "node scripts/generate-component.js",
     "generate:hook": "node scripts/generate-hook.js",
     "generate:module": "node scripts/generate-module.js",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write src/",
+    "format:check": "prettier --check src/",
     "cf:deploy": "npm run build && wrangler deploy",
     "cf:dev": "wrangler dev"
   },
@@ -23,6 +27,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@tailwindcss/postcss": "^4.2.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
@@ -30,10 +35,14 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.27",
+    "eslint": "^10.0.3",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "jsdom": "^27.0.1",
     "postcss": "^8.5.8",
+    "prettier": "^3.8.1",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.6.3",
+    "typescript-eslint": "^8.57.1",
     "vite": "^5.4.10",
     "vitest": "^3.2.4",
     "wrangler": "^4.75.0"

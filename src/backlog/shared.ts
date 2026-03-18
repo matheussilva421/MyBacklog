@@ -8,17 +8,45 @@ import {
 } from "lucide-react";
 import type {
   Game as DbGameMetadata,
+  GameFormat,
   GameTag as DbGameTag,
   Goal as DbGoal,
   LibraryEntry as DbLibraryEntry,
   List as DbList,
+  OwnershipStatus,
   PlaySession as DbPlaySession,
   Priority as DbPriority,
   ProgressStatus as DbProgressStatus,
   Review as DbReview,
   Tag as DbTag,
 } from "../core/types";
-import type { ImportPayload, ImportSource } from "../modules/import-export/utils/importExport";
+
+export type ImportSource = "csv" | "steam" | "playnite";
+
+export type ImportPayload = {
+  title: string;
+  platform: string;
+  sourceStore: string;
+  format: GameFormat;
+  ownershipStatus: OwnershipStatus;
+  progressStatus: DbProgressStatus;
+  playtimeMinutes: number;
+  completionPercent: number;
+  priority: DbPriority;
+  personalRating?: number;
+  notes?: string;
+  rawgId?: number;
+  genres?: string;
+  checklist?: string;
+  estimatedTime?: string;
+  mood?: string;
+  difficulty?: string;
+  releaseYear?: number;
+  favorite?: boolean;
+  coverUrl?: string;
+  developer?: string;
+  publisher?: string;
+};
 
 export type ScreenKey = "dashboard" | "library" | "planner" | "stats" | "profile" | "game";
 
@@ -211,38 +239,55 @@ export {
   parseEtaHours,
 } from "../core/utils";
 
+/** Maps UI status label → DB progressStatus. "Wishlist" handled separately via ownershipStatus. */
 export function statusToDbStatus(status: Status): DbProgressStatus {
-  if (status === "Jogando") return "playing";
-  if (status === "Pausado") return "paused";
-  if (status === "Terminado") return "finished";
-  return "not_started";
+  switch (status) {
+    case "Jogando": return "playing";
+    case "Pausado": return "paused";
+    case "Terminado": return "finished";
+    case "Backlog":
+    case "Wishlist":
+    default: return "not_started";
+  }
 }
 
+/** Maps UI priority label → DB priority enum. */
 export function priorityToDbPriority(priority: Priority): DbPriority {
-  if (priority === "Alta") return "high";
-  if (priority === "Baixa") return "low";
-  return "medium";
+  switch (priority) {
+    case "Alta": return "high";
+    case "Baixa": return "low";
+    case "Média":
+    default: return "medium";
+  }
 }
 
+/** Maps DB entry → UI status label. Considers both ownershipStatus and progressStatus. */
 export function dbStatusToStatus(entry: DbLibraryEntry): Status {
   if (entry.ownershipStatus === "wishlist") return "Wishlist";
-  if (entry.progressStatus === "playing") return "Jogando";
-  if (entry.progressStatus === "paused") return "Pausado";
-  if (entry.progressStatus === "finished" || entry.progressStatus === "completed_100") return "Terminado";
-  return "Backlog";
+  switch (entry.progressStatus) {
+    case "playing": return "Jogando";
+    case "paused": return "Pausado";
+    case "finished":
+    case "completed_100": return "Terminado";
+    default: return "Backlog";
+  }
 }
 
+/** Maps DB priority enum → UI priority label. */
 export function dbPriorityToPriority(priority: DbPriority): Priority {
-  if (priority === "high") return "Alta";
-  if (priority === "low") return "Baixa";
-  return "Média";
+  switch (priority) {
+    case "high": return "Alta";
+    case "low": return "Baixa";
+    case "medium":
+    default: return "Média";
+  }
 }
 
 export { composeLibraryRecords, dbGameToUiGame } from "../modules/library/utils";
 export { createDbGameFromForm, createGameFormState } from "../modules/game-page/utils/formState";
 export { createSessionFormState, defaultSessionToDbSession } from "../modules/sessions/utils/sessionForm";
 export { buildPlannerFit, buildPlannerReason, computePlannerScore } from "../modules/planner/utils/scoring";
-export { buildImportPreview, buildRestorePreview, recordToImportPayload, parseBackupText, gamesToCsv, parseImportText, type ImportSource } from "../modules/import-export/utils/importExport";
+export { buildImportPreview, buildRestorePreview, recordToImportPayload, parseBackupText, gamesToCsv, parseImportText } from "../modules/import-export/utils/importExport";
 export { backlogByDuration, platformDistribution, yearlyEvolution } from "../modules/dashboard/utils/dashboardData";
 export { plannerQueue, tacticalGoals, systemRules } from "../modules/planner/utils/plannerData";
 export { screenMeta } from "../modules/dashboard/utils/navigationData";
