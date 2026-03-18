@@ -4,6 +4,7 @@ import {
   Clock3,
   FolderKanban,
   Heart,
+  ListChecks,
   MessageSquareQuote,
   Pencil,
   Save,
@@ -26,8 +27,14 @@ type ReviewFormState = {
   hasSpoiler: boolean;
 };
 
+type ListOption = {
+  id: number;
+  name: string;
+};
+
 type GamePageScreenProps = {
   data: GamePageData;
+  availableLists: ListOption[];
   onBack: () => void;
   onOpenEdit: () => void;
   onOpenSession: (gameId?: number) => void;
@@ -38,6 +45,7 @@ type GamePageScreenProps = {
   onDelete: () => void;
   onSaveReview: (payload: ReviewFormState) => Promise<void>;
   onSaveTags: (value: string) => Promise<void>;
+  onSaveLists: (listIds: number[]) => Promise<void>;
 };
 
 function createReviewFormState(data: GamePageData): ReviewFormState {
@@ -54,6 +62,7 @@ function createReviewFormState(data: GamePageData): ReviewFormState {
 
 export function GamePageScreen({
   data,
+  availableLists,
   onBack,
   onOpenEdit,
   onOpenSession,
@@ -64,13 +73,18 @@ export function GamePageScreen({
   onDelete,
   onSaveReview,
   onSaveTags,
+  onSaveLists,
 }: GamePageScreenProps) {
   const [reviewForm, setReviewForm] = useState<ReviewFormState>(() => createReviewFormState(data));
   const [tagsValue, setTagsValue] = useState(() => data.tags.map((tag) => tag.name).join(", "));
+  const [selectedListIds, setSelectedListIds] = useState<number[]>(
+    () => data.lists.map((list) => list.id).filter((listId): listId is number => listId != null),
+  );
 
   useEffect(() => {
     setReviewForm(createReviewFormState(data));
     setTagsValue(data.tags.map((tag) => tag.name).join(", "));
+    setSelectedListIds(data.lists.map((list) => list.id).filter((listId): listId is number => listId != null));
   }, [data]);
 
   const handleReviewSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -81,6 +95,17 @@ export function GamePageScreen({
   const handleTagsSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await onSaveTags(tagsValue);
+  };
+
+  const handleListsSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await onSaveLists(selectedListIds);
+  };
+
+  const toggleList = (listId: number) => {
+    setSelectedListIds((current) =>
+      current.includes(listId) ? current.filter((id) => id !== listId) : [...current, listId],
+    );
   };
 
   return (
@@ -273,9 +298,7 @@ export function GamePageScreen({
                 <textarea
                   rows={3}
                   value={reviewForm.shortReview}
-                  onChange={(event) =>
-                    setReviewForm((current) => ({ ...current, shortReview: event.target.value }))
-                  }
+                  onChange={(event) => setReviewForm((current) => ({ ...current, shortReview: event.target.value }))}
                 />
               </label>
               <label className="field">
@@ -299,9 +322,7 @@ export function GamePageScreen({
                 <textarea
                   rows={6}
                   value={reviewForm.longReview}
-                  onChange={(event) =>
-                    setReviewForm((current) => ({ ...current, longReview: event.target.value }))
-                  }
+                  onChange={(event) => setReviewForm((current) => ({ ...current, longReview: event.target.value }))}
                 />
               </label>
             </div>
@@ -310,9 +331,7 @@ export function GamePageScreen({
               <input
                 type="checkbox"
                 checked={reviewForm.hasSpoiler}
-                onChange={(event) =>
-                  setReviewForm((current) => ({ ...current, hasSpoiler: event.target.checked }))
-                }
+                onChange={(event) => setReviewForm((current) => ({ ...current, hasSpoiler: event.target.checked }))}
               />
               <span>Marcar review como contendo spoiler</span>
             </label>
@@ -354,8 +373,8 @@ export function GamePageScreen({
         <Panel>
           <SectionHeader
             icon={Tags}
-            title="Tags e organização"
-            description="Associações rápidas para listas, filtros e recortes pessoais."
+            title="Tags e listas"
+            description="Organização pessoal do jogo para filtros, recortes e rotinas de execução."
           />
 
           <div className="game-page-tag-list">
@@ -382,13 +401,57 @@ export function GamePageScreen({
               </NotchButton>
             </div>
           </form>
+
+          <form className="modal-form" onSubmit={handleListsSubmit}>
+            <SectionHeader
+              icon={ListChecks}
+              title="Adicionar à lista"
+              description="Atribua este item às listas persistidas do seu perfil."
+            />
+
+            {availableLists.length === 0 ? (
+              <EmptyState message="Crie uma lista no perfil para começar a organizar seus jogos." />
+            ) : (
+              <>
+                <div className="filter-bar filter-bar--dense">
+                  {availableLists.map((list) => (
+                    <button
+                      key={list.id}
+                      type="button"
+                      className={`filter-chip ${selectedListIds.includes(list.id) ? "filter-chip--active" : ""}`}
+                      onClick={() => toggleList(list.id)}
+                    >
+                      {list.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="detail-note__tags">
+                  {data.lists.length === 0 ? (
+                    <Pill tone="neutral">Sem listas vinculadas</Pill>
+                  ) : (
+                    data.lists.map((list) => (
+                      <Pill key={list.id ?? list.name} tone="cyan">
+                        {list.name}
+                      </Pill>
+                    ))
+                  )}
+                </div>
+                <div className="modal-actions">
+                  <NotchButton variant="secondary" type="submit">
+                    <Save size={14} />
+                    Salvar listas
+                  </NotchButton>
+                </div>
+              </>
+            )}
+          </form>
         </Panel>
 
         <Panel>
           <SectionHeader
             icon={Sparkles}
             title="Metas do sistema"
-            description="Metas globais persistidas na base e refletidas para esta leitura."
+            description="Metas persistidas na base e refletidas em tempo real para esta leitura."
           />
 
           <div className="goal-stack">

@@ -34,8 +34,12 @@ export default function App() {
       <LibraryScreen
         libraryGames={app.libraryGames}
         selectedGame={app.selectedGame}
+        selectedGameLists={app.selectedGameLists}
         filter={app.filter}
+        selectedListFilter={app.selectedListFilter}
+        listOptions={app.listOptions}
         onFilterChange={(value) => app.setFilter(value)}
+        onListFilterChange={(value) => app.setSelectedListFilter(value)}
         onSelectGame={(gameId) => app.setSelectedGameId(gameId)}
         onExport={app.handleExport}
         onBackupExport={app.handleBackupExport}
@@ -91,6 +95,7 @@ export default function App() {
     screenContent = app.selectedGamePage ? (
       <GamePageScreen
         data={app.selectedGamePage}
+        availableLists={app.listOptions.map((list) => ({ id: list.id, name: list.name }))}
         onBack={() => app.openLibraryGame(app.selectedGamePage?.game.id)}
         onOpenEdit={app.openEditGameModal}
         onOpenSession={app.openSessionModal}
@@ -101,6 +106,7 @@ export default function App() {
         onDelete={app.handleDeleteSelectedGame}
         onSaveReview={app.handleGameReviewSave}
         onSaveTags={app.handleGameTagsSave}
+        onSaveLists={app.handleGameListsSave}
       />
     ) : (
       <Panel>

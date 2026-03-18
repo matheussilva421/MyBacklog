@@ -13,6 +13,7 @@ import type {
   Goal as DbGoal,
   GoalType,
   LibraryEntry as DbLibraryEntry,
+  LibraryEntryList as DbLibraryEntryList,
   List as DbList,
   OwnershipStatus,
   Period,
@@ -24,7 +25,7 @@ import type {
   Tag as DbTag,
 } from "../core/types";
 
-export type { GoalType, Period, DbGoal, DbList, DbSetting };
+export type { GoalType, Period, DbGoal, DbLibraryEntryList, DbList, DbSetting };
 
 export type ImportSource = "csv" | "steam" | "playnite";
 
@@ -68,6 +69,7 @@ export const navigationItems: Array<{ key: NavigationScreenKey; label: string; i
 export type Status = "Backlog" | "Jogando" | "Terminado" | "Pausado" | "Wishlist";
 export type Priority = "Alta" | "Média" | "Baixa";
 export type StatusFilter = "Todos" | Status;
+export type LibraryListFilter = "all" | number;
 
 export type Game = {
   id: number;
@@ -127,7 +129,7 @@ export type BarPoint = {
 export type Goal = {
   label: string;
   value: number;
-  tone: "sunset" | "violet" | "yellow";
+  tone: "sunset" | "cyan" | "violet" | "yellow";
 };
 
 export type Rule = {
@@ -208,6 +210,7 @@ export type BackupPayload = {
   playSessions: DbPlaySession[];
   reviews: DbReview[];
   lists: DbList[];
+  libraryEntryLists: DbLibraryEntryList[];
   tags: DbTag[];
   gameTags: DbGameTag[];
   goals: DbGoal[];

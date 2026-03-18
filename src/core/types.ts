@@ -87,6 +87,13 @@ export interface List {
   createdAt: string;
 }
 
+export interface LibraryEntryList {
+  id?: number;
+  libraryEntryId: number;
+  listId: number;
+  createdAt: string;
+}
+
 export interface Tag {
   id?: number;
   name: string;

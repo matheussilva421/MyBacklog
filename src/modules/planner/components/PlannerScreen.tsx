@@ -1,44 +1,20 @@
 import { Binary, ChevronRight, FolderKanban, Pencil, Plus, Target, Trash2 } from "lucide-react";
-import type { DbGoal, Game, Goal, PlannerEntry, Rule } from "../../../backlog/shared";
+import type { Game, Goal, PlannerEntry, Rule } from "../../../backlog/shared";
 import { cx } from "../../../backlog/shared";
 import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
+import type { ResolvedGoalRow } from "../utils/goals";
 
 type PlannerScreenProps = {
   visiblePlannerQueue: PlannerEntry[];
   goalProgress: Goal[];
-  goalRows: DbGoal[];
+  goalRows: ResolvedGoalRow[];
   systemRules: Rule[];
   findGame: (id: number) => Game | undefined;
   onOpenGamePage: (gameId?: number) => void;
   onCreateGoal: () => void;
-  onEditGoal: (goal: DbGoal) => void;
+  onEditGoal: (goal: ResolvedGoalRow) => void;
   onDeleteGoal: (goalId: number) => void;
 };
-
-const goalLabelMap: Record<string, string> = {
-  finished: "Jogos concluídos",
-  started: "Jogos iniciados",
-  playtime: "Horas jogadas",
-  backlog_reduction: "Redução de backlog",
-};
-
-const goalToneMap: Record<string, "sunset" | "cyan" | "violet" | "yellow"> = {
-  finished: "sunset",
-  started: "cyan",
-  playtime: "violet",
-  backlog_reduction: "yellow",
-};
-
-const periodLabelMap: Record<string, string> = {
-  monthly: "Mensal",
-  yearly: "Anual",
-  total: "Total",
-};
-
-function formatGoalCurrent(goal: DbGoal): string {
-  if (goal.type === "playtime") return `${goal.current}h / ${goal.target}h`;
-  return `${goal.current} / ${goal.target}`;
-}
 
 export function PlannerScreen({
   visiblePlannerQueue,
@@ -94,7 +70,7 @@ export function PlannerScreen({
           <SectionHeader
             icon={Target}
             title="Metas táticas"
-            description={hasDbGoals ? "Metas persistidas na base local" : "Pequenas vitórias para reduzir o acúmulo"}
+            description={hasDbGoals ? "Metas persistidas e calculadas em tempo real" : "Pequenas vitórias para reduzir o acúmulo"}
             action={
               <NotchButton variant="secondary" onClick={onCreateGoal}>
                 <Plus size={14} />
@@ -104,27 +80,24 @@ export function PlannerScreen({
           />
           <div className="goal-stack">
             {hasDbGoals ? (
-              goalRows.map((goal) => {
-                const pct = Math.max(0, Math.min(100, Math.round((goal.current / Math.max(1, goal.target)) * 100)));
-                return (
-                  <div className="goal-row" key={goal.id}>
-                    <div className="goal-row__head">
-                      <span>{goalLabelMap[goal.type] ?? goal.type}</span>
-                      <div className="goal-row__actions">
-                        <Pill tone="neutral">{periodLabelMap[goal.period] ?? goal.period}</Pill>
-                        <strong>{formatGoalCurrent(goal)}</strong>
-                        <NotchButton variant="ghost" onClick={() => onEditGoal(goal)}>
-                          <Pencil size={12} />
-                        </NotchButton>
-                        <NotchButton variant="ghost" onClick={() => goal.id != null && onDeleteGoal(goal.id)}>
-                          <Trash2 size={12} />
-                        </NotchButton>
-                      </div>
+              goalRows.map((goal) => (
+                <div className="goal-row" key={goal.id}>
+                  <div className="goal-row__head">
+                    <span>{goal.label}</span>
+                    <div className="goal-row__actions">
+                      <Pill tone="neutral">{goal.periodLabel}</Pill>
+                      <strong>{goal.currentLabel}</strong>
+                      <NotchButton variant="ghost" onClick={() => onEditGoal(goal)}>
+                        <Pencil size={12} />
+                      </NotchButton>
+                      <NotchButton variant="ghost" onClick={() => goal.id != null && onDeleteGoal(goal.id)}>
+                        <Trash2 size={12} />
+                      </NotchButton>
                     </div>
-                    <ProgressBar value={pct} tone={goalToneMap[goal.type] ?? "yellow"} thin />
                   </div>
-                );
-              })
+                  <ProgressBar value={goal.progressPercent} tone={goal.tone} thin />
+                </div>
+              ))
             ) : (
               goalProgress.map((goal) => (
                 <div className="goal-row" key={goal.label}>

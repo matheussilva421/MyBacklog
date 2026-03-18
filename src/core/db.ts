@@ -6,6 +6,7 @@ import type {
   ImportJob,
   LegacyGameRecord,
   LibraryEntry,
+  LibraryEntryList,
   List,
   PlaySession,
   Review,
@@ -33,6 +34,7 @@ class MyBacklogDB extends Dexie {
   playSessions!: Table<PlaySession, number>;
   reviews!: Table<Review, number>;
   lists!: Table<List, number>;
+  libraryEntryLists!: Table<LibraryEntryList, number>;
   tags!: Table<Tag, number>;
   gameTags!: Table<GameTag, number>;
   goals!: Table<Goal, number>;
@@ -161,6 +163,22 @@ class MyBacklogDB extends Dexie {
             delete entry.gameId;
           });
       });
+
+    this.version(3).stores({
+      games: "++id, normalizedTitle, title, rawgId, releaseYear",
+      libraryEntries:
+        "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt",
+      playSessions: "++id, libraryEntryId, date",
+      reviews: "++id, libraryEntryId",
+      lists: "++id, name",
+      libraryEntryLists:
+        "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
+      tags: "++id, name",
+      gameTags: "++id, libraryEntryId, tagId",
+      goals: "++id, type, period",
+      settings: "++id, key, updatedAt",
+      importJobs: "++id, source, status, createdAt, updatedAt",
+    });
   }
 }
 

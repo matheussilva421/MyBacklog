@@ -927,8 +927,32 @@ button {
   color: #6d7483;
 }
 
+.filter-stack,
+.filter-group {
+  display: grid;
+  gap: 10px;
+}
+
+.filter-stack {
+  margin-bottom: 18px;
+}
+
+.filter-group__label {
+  color: var(--text-faint);
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
 .filter-bar {
-  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filter-bar--dense {
+  margin-top: 6px;
 }
 
 .filter-chip {
@@ -947,6 +971,10 @@ button {
 .filter-chip--active {
   background: rgba(244, 239, 27, 0.12);
   border-color: rgba(244, 239, 27, 0.34);
+}
+
+.detail-note__tags .cp-pill svg {
+  margin-right: 4px;
 }
 
 .library-grid {

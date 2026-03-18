@@ -7,6 +7,7 @@ import type {
   Goal as DbGoal,
   GoalType,
   LibraryEntry as DbLibraryEntry,
+  LibraryEntryList as DbLibraryEntryList,
   List as DbList,
   Period,
   PlaySession as DbPlaySession,
@@ -14,12 +15,12 @@ import type {
   Setting as DbSetting,
   Tag as DbTag,
 } from "../core/types";
-import { buildGamePageData } from "../modules/game-page/utils/gamePageData";
+import { useDashboardInsights } from "../modules/dashboard/hooks/useDashboardInsights";
+import { useSelectedGamePage } from "../modules/game-page/hooks/useSelectedGamePage";
+import { useLibraryState } from "../modules/library/hooks/useLibraryState";
+import { usePlannerInsights } from "../modules/planner/hooks/usePlannerInsights";
 import {
-  backlogByDuration,
   buildImportPreview,
-  buildPlannerFit,
-  buildPlannerReason,
   buildRestorePreview,
   composeLibraryRecords,
   computePlannerScore,
@@ -35,29 +36,20 @@ import {
   defaultSessions,
   downloadText,
   formatDuration,
-  formatMonthLabel,
   mergeImportedGame,
   parseBackupText,
-  parseEtaHours,
-  plannerQueue,
-  platformDistribution,
-  profileAchievements,
   recordToImportPayload,
   screenMeta,
   systemRules,
   tacticalGoals,
-  yearlyEvolution,
   mergePlatformList,
-  type Achievement,
   type BackupPayload,
   type BackupTables,
   type GameFormState,
-  type Goal,
   type GoalFormState,
   type ImportPreviewAction,
   type ImportPreviewEntry,
-  type PiePoint,
-  type PlannerEntry,
+  type LibraryListFilter,
   type RestoreMode,
   type RestorePreview,
   type ScreenKey,
@@ -76,21 +68,15 @@ function sortByUpdatedAtDesc<T extends { updatedAt: string }>(rows: T[]): T[] {
   return [...rows].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
-function isSameMonth(date: Date, target: Date): boolean {
-  return date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth();
-}
-
-function formatPositiveHours(hours: number): string {
-  return `+${hours}h em 7 dias`;
-}
-
 export function useBacklogApp() {
   const [screen, setScreen] = useState<ScreenKey>("dashboard");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("Todos");
+  const [selectedListFilter, setSelectedListFilter] = useState<LibraryListFilter>("all");
   const [selectedGameId, setSelectedGameId] = useState(0);
   const [gameRows, setGameRows] = useState<DbGameMetadata[]>([]);
   const [libraryEntryRows, setLibraryEntryRows] = useState<DbLibraryEntry[]>([]);
+  const [libraryEntryListRows, setLibraryEntryListRows] = useState<DbLibraryEntryList[]>([]);
   const [sessionRows, setSessionRows] = useState<DbPlaySession[]>([]);
   const [reviewRows, setReviewRows] = useState<DbReview[]>([]);
   const [tagRows, setTagRows] = useState<DbTag[]>([]);
@@ -137,7 +123,7 @@ export function useBacklogApp() {
       storedEntries = await db.libraryEntries.orderBy("updatedAt").reverse().toArray();
     }
 
-    const [storedGames, storedSessions, storedReviews, storedTags, storedGameTags, storedGoals, storedLists, storedSettings] = await Promise.all([
+    const [storedGames, storedSessions, storedReviews, storedTags, storedGameTags, storedGoals, storedLists, storedLibraryEntryLists, storedSettings] = await Promise.all([
       db.games.toArray(),
       db.playSessions.orderBy("date").reverse().toArray(),
       db.reviews.toArray(),
@@ -145,6 +131,7 @@ export function useBacklogApp() {
       db.gameTags.toArray(),
       db.goals.toArray(),
       db.lists.toArray(),
+      db.libraryEntryLists.toArray(),
       db.settings.toArray(),
     ]);
     setGameRows(sortByUpdatedAtDesc(storedGames));
@@ -155,6 +142,7 @@ export function useBacklogApp() {
     setGameTagRows(storedGameTags);
     setGoalRows(storedGoals);
     setListRows(storedLists);
+    setLibraryEntryListRows(storedLibraryEntryLists);
     setSettingRows(storedSettings);
   };
 
@@ -180,6 +168,12 @@ export function useBacklogApp() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  useEffect(() => {
+    if (selectedListFilter === "all") return;
+    if (listRows.some((list) => list.id === selectedListFilter)) return;
+    setSelectedListFilter("all");
+  }, [listRows, selectedListFilter]);
+
   const records = useMemo(() => composeLibraryRecords(gameRows, libraryEntryRows), [gameRows, libraryEntryRows]);
   const recordsByEntryId = useMemo(
     () => new Map(records.map((record) => [record.libraryEntry.id, record] as const)),
@@ -190,121 +184,56 @@ export function useBacklogApp() {
     [reviewRows],
   );
   const tagById = useMemo(() => new Map(tagRows.map((tag) => [tag.id, tag] as const)), [tagRows]);
+  const listById = useMemo(() => new Map(listRows.map((list) => [list.id, list] as const)), [listRows]);
   const games = useMemo(() => records.map(dbGameToUiGame), [records]);
   const displayName = useMemo(() => {
     const setting = settingRows.find((s) => s.key === "displayName");
     return setting?.value || "Backlog OS";
   }, [settingRows]);
 
-  const findRecord = (entryId: number) => recordsByEntryId.get(entryId);
   const findGame = (id: number) => games.find((game) => game.id === id);
 
-  const monthlyProgress = useMemo(() => {
-    if (libraryEntryRows.length === 0) return yearlyEvolution;
-    const months = Array.from({ length: 6 }, (_, index) => {
-      const date = new Date();
-      date.setDate(1);
-      date.setMonth(date.getMonth() - (5 - index));
-      return { month: formatMonthLabel(date), key: `${date.getFullYear()}-${date.getMonth()}`, started: 0, finished: 0 };
-    });
-    const monthMap = new Map(months.map((entry) => [entry.key, entry]));
-    for (const entry of libraryEntryRows) {
-      const createdKey = `${new Date(entry.createdAt).getFullYear()}-${new Date(entry.createdAt).getMonth()}`;
-      if (entry.ownershipStatus !== "wishlist") {
-        const createdBucket = monthMap.get(createdKey);
-        if (createdBucket) createdBucket.started += 1;
-      }
-      if (entry.progressStatus === "finished" || entry.progressStatus === "completed_100") {
-        const finishedAt = new Date(entry.updatedAt);
-        const finishedBucket = monthMap.get(`${finishedAt.getFullYear()}-${finishedAt.getMonth()}`);
-        if (finishedBucket) finishedBucket.finished += 1;
-      }
-    }
-    return months.map(({ month, started, finished }) => ({ month, started, finished }));
-  }, [libraryEntryRows]);
+  const { monthlyProgress, platformData, durationBuckets, stats, achievementCards } = useDashboardInsights({
+    games,
+    libraryEntryRows,
+    sessionRows,
+  });
 
-  const platformData = useMemo<PiePoint[]>(() => {
-    if (games.length === 0) return platformDistribution;
-    const counts = new Map<string, number>();
-    for (const game of games) counts.set(game.platform, (counts.get(game.platform) || 0) + 1);
-    const total = games.length;
-    return Array.from(counts.entries())
-      .sort(([, left], [, right]) => right - left)
-      .slice(0, 5)
-      .map(([name, value]) => ({ name, value: Math.max(1, Math.round((value / total) * 100)) }));
-  }, [games]);
+  const { resolvedGoalRows, plannerGoalSignals, computedPlannerQueue, goalProgress } = usePlannerInsights({
+    games,
+    libraryEntryRows,
+    sessionRows,
+    goalRows,
+    fallbackGoalProgress: tacticalGoals,
+  });
 
-  const durationBuckets = useMemo(() => {
-    if (games.length === 0) return backlogByDuration;
-    const buckets = [{ name: "Até 10h", total: 0 }, { name: "10-25h", total: 0 }, { name: "25-50h", total: 0 }, { name: "50h+", total: 0 }];
-    for (const game of games) {
-      if (game.status === "Terminado" || game.status === "Wishlist") continue;
-      const etaHours = parseEtaHours(game.eta);
-      if (!Number.isFinite(etaHours) || etaHours > 50) buckets[3].total += 1;
-      else if (etaHours > 25) buckets[2].total += 1;
-      else if (etaHours > 10) buckets[1].total += 1;
-      else buckets[0].total += 1;
-    }
-    return buckets;
-  }, [games]);
-
-  const computedPlannerQueue = useMemo<PlannerEntry[]>(() => {
-    if (games.length === 0) return plannerQueue;
-    return games
-      .filter((game) => game.status !== "Terminado" && game.status !== "Wishlist")
-      .sort((left, right) => computePlannerScore(right) - computePlannerScore(left))
-      .slice(0, 4)
-      .map((game, index) => ({ rank: index + 1, gameId: game.id, reason: buildPlannerReason(game), eta: game.eta, fit: buildPlannerFit(game) }));
-  }, [games]);
-
-  const goalProgress = useMemo<Goal[]>(() => {
-    if (games.length === 0) return tacticalGoals;
-    const shortTarget = games.filter((game) => game.status === "Terminado" && parseEtaHours(game.eta) <= 12).length;
-    const sessionsThisWeek = sessionRows.filter((session) => Date.now() - new Date(session.date).getTime() <= 7 * 24 * 60 * 60 * 1000).length;
-    const backlogCount = games.filter((game) => game.status === "Backlog").length;
-    return [
-      { label: "Finalizar 1 jogo curto", value: Math.min(100, shortTarget * 100), tone: "sunset" },
-      { label: "Registrar 5 sessões", value: Math.min(100, Math.round((sessionsThisWeek / 5) * 100)), tone: "violet" },
-      { label: "Reduzir backlog em 2 jogos", value: Math.max(0, Math.min(100, 100 - Math.round((backlogCount / Math.max(2, games.length || 1)) * 100))), tone: "yellow" },
-    ];
-  }, [games, sessionRows]);
-
-  const achievementCards = useMemo<Achievement[]>(() => {
-    if (games.length === 0) return profileAchievements;
-    const largestBucket = durationBuckets.reduce((current, entry) => (entry.total > current.total ? entry : current), durationBuckets[0] || { name: "Até 10h", total: 0 });
-    return [
-      { icon: profileAchievements[0].icon, tone: "emerald", title: `${games.filter((game) => game.status === "Terminado").length} jogos finalizados`, description: "Histórico sólido e biblioteca viva." },
-      { icon: profileAchievements[1].icon, tone: "cyan", title: "Radar de progresso ativo", description: `${games.filter((game) => game.status === "Jogando").length} jogos com acompanhamento contínuo.` },
-      { icon: profileAchievements[2].icon, tone: "magenta", title: `${games.filter((game) => game.status === "Pausado").length} jogos pausados`, description: "Baixo atrito para retomar e gerar avanço real." },
-      { icon: profileAchievements[3].icon, tone: "yellow", title: "Gargalo de médio porte", description: `${largestBucket?.name || "Até 10h"} segue como principal bloco do backlog.` },
-    ];
-  }, [durationBuckets, games]);
-
-  const matchesCollection = (values: Array<string | number>) => {
+  const matchesQuery = (values: Array<string | number>) => {
     if (!deferredQuery) return true;
     return values.some((value) => String(value).toLowerCase().includes(deferredQuery));
   };
 
-  const tagNamesByEntryId = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const relation of gameTagRows) {
-      const tag = tagById.get(relation.tagId);
-      if (!tag) continue;
-      const current = map.get(relation.libraryEntryId) ?? "";
-      map.set(relation.libraryEntryId, current ? `${current}, ${tag.name}` : tag.name);
-    }
-    return map;
-  }, [gameTagRows, tagById]);
-
-  const searchedGames = useMemo(() => games.filter((game) => matchesCollection([game.title, game.platform, game.genre, game.mood, game.notes, game.difficulty, tagNamesByEntryId.get(game.id) ?? ""])), [deferredQuery, games, tagNamesByEntryId]);
-  const libraryGames = useMemo(() => searchedGames.filter((game) => (filter === "Todos" ? true : game.status === filter)), [filter, searchedGames]);
+  const { listOptions, searchedGames, libraryGames, selectedGame, selectedRecord, selectedGameLists } = useLibraryState({
+    games,
+    recordsByEntryId,
+    tagById,
+    listById,
+    gameTagRows,
+    libraryEntryListRows,
+    query: deferredQuery,
+    filter,
+    selectedListFilter,
+    selectedGameId,
+  });
 
   useEffect(() => {
-    if (selectedGameId > 0 && games.some((game) => game.id === selectedGameId)) {
+    if (selectedGameId > 0 && libraryGames.some((game) => game.id === selectedGameId)) {
       return;
     }
     if (libraryGames.length > 0) {
       setSelectedGameId(libraryGames[0].id);
+      return;
+    }
+    if (selectedGameId > 0 && searchedGames.some((game) => game.id === selectedGameId)) {
       return;
     }
     if (searchedGames.length > 0) {
@@ -320,71 +249,47 @@ export function useBacklogApp() {
     }
   }, [games, libraryGames, searchedGames, selectedGameId]);
 
-  const selectedGame =
-    libraryGames.find((game) => game.id === selectedGameId) ??
-    searchedGames.find((game) => game.id === selectedGameId) ??
-    findGame(selectedGameId) ??
-    games[0];
-  const selectedRecord = selectedGame ? findRecord(selectedGame.id) : undefined;
-  const selectedGamePage = useMemo(() => {
-    if (!selectedGame || !selectedRecord?.libraryEntry.id) return null;
-    const entryId = selectedRecord.libraryEntry.id;
-    const sessions = sessionRows.filter((session) => session.libraryEntryId === entryId);
-    const tags = gameTagRows
-      .filter((relation) => relation.libraryEntryId === entryId)
-      .map((relation) => tagById.get(relation.tagId))
-      .filter((tag): tag is DbTag => Boolean(tag));
+  const selectedGamePage = useSelectedGamePage({
+    selectedGame,
+    selectedRecord,
+    sessionRows,
+    gameTagRows,
+    libraryEntryListRows,
+    tagById,
+    listById,
+    reviewByEntryId,
+    goalRows: resolvedGoalRows,
+    plannerGoalSignals,
+  });
 
-    return buildGamePageData({
-      game: selectedGame,
-      record: selectedRecord,
-      sessions,
-      review: reviewByEntryId.get(entryId),
-      tags,
-      goals: goalRows,
-    });
-  }, [gameTagRows, goalRows, reviewByEntryId, selectedGame, selectedRecord, sessionRows, tagById]);
-
-  const stats = useMemo(() => {
-    const now = new Date();
-    const weekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
-    const total = games.length;
-    const backlog = games.filter((game) => game.status === "Backlog").length;
-    const playing = games.filter((game) => game.status === "Jogando").length;
-    const finished = games.filter((game) => game.status === "Terminado").length;
-    const hours = games.reduce((totalHours, game) => totalHours + game.hours, 0);
-    const addedThisMonth = libraryEntryRows.filter((entry) => isSameMonth(new Date(entry.createdAt), now)).length;
-    const highPriorityBacklog = games.filter((game) => game.status === "Backlog" && game.priority === "Alta").length;
-    const sessionsThisWeek = sessionRows.filter((session) => new Date(session.date).getTime() >= weekAgo).length;
-    const recentHours = Math.round(
-      sessionRows
-        .filter((session) => new Date(session.date).getTime() >= weekAgo)
-        .reduce((totalMinutes, session) => totalMinutes + session.durationMinutes, 0) / 60,
-    );
-    const completionRate = total > 0 ? Math.round((finished / total) * 100) : 0;
-    return {
-      total,
-      backlog,
-      playing,
-      finished,
-      hours,
-      totalDelta: addedThisMonth > 0 ? `+${addedThisMonth} este mês` : "sem novos este mês",
-      backlogDelta:
-        highPriorityBacklog > 0
-          ? `${highPriorityBacklog} alta prioridade`
-          : "sem pressão tática",
-      playingDelta:
-        sessionsThisWeek > 0
-          ? `${sessionsThisWeek} sessões na semana`
-          : "sem sessões recentes",
-      finishedDelta: `${completionRate}% de conclusão`,
-      hoursDelta: formatPositiveHours(recentHours),
-    };
-  }, [games, libraryEntryRows, sessionRows]);
-
-  const continuePlayingGames = useMemo(() => games.filter((game) => game.status === "Jogando" || game.status === "Pausado").sort((left, right) => computePlannerScore(right) - computePlannerScore(left)).slice(0, 3).filter((game) => matchesCollection([game.title, game.genre, game.platform, game.notes])), [deferredQuery, games]);
-  const visiblePlannerQueue = useMemo(() => computedPlannerQueue.filter((entry) => { const game = findGame(entry.gameId); return matchesCollection([game?.title ?? "", entry.reason, entry.fit, entry.eta]); }), [computedPlannerQueue, deferredQuery, games]);
-  const visibleSessions = useMemo(() => sessionRows.filter((entry) => { const game = findGame(entry.libraryEntryId); return matchesCollection([game?.title ?? "", game?.platform ?? "", entry.note ?? "", formatDuration(entry.durationMinutes)]); }), [deferredQuery, games, sessionRows]);
+  const continuePlayingGames = useMemo(
+    () =>
+      games
+        .filter((game) => game.status === "Jogando" || game.status === "Pausado")
+        .sort(
+          (left, right) =>
+            computePlannerScore(right, plannerGoalSignals) - computePlannerScore(left, plannerGoalSignals),
+        )
+        .slice(0, 3)
+        .filter((game) => matchesQuery([game.title, game.genre, game.platform, game.notes])),
+    [games, plannerGoalSignals, deferredQuery],
+  );
+  const visiblePlannerQueue = useMemo(
+    () =>
+      computedPlannerQueue.filter((entry) => {
+        const game = findGame(entry.gameId);
+        return matchesQuery([game?.title ?? "", entry.reason, entry.fit, entry.eta]);
+      }),
+    [computedPlannerQueue, deferredQuery, games],
+  );
+  const visibleSessions = useMemo(
+    () =>
+      sessionRows.filter((entry) => {
+        const game = findGame(entry.libraryEntryId);
+        return matchesQuery([game?.title ?? "", game?.platform ?? "", entry.note ?? "", formatDuration(entry.durationMinutes)]);
+      }),
+    [deferredQuery, games, sessionRows],
+  );
 
   const importPreviewSummary = useMemo(() => {
     const summary = { create: 0, update: 0, ignore: 0, fresh: 0, existing: 0, duplicates: 0 };
@@ -470,17 +375,18 @@ export function useBacklogApp() {
   };
 
   const readBackupTables = async (): Promise<BackupTables> => {
-    const [games, libraryEntries, playSessions, reviews, lists, tags, gameTags, goals] = await Promise.all([
+    const [games, libraryEntries, playSessions, reviews, lists, libraryEntryLists, tags, gameTags, goals] = await Promise.all([
       db.games.toArray(),
       db.libraryEntries.toArray(),
       db.playSessions.toArray(),
       db.reviews.toArray(),
       db.lists.toArray(),
+      db.libraryEntryLists.toArray(),
       db.tags.toArray(),
       db.gameTags.toArray(),
       db.goals.toArray(),
     ]);
-    return { games, libraryEntries, playSessions, reviews, lists, tags, gameTags, goals };
+    return { games, libraryEntries, playSessions, reviews, lists, libraryEntryLists, tags, gameTags, goals };
   };
 
   const handleGameFormChange = <K extends keyof GameFormState>(field: K, value: GameFormState[K]) => {
@@ -677,12 +583,21 @@ export function useBacklogApp() {
 
   const handleBackupExport = async () => {
     const tables = await readBackupTables();
-    const totalRecords = tables.games.length + tables.libraryEntries.length + tables.playSessions.length + tables.reviews.length + tables.lists.length + tables.tags.length + tables.gameTags.length + tables.goals.length;
+    const totalRecords =
+      tables.games.length +
+      tables.libraryEntries.length +
+      tables.playSessions.length +
+      tables.reviews.length +
+      tables.lists.length +
+      tables.libraryEntryLists.length +
+      tables.tags.length +
+      tables.gameTags.length +
+      tables.goals.length;
     if (totalRecords === 0) {
       setNotice("A base local está vazia para backup.");
       return;
     }
-    const payload: BackupPayload = { version: 2, exportedAt: new Date().toISOString(), source: "mybacklog", ...tables };
+    const payload: BackupPayload = { version: 3, exportedAt: new Date().toISOString(), source: "mybacklog", ...tables };
     downloadText(`arsenal-gamer-backup-${payload.exportedAt.slice(0, 10)}.json`, JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
     setNotice("Backup JSON exportado.");
   };
@@ -711,8 +626,9 @@ export function useBacklogApp() {
       }
 
       const payload = restorePreview.payload;
-      await db.transaction("rw", [db.games, db.libraryEntries, db.playSessions, db.reviews, db.lists, db.tags, db.gameTags, db.goals], async () => {
+      await db.transaction("rw", [db.games, db.libraryEntries, db.playSessions, db.reviews, db.lists, db.libraryEntryLists, db.tags, db.gameTags, db.goals], async () => {
         if (restorePreview.mode === "replace") {
+          await db.libraryEntryLists.clear();
           await db.gameTags.clear();
           await db.reviews.clear();
           await db.playSessions.clear();
@@ -726,17 +642,19 @@ export function useBacklogApp() {
           if (payload.playSessions.length) await db.playSessions.bulkPut(payload.playSessions);
           if (payload.reviews.length) await db.reviews.bulkPut(payload.reviews);
           if (payload.lists.length) await db.lists.bulkPut(payload.lists);
+          if (payload.libraryEntryLists.length) await db.libraryEntryLists.bulkPut(payload.libraryEntryLists);
           if (payload.tags.length) await db.tags.bulkPut(payload.tags);
           if (payload.gameTags.length) await db.gameTags.bulkPut(payload.gameTags);
           if (payload.goals.length) await db.goals.bulkPut(payload.goals);
           return;
         }
 
-        const [existingGames, existingEntries, existingTags, existingLists, existingGoals, existingReviews, existingSessions, existingGameTags] = await Promise.all([
+        const [existingGames, existingEntries, existingTags, existingLists, existingLibraryEntryLists, existingGoals, existingReviews, existingSessions, existingGameTags] = await Promise.all([
           db.games.toArray(),
           db.libraryEntries.toArray(),
           db.tags.toArray(),
           db.lists.toArray(),
+          db.libraryEntryLists.toArray(),
           db.goals.toArray(),
           db.reviews.toArray(),
           db.playSessions.toArray(),
@@ -753,6 +671,7 @@ export function useBacklogApp() {
         );
         const existingTagMap = new Map(existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag]));
         const existingListMap = new Map(existingLists.map((list) => [list.name.trim().toLowerCase(), list]));
+        const libraryEntryListSet = new Set(existingLibraryEntryLists.map((entry) => `${entry.libraryEntryId}::${entry.listId}`));
         const existingGoalMap = new Map(existingGoals.map((goal) => [`${goal.type}::${goal.period}`, goal]));
         const existingReviewMap = new Map(existingReviews.map((review) => [review.libraryEntryId, review]));
         const sessionSet = new Set(existingSessions.map((session) => `${session.libraryEntryId}::${session.date}::${session.durationMinutes}::${(session.note || "").trim().toLowerCase()}::${session.completionPercent ?? ""}`));
@@ -761,6 +680,7 @@ export function useBacklogApp() {
         const payloadGamesById = new Map(payload.games.map((game) => [game.id, game]));
         const resolvedGameIdByPayloadId = new Map<number, number>();
         const resolvedEntryIdByPayloadId = new Map<number, number>();
+        const resolvedListIdByPayloadId = new Map<number, number>();
         const resolvedTagIdByPayloadId = new Map<number, number>();
 
         for (const game of payload.games) {
@@ -795,8 +715,23 @@ export function useBacklogApp() {
           const key = list.name.trim().toLowerCase();
           if (!key) continue;
           const existing = existingListMap.get(key);
-          if (existing?.id != null) await db.lists.put({ ...existing, ...list, id: existing.id });
-          else await db.lists.add({ ...list, id: undefined, name: list.name.trim() });
+          if (existing?.id != null) {
+            if (list.id != null) resolvedListIdByPayloadId.set(list.id, existing.id);
+            await db.lists.put({ ...existing, ...list, id: existing.id });
+          } else {
+            const nextId = Number(await db.lists.add({ ...list, id: undefined, name: list.name.trim() }));
+            if (list.id != null) resolvedListIdByPayloadId.set(list.id, nextId);
+          }
+        }
+
+        for (const relation of payload.libraryEntryLists) {
+          const libraryEntryId = resolvedEntryIdByPayloadId.get(relation.libraryEntryId);
+          const listId = resolvedListIdByPayloadId.get(relation.listId);
+          if (!libraryEntryId || !listId) continue;
+          const key = `${libraryEntryId}::${listId}`;
+          if (libraryEntryListSet.has(key)) continue;
+          libraryEntryListSet.add(key);
+          await db.libraryEntryLists.add({ libraryEntryId, listId, createdAt: relation.createdAt || new Date().toISOString() });
         }
 
         for (const tag of payload.tags) {
@@ -1022,15 +957,44 @@ export function useBacklogApp() {
     setNotice(names.length > 0 ? "Tags sincronizadas para este jogo." : "Tags removidas deste jogo.");
   };
 
+  const handleGameListsSave = async (listIds: number[]) => {
+    if (!selectedRecord?.libraryEntry.id) return;
+
+    const libraryEntryId = selectedRecord.libraryEntry.id;
+    const validListIds = new Set(listRows.map((list) => list.id).filter((listId): listId is number => listId != null));
+    const nextListIds = Array.from(new Set(listIds)).filter((listId) => validListIds.has(listId));
+
+    await db.transaction("rw", db.libraryEntryLists, async () => {
+      const currentRelations = await db.libraryEntryLists.where("libraryEntryId").equals(libraryEntryId).toArray();
+      const currentListIds = new Set(currentRelations.map((relation) => relation.listId));
+
+      for (const relation of currentRelations) {
+        if (!nextListIds.includes(relation.listId) && relation.id != null) {
+          await db.libraryEntryLists.delete(relation.id);
+        }
+      }
+
+      for (const listId of nextListIds) {
+        if (!currentListIds.has(listId)) {
+          await db.libraryEntryLists.add({ libraryEntryId, listId, createdAt: new Date().toISOString() });
+        }
+      }
+    });
+
+    await refreshData();
+    setNotice(nextListIds.length > 0 ? "Listas sincronizadas para este jogo." : "Jogo removido de todas as listas.");
+  };
+
   const handleDeleteSelectedGame = async () => {
     if (!selectedRecord || !selectedGame) return;
     const confirmed = window.confirm(`Excluir ${selectedGame.title} da biblioteca?`);
     if (!confirmed) return;
-    await db.transaction("rw", [db.games, db.libraryEntries, db.playSessions, db.reviews, db.gameTags], async () => {
+    await db.transaction("rw", [db.games, db.libraryEntries, db.playSessions, db.reviews, db.gameTags, db.libraryEntryLists], async () => {
       const entryId = selectedRecord.libraryEntry.id!;
       await db.playSessions.where("libraryEntryId").equals(entryId).delete();
       await db.reviews.where("libraryEntryId").equals(entryId).delete();
       await db.gameTags.where("libraryEntryId").equals(entryId).delete();
+      await db.libraryEntryLists.where("libraryEntryId").equals(entryId).delete();
       await db.libraryEntries.delete(entryId);
       const siblingCount = await db.libraryEntries.where("gameId").equals(selectedRecord.game.id!).count();
       if (siblingCount === 0) await db.games.delete(selectedRecord.game.id!);
@@ -1122,18 +1086,30 @@ export function useBacklogApp() {
 
   // ── List CRUD ──
   const handleListCreate = async (name: string) => {
-    if (!name.trim()) {
+    const normalizedName = name.trim();
+    if (!normalizedName) {
       setNotice("Informe um nome para a lista.");
       return;
     }
-    await db.lists.add({ name: name.trim(), createdAt: new Date().toISOString() });
+    const existing = await db.lists
+      .filter((list) => list.name.trim().toLowerCase() === normalizedName.toLowerCase())
+      .first();
+    if (existing) {
+      setNotice("Essa lista já existe.");
+      return;
+    }
+    await db.lists.add({ name: normalizedName, createdAt: new Date().toISOString() });
     await refreshData();
     setNotice("Lista criada com sucesso.");
   };
   const handleListDelete = async (listId: number) => {
     const confirmed = window.confirm("Excluir esta lista?");
     if (!confirmed) return;
-    await db.lists.delete(listId);
+    await db.transaction("rw", db.lists, db.libraryEntryLists, async () => {
+      await db.libraryEntryLists.where("listId").equals(listId).delete();
+      await db.lists.delete(listId);
+    });
+    if (selectedListFilter === listId) setSelectedListFilter("all");
     await refreshData();
     setNotice("Lista removida.");
   };
@@ -1176,11 +1152,11 @@ export function useBacklogApp() {
   };
 
   return {
-    screen, setScreen, query, setQuery, filter, setFilter, selectedGameId, setSelectedGameId,
+    screen, setScreen, query, setQuery, filter, setFilter, selectedListFilter, setSelectedListFilter, selectedGameId, setSelectedGameId,
     loading, notice, submitting, heroCopy, games, libraryGames, selectedGame, selectedGamePage, monthlyProgress, platformData,
     durationBuckets, visibleSessions, visiblePlannerQueue, continuePlayingGames, stats, goalProgress,
     achievementCards, systemRules, findGame, gameModalMode, gameForm, sessionModalOpen, sessionForm,
-    sessionEditId, goalRows, listRows, displayName,
+    sessionEditId, goalRows: resolvedGoalRows, listRows, listOptions, selectedGameLists, displayName,
     goalModalMode, goalForm,
     importModalOpen, importSource, importText, importFileName, importPreview, importPreviewSummary,
     importFileInputRef, restoreModalOpen, restoreMode, restoreText, restoreFileName, restorePreview,
@@ -1191,7 +1167,7 @@ export function useBacklogApp() {
     handleImportPreviewActionChange, handleImportFileChange, handleRestoreFileChange, handleGameSubmit,
     handleImportSubmit, handleExport, handleBackupExport, handleRestoreSubmit, handleSessionSubmit,
     handleDeleteSelectedGame, handleResumeSelectedGame, handleFavoriteSelectedGame, handleGameReviewSave,
-    handleGameTagsSave, handleSendSelectedToPlanner, openLibraryGame, openGamePage,
+    handleGameTagsSave, handleGameListsSave, handleSendSelectedToPlanner, openLibraryGame, openGamePage,
     handleSessionDelete,
     openCreateGoalModal, openEditGoalModal, closeGoalModal, handleGoalFormChange, handleGoalSubmit, handleGoalDelete,
     handleListCreate, handleListDelete, handleSettingSave,

@@ -1,6 +1,7 @@
 import { buildPlannerFit, buildPlannerReason, computePlannerScore } from "../../planner/utils/scoring";
+import type { PlannerGoalSignals } from "../../planner/utils/goals";
 import type { Game, LibraryRecord } from "../../../backlog/shared";
-import type { Goal as DbGoal, PlaySession, Review, Tag } from "../../../core/types";
+import type { Goal as DbGoal, List, PlaySession, Review, Tag } from "../../../core/types";
 
 export type GamePageGoal = {
   id: string;
@@ -16,6 +17,7 @@ export type GamePageData = {
   sessions: PlaySession[];
   review?: Review;
   tags: Tag[];
+  lists: List[];
   goals: GamePageGoal[];
   plannerScore: number;
   plannerReason: string;
@@ -46,8 +48,9 @@ function mapGoalTone(goal: DbGoal): GamePageGoal["tone"] {
 
 function formatGoalProgress(goal: DbGoal): string {
   if (goal.type === "playtime") {
-    return `${goal.current}h / ${goal.target}h`;
+    return `${goal.current.toFixed(1)}h / ${goal.target}h`;
   }
+
   return `${goal.current} / ${goal.target}`;
 }
 
@@ -57,15 +60,17 @@ export function buildGamePageData(input: {
   sessions: PlaySession[];
   review?: Review;
   tags: Tag[];
+  lists: List[];
   goals: DbGoal[];
+  goalSignals: PlannerGoalSignals;
 }): GamePageData {
   const sessions = [...input.sessions].sort((left, right) => right.date.localeCompare(left.date));
   const totalSessionMinutes = sessions.reduce((total, session) => total + session.durationMinutes, 0);
   const totalSessions = sessions.length;
   const averageSessionMinutes = totalSessions > 0 ? Math.round(totalSessionMinutes / totalSessions) : 0;
-  const plannerScore = computePlannerScore(input.game);
-  const plannerReason = buildPlannerReason(input.game);
-  const plannerFit = buildPlannerFit(input.game);
+  const plannerScore = computePlannerScore(input.game, input.goalSignals);
+  const plannerReason = buildPlannerReason(input.game, input.goalSignals);
+  const plannerFit = buildPlannerFit(input.game, input.goalSignals);
 
   return {
     game: input.game,
@@ -73,6 +78,7 @@ export function buildGamePageData(input: {
     sessions,
     review: input.review,
     tags: input.tags,
+    lists: input.lists,
     goals: input.goals.map((goal) => ({
       id: `${goal.type}-${goal.period}`,
       label: mapGoalLabel(goal),

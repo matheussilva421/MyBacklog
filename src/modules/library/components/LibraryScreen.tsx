@@ -1,19 +1,31 @@
-import { ArrowUpRight, Download, FolderKanban, Gamepad2, Heart, Library, Plus, Upload } from "lucide-react";
+import { ArrowUpRight, Download, FolderKanban, Gamepad2, Heart, Library, ListChecks, Plus, Upload } from "lucide-react";
 import {
   cx,
   filterOptions,
   priorityTone,
   statusTone,
   type Game,
+  type LibraryListFilter,
   type StatusFilter,
 } from "../../../backlog/shared";
+import type { DbList } from "../../../backlog/shared";
 import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
+
+type ListOption = {
+  id: number;
+  name: string;
+  count: number;
+};
 
 type LibraryScreenProps = {
   libraryGames: Game[];
   selectedGame?: Game;
+  selectedGameLists: DbList[];
   filter: StatusFilter;
+  selectedListFilter: LibraryListFilter;
+  listOptions: ListOption[];
   onFilterChange: (value: StatusFilter) => void;
+  onListFilterChange: (value: LibraryListFilter) => void;
   onSelectGame: (gameId: number) => void;
   onExport: () => void;
   onBackupExport: () => void;
@@ -31,8 +43,12 @@ type LibraryScreenProps = {
 export function LibraryScreen({
   libraryGames,
   selectedGame,
+  selectedGameLists,
   filter,
+  selectedListFilter,
+  listOptions,
   onFilterChange,
+  onListFilterChange,
   onSelectGame,
   onExport,
   onBackupExport,
@@ -52,7 +68,7 @@ export function LibraryScreen({
         <SectionHeader
           icon={Library}
           title="Biblioteca"
-          description="Catálogo completo com filtros e seleção rápida"
+          description="Catálogo completo com filtros por status, listas e seleção rápida."
           action={
             <div className="panel-toolbar">
               <NotchButton variant="secondary" onClick={onExport}>
@@ -75,17 +91,45 @@ export function LibraryScreen({
           }
         />
 
-        <div className="filter-bar">
-          {filterOptions.map((option) => (
-            <button
-              type="button"
-              key={option}
-              className={cx("filter-chip", filter === option && "filter-chip--active")}
-              onClick={() => onFilterChange(option)}
-            >
-              {option}
-            </button>
-          ))}
+        <div className="filter-stack">
+          <div className="filter-group">
+            <span className="filter-group__label">Status</span>
+            <div className="filter-bar">
+              {filterOptions.map((option) => (
+                <button
+                  type="button"
+                  key={option}
+                  className={cx("filter-chip", filter === option && "filter-chip--active")}
+                  onClick={() => onFilterChange(option)}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="filter-group">
+            <span className="filter-group__label">Listas</span>
+            <div className="filter-bar">
+              <button
+                type="button"
+                className={cx("filter-chip", selectedListFilter === "all" && "filter-chip--active")}
+                onClick={() => onListFilterChange("all")}
+              >
+                Todas as listas
+              </button>
+              {listOptions.map((list) => (
+                <button
+                  type="button"
+                  key={list.id}
+                  className={cx("filter-chip", selectedListFilter === list.id && "filter-chip--active")}
+                  onClick={() => onListFilterChange(list.id)}
+                >
+                  {list.name} ({list.count})
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {libraryGames.length === 0 ? (
@@ -140,7 +184,7 @@ export function LibraryScreen({
         <SectionHeader
           icon={Gamepad2}
           title="Ficha do jogo"
-          description="Painel lateral com detalhes e ações rápidas"
+          description="Painel lateral com detalhes, listas e ações rápidas."
           action={
             <div className="panel-toolbar">
               <NotchButton variant="secondary" onClick={onOpenEdit} disabled={!selectedGame}>
@@ -202,6 +246,22 @@ export function LibraryScreen({
               <div className="detail-note__tags">
                 <Pill tone="cyan">Mood: {selectedGame.mood}</Pill>
                 <Pill tone="magenta">Dificuldade: {selectedGame.difficulty}</Pill>
+              </div>
+            </div>
+
+            <div className="detail-note">
+              <span className="detail-note__eyebrow">Listas ativas</span>
+              <div className="detail-note__tags">
+                {selectedGameLists.length === 0 ? (
+                  <Pill tone="neutral">Sem listas vinculadas</Pill>
+                ) : (
+                  selectedGameLists.map((list) => (
+                    <Pill key={list.id ?? list.name} tone="cyan">
+                      <ListChecks size={12} />
+                      {list.name}
+                    </Pill>
+                  ))
+                )}
               </div>
             </div>
 

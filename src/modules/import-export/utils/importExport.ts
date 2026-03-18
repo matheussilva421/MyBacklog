@@ -1,4 +1,4 @@
-import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry, PlaySession as DbPlaySession, Goal as DbGoal, List as DbList, Tag as DbTag, Review as DbReview, OwnershipStatus, Priority, ProgressStatus } from "../../../core/types";
+import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry, LibraryEntryList as DbLibraryEntryList, PlaySession as DbPlaySession, Goal as DbGoal, List as DbList, Tag as DbTag, Review as DbReview, OwnershipStatus, Priority, ProgressStatus } from "../../../core/types";
 import { normalizeGameTitle, mergePlatformList } from "../../../core/utils";
 import { composeLibraryRecords } from "../../library/utils";
 import type { BackupPayload, RestoreMode, ImportPreviewEntry, RestorePreview, ImportPayload, ImportSource } from "../../../backlog/shared";
@@ -448,18 +448,20 @@ export function buildRestorePreview(
     playSessions: DbPlaySession[];
     reviews: DbReview[];
     lists: DbList[];
+    libraryEntryLists: DbLibraryEntryList[];
     tags: DbTag[];
     gameTags: Array<{ libraryEntryId: number; tagId: number }>;
     goals: DbGoal[];
   },
 ): RestorePreview {
-  const { games, libraryEntries, playSessions, reviews, lists, tags, gameTags, goals } = tables;
+  const { games, libraryEntries, playSessions, reviews, lists, libraryEntryLists, tags, gameTags, goals } = tables;
 
   const currentGames = games;
   const currentEntries = libraryEntries;
   const currentSessions = new Set(playSessions.map((s) => `${s.libraryEntryId}::${s.date}::${s.durationMinutes}::${(s.note || "").trim().toLowerCase()}::${s.completionPercent ?? ""}`));
   const currentReviewsByEntry = new Map(reviews.map((r) => [r.libraryEntryId, r]));
   const currentListsByName = new Map(lists.map((l) => [l.name.trim().toLowerCase(), l]));
+  const currentLibraryEntryLists = new Set(libraryEntryLists.map((entry) => `${entry.libraryEntryId}::${entry.listId}`));
   const currentTagsByName = new Map(tags.map((t) => [t.name.trim().toLowerCase(), t]));
   const currentGameTags = new Set(gameTags.map((gt) => `${gt.libraryEntryId}::${gt.tagId}`));
   const currentGoalsByKey = new Map(goals.map((g) => [`${g.type}::${g.period}`, g]));
@@ -472,6 +474,7 @@ export function buildRestorePreview(
 
   const payloadGamesById = new Map(payload.games.map((game) => [game.id, game]));
   const resolvedEntryIdByPayloadId = new Map<number, number>();
+  const resolvedListIdByPayloadId = new Map<number, number>();
   const resolvedTagIdByPayloadId = new Map<number, number>();
 
   let gameCreate = 0;
@@ -545,8 +548,32 @@ export function buildRestorePreview(
       continue;
     }
     seenLists.add(key);
-    if (currentListsByName.has(key)) listUpdate += 1;
+    const existing = currentListsByName.get(key);
+    if (existing?.id != null && list.id != null) resolvedListIdByPayloadId.set(list.id, existing.id);
+    if (list.id != null && !resolvedListIdByPayloadId.has(list.id)) resolvedListIdByPayloadId.set(list.id, list.id);
+    if (existing) listUpdate += 1;
     else listCreate += 1;
+  }
+
+  let libraryEntryListCreate = 0;
+  let libraryEntryListSkip = 0;
+  const seenLibraryEntryLists = new Set<string>();
+  for (const relation of payload.libraryEntryLists) {
+    const targetEntryId = resolvedEntryIdByPayloadId.get(relation.libraryEntryId);
+    const targetListId = resolvedListIdByPayloadId.get(relation.listId);
+    if (!targetEntryId || !targetListId) {
+      libraryEntryListSkip += 1;
+      continue;
+    }
+
+    const key = `${targetEntryId}::${targetListId}`;
+    if (currentLibraryEntryLists.has(key) || seenLibraryEntryLists.has(key)) {
+      libraryEntryListSkip += 1;
+      continue;
+    }
+
+    seenLibraryEntryLists.add(key);
+    libraryEntryListCreate += 1;
   }
 
   let tagCreate = 0;
@@ -610,8 +637,9 @@ export function buildRestorePreview(
       { label: "Sessões", create: sessionCreate, update: 0, skip: sessionSkip },
       { label: "Reviews", create: reviewCreate, update: reviewUpdate, skip: reviewSkip },
       { label: "Listas", create: listCreate, update: listUpdate, skip: listSkip },
+      { label: "Relações de lista", create: libraryEntryListCreate, update: 0, skip: libraryEntryListSkip },
       { label: "Tags", create: tagCreate, update: tagUpdate, skip: tagSkip },
-      { label: "Relacoes tag", create: gameTagCreate, update: 0, skip: gameTagSkip },
+      { label: "Relações tag", create: gameTagCreate, update: 0, skip: gameTagSkip },
       { label: "Metas", create: goalCreate, update: goalUpdate, skip: goalSkip },
     ],
   };
@@ -634,6 +662,7 @@ export function parseBackupText(text: string): BackupPayload | null {
       playSessions: Array.isArray(data.playSessions) ? data.playSessions : [],
       reviews: Array.isArray(data.reviews) ? data.reviews : [],
       lists: Array.isArray(data.lists) ? data.lists : [],
+      libraryEntryLists: Array.isArray(data.libraryEntryLists) ? data.libraryEntryLists : [],
       tags: Array.isArray(data.tags) ? data.tags : [],
       gameTags: Array.isArray(data.gameTags) ? data.gameTags : [],
       goals: Array.isArray(data.goals) ? data.goals : [],
