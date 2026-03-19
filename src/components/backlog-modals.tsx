@@ -37,12 +37,14 @@ type RestorePreviewTotals = {
 export function GameModal({
   mode,
   form,
+  submitting = false,
   onChange,
   onSubmit,
   onClose,
 }: {
   mode: "create" | "edit" | null;
   form: GameFormState;
+  submitting?: boolean;
   onChange: <K extends keyof GameFormState>(field: K, value: GameFormState[K]) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onClose: () => void;
@@ -158,7 +160,7 @@ export function GameModal({
           <NotchButton variant="ghost" type="button" onClick={onClose}>
             Cancelar
           </NotchButton>
-          <NotchButton variant="primary" type="submit">
+          <NotchButton variant="primary" type="submit" disabled={submitting}>
             {mode === "edit" ? "Salvar alterações" : "Criar jogo"}
           </NotchButton>
         </div>
@@ -175,6 +177,7 @@ export function ImportModal({
   preview,
   summary,
   fileInputRef,
+  submitting = false,
   onSourceChange,
   onTextChange,
   onFileChange,
@@ -191,6 +194,7 @@ export function ImportModal({
   preview: ImportPreviewEntry[] | null;
   summary: ImportPreviewSummary;
   fileInputRef: MutableRefObject<HTMLInputElement | null>;
+  submitting?: boolean;
   onSourceChange: (value: ImportSource) => void;
   onTextChange: (value: string) => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
@@ -368,7 +372,7 @@ export function ImportModal({
           <NotchButton variant="ghost" type="button" onClick={onClose}>
             Cancelar
           </NotchButton>
-          <NotchButton variant="primary" type="submit">
+          <NotchButton variant="primary" type="submit" disabled={submitting}>
             {preview ? "Aplicar importação" : "Gerar preview"}
           </NotchButton>
         </div>
@@ -385,6 +389,7 @@ export function RestoreModal({
   preview,
   totals,
   fileInputRef,
+  submitting = false,
   onModeChange,
   onTextChange,
   onFileChange,
@@ -398,6 +403,7 @@ export function RestoreModal({
   preview: RestorePreview | null;
   totals: RestorePreviewTotals;
   fileInputRef: MutableRefObject<HTMLInputElement | null>;
+  submitting?: boolean;
   onModeChange: (value: RestoreMode) => void;
   onTextChange: (value: string) => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
@@ -508,7 +514,7 @@ export function RestoreModal({
           <NotchButton variant="ghost" type="button" onClick={onClose}>
             Cancelar
           </NotchButton>
-          <NotchButton variant="primary" type="submit">
+          <NotchButton variant="primary" type="submit" disabled={submitting}>
             {preview ? (preview.mode === "replace" ? "Substituir base local" : "Aplicar restore") : "Gerar preview"}
           </NotchButton>
         </div>
@@ -522,6 +528,7 @@ export function SessionModal({
   mode = "create",
   form,
   libraryGames,
+  submitting = false,
   onChange,
   onSubmit,
   onClose,
@@ -530,6 +537,7 @@ export function SessionModal({
   mode?: "create" | "edit";
   form: SessionFormState;
   libraryGames: Game[];
+  submitting?: boolean;
   onChange: <K extends keyof SessionFormState>(field: K, value: SessionFormState[K]) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onClose: () => void;
@@ -580,7 +588,7 @@ export function SessionModal({
           <NotchButton variant="ghost" type="button" onClick={onClose}>
             Cancelar
           </NotchButton>
-          <NotchButton variant="primary" type="submit">
+          <NotchButton variant="primary" type="submit" disabled={submitting}>
             {mode === "edit" ? "Salvar alterações" : "Salvar sessão"}
           </NotchButton>
         </div>
@@ -592,12 +600,14 @@ export function SessionModal({
 export function GoalModal({
   mode,
   form,
+  submitting = false,
   onChange,
   onSubmit,
   onClose,
 }: {
   mode: "create" | "edit" | null;
   form: GoalFormState;
+  submitting?: boolean;
   onChange: <K extends keyof GoalFormState>(field: K, value: GoalFormState[K]) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onClose: () => void;
@@ -641,7 +651,7 @@ export function GoalModal({
           <NotchButton variant="ghost" type="button" onClick={onClose}>
             Cancelar
           </NotchButton>
-          <NotchButton variant="primary" type="submit">
+          <NotchButton variant="primary" type="submit" disabled={submitting}>
             {mode === "edit" ? "Salvar alterações" : "Criar meta"}
           </NotchButton>
         </div>

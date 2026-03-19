@@ -42,6 +42,15 @@ export function parseDateInput(value: string | Date): Date {
   return new Date(trimmed);
 }
 
+export function startOfWeek(value: string | Date): Date {
+  const date = parseDateInput(value);
+  const day = date.getDay();
+  const diff = (day + 6) % 7;
+  date.setDate(date.getDate() - diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 export function startOfLocalDay(value: string | Date): Date {
   const date = parseDateInput(value);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
