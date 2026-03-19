@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useEffect, useRef } from "react";
 import { db } from "../core/db";
 import {
   buildDynamicTacticalGoals,
@@ -24,12 +25,14 @@ import { usePlannerInsights } from "../modules/planner/hooks/usePlannerInsights"
 import { useBuildSessionInsights } from "../modules/sessions/hooks/useBuildSessionInsights";
 import { useAppPreferences } from "../modules/settings/hooks/useAppPreferences";
 import { useCatalogMaintenanceState } from "../modules/catalog-maintenance/hooks/useCatalogMaintenanceState";
+import { guidedTourSteps } from "../modules/onboarding/utils/guidedTour";
 
 export function useBacklogApp() {
   const data = useBacklogDataState();
   const importState = useImportExportState(data.setNotice);
   const preferences = useAppPreferences(data.settingRows);
   const ui = useBacklogUiState({ preferences });
+  const hasAutoOpenedGuidedTour = useRef(false);
 
   const effectiveSelectedListFilter = useMemo<LibraryListFilter>(() => {
     if (ui.selectedListFilter === "all") return "all";
@@ -259,6 +262,30 @@ export function useBacklogApp() {
     setGoalModalMode: ui.setGoalModalMode,
   });
 
+  const guidedTourStep = guidedTourSteps[ui.guidedTourStepIndex] ?? guidedTourSteps[0];
+  const guidedTourTarget = ui.guidedTourOpen ? guidedTourStep.target : null;
+
+  useEffect(() => {
+    if (!hasCompletedOnboarding || preferences.guidedTourCompleted || ui.guidedTourOpen || hasAutoOpenedGuidedTour.current) {
+      return;
+    }
+
+    hasAutoOpenedGuidedTour.current = true;
+    ui.openGuidedTour("dashboard");
+  }, [hasCompletedOnboarding, preferences.guidedTourCompleted, ui]);
+
+  const closeGuidedTour = async () => {
+    const persisted = await actions.handleGuidedTourComplete();
+    ui.closeGuidedTour(true);
+    if (persisted) data.setNotice("Guia rápido encerrado. Você pode reabrir esse tutorial no Perfil.");
+  };
+
+  const finishGuidedTour = async () => {
+    const persisted = await actions.handleGuidedTourComplete();
+    ui.closeGuidedTour(true);
+    if (persisted) data.setNotice("Tutorial guiado concluído. O Arsenal Gamer já está pronto para uso.");
+  };
+
   return {
     screen: ui.screen,
     setScreen: ui.setScreen,
@@ -278,6 +305,11 @@ export function useBacklogApp() {
     preferences,
     displayName,
     hasCompletedOnboarding,
+    guidedTourOpen: ui.guidedTourOpen,
+    guidedTourStep,
+    guidedTourStepIndex: ui.guidedTourStepIndex,
+    guidedTourStepCount: guidedTourSteps.length,
+    guidedTourTarget,
     onboardingInitialDraft,
     onboardingInitialLists,
     onboardingInitialGoalIds,
@@ -327,6 +359,7 @@ export function useBacklogApp() {
     catalogMaintenanceReport,
     catalogAuditReport,
     openCreateGameModal: ui.openCreateGameModal,
+    openGuidedTour: ui.openGuidedTour,
     openEditGameModal,
     openEditGameModalFor,
     closeGameModal: ui.closeGameModal,
@@ -357,6 +390,10 @@ export function useBacklogApp() {
     openCreateGoalModal: ui.openCreateGoalModal,
     openEditGoalModal: ui.openEditGoalModal,
     closeGoalModal: ui.closeGoalModal,
+    closeGuidedTour,
+    finishGuidedTour,
+    nextGuidedTourStep: () => ui.nextGuidedTourStep(guidedTourSteps.length),
+    previousGuidedTourStep: ui.previousGuidedTourStep,
     ...actions,
   };
 }

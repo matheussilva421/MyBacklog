@@ -16,6 +16,7 @@ describe("ProfileScreen", () => {
           rawgApiKey: "",
           plannerPreference: "balanced",
           onboardingCompleted: true,
+          guidedTourCompleted: true,
         }}
         listRows={[]}
         catalogAuditReport={{
@@ -43,6 +44,8 @@ describe("ProfileScreen", () => {
         onListCreate={vi.fn()}
         onListDelete={vi.fn()}
         onRepairCatalog={vi.fn()}
+        onOpenMaintenance={vi.fn()}
+        onOpenGuidedTour={vi.fn()}
       />,
     );
 
@@ -65,6 +68,7 @@ describe("ProfileScreen", () => {
           rawgApiKey: "",
           plannerPreference: "balanced",
           onboardingCompleted: true,
+          guidedTourCompleted: true,
         }}
         listRows={[]}
         catalogAuditReport={{
@@ -83,6 +87,8 @@ describe("ProfileScreen", () => {
         onListCreate={vi.fn()}
         onListDelete={vi.fn()}
         onRepairCatalog={onRepairCatalog}
+        onOpenMaintenance={vi.fn()}
+        onOpenGuidedTour={vi.fn()}
       />,
     );
 

@@ -31,6 +31,24 @@ vi.mock("./modules/settings/components/ProfileScreen", () => ({
 vi.mock("./modules/game-page/components/GamePageScreen", () => ({
   GamePageScreen: () => <div>game-screen</div>,
 }));
+vi.mock("./modules/onboarding/components/GuidedTourModal", () => ({
+  GuidedTourModal: ({
+    open,
+    onNext,
+    onClose,
+  }: {
+    open: boolean;
+    onNext: () => void;
+    onClose: () => void;
+  }) =>
+    open ? (
+      <div>
+        <div>guided-tour</div>
+        <button onClick={onNext}>tour-next</button>
+        <button onClick={onClose}>tour-close</button>
+      </div>
+    ) : null,
+}));
 vi.mock("./modules/onboarding/components/OnboardingScreen", () => ({
   OnboardingScreen: () => <div>onboarding-screen</div>,
 }));
@@ -107,6 +125,7 @@ function createAppState(overrides: Record<string, unknown> = {}) {
       rawgApiKey: "",
       plannerPreference: "balanced",
       onboardingCompleted: true,
+      guidedTourCompleted: true,
     },
     listRows: [],
     catalogMaintenanceReport: {
@@ -202,6 +221,16 @@ function createAppState(overrides: Record<string, unknown> = {}) {
     setQuery: vi.fn(),
     heroCopy: { before: "Visão", accent: "Geral" },
     openImportFlow: vi.fn(),
+    guidedTourOpen: false,
+    guidedTourStep: { screen: "dashboard", target: "dashboard", title: "tour", description: "tour", bullets: [] },
+    guidedTourStepIndex: 0,
+    guidedTourStepCount: 8,
+    guidedTourTarget: null,
+    openGuidedTour: vi.fn(),
+    closeGuidedTour: vi.fn(),
+    finishGuidedTour: vi.fn(),
+    nextGuidedTourStep: vi.fn(),
+    previousGuidedTourStep: vi.fn(),
     ...overrides,
   };
 }
@@ -233,5 +262,25 @@ describe("App", () => {
     fireEvent.change(screen.getByPlaceholderText("Busca global..."), { target: { value: "cyber" } });
 
     expect(setQuery).toHaveBeenCalledWith("cyber");
+  });
+
+  it("renders and controls the guided tour overlay", () => {
+    const nextGuidedTourStep = vi.fn();
+    const closeGuidedTour = vi.fn();
+    useBacklogAppMock.mockReturnValue(
+      createAppState({
+        guidedTourOpen: true,
+        nextGuidedTourStep,
+        closeGuidedTour,
+      }),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByText("tour-next"));
+    fireEvent.click(screen.getByText("tour-close"));
+
+    expect(screen.getByText("guided-tour")).toBeInTheDocument();
+    expect(nextGuidedTourStep).toHaveBeenCalled();
+    expect(closeGuidedTour).toHaveBeenCalled();
   });
 });

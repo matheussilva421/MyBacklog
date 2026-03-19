@@ -75,6 +75,11 @@ function createBaseUiState(overrides: Record<string, unknown> = {}) {
     setGoalModalMode: vi.fn(),
     goalForm: {},
     editingGoalId: null,
+    guidedTourOpen: false,
+    setGuidedTourOpen: vi.fn(),
+    guidedTourStepIndex: 0,
+    setGuidedTourStepIndex: vi.fn(),
+    guidedTourOriginScreen: "dashboard",
     openCreateGameModal: vi.fn(),
     closeGameModal: vi.fn(),
     openSessionModal: vi.fn(),
@@ -83,6 +88,10 @@ function createBaseUiState(overrides: Record<string, unknown> = {}) {
     openCreateGoalModal: vi.fn(),
     openEditGoalModal: vi.fn(),
     closeGoalModal: vi.fn(),
+    openGuidedTour: vi.fn(),
+    closeGuidedTour: vi.fn(),
+    nextGuidedTourStep: vi.fn(),
+    previousGuidedTourStep: vi.fn(),
     handleGameFormChange: vi.fn(),
     handleSessionFormChange: vi.fn(),
     handleGoalFormChange: vi.fn(),
@@ -169,6 +178,7 @@ describe("useBacklogApp", () => {
       rawgApiKey: "",
       plannerPreference: "balanced",
       onboardingCompleted: true,
+      guidedTourCompleted: true,
     });
     useBacklogUiStateMock.mockReturnValue(createBaseUiState());
     useLibraryStateMock.mockReturnValue({
@@ -231,6 +241,7 @@ describe("useBacklogApp", () => {
       handleCatalogDuplicateMerge: vi.fn(),
       handleCatalogMetadataEnrich: vi.fn(),
       handleCatalogMetadataEnrichQueue: vi.fn(),
+      handleGuidedTourComplete: vi.fn(),
     });
   });
 
@@ -261,5 +272,23 @@ describe("useBacklogApp", () => {
 
     expect(result.current.catalogAuditReport.summary.totalIssues).toBe(1);
     expect(result.current.catalogMaintenanceReport.summary.duplicateGroups).toBe(1);
+  });
+
+  it("opens the guided tour automatically when it has not been completed", () => {
+    const openGuidedTour = vi.fn();
+    useAppPreferencesMock.mockReturnValue({
+      operatorName: "Matheus",
+      primaryPlatforms: ["PC"],
+      defaultStores: ["Steam"],
+      rawgApiKey: "",
+      plannerPreference: "balanced",
+      onboardingCompleted: true,
+      guidedTourCompleted: false,
+    });
+    useBacklogUiStateMock.mockReturnValue(createBaseUiState({ openGuidedTour }));
+
+    renderHook(() => useBacklogApp());
+
+    expect(openGuidedTour).toHaveBeenCalledWith("dashboard");
   });
 });

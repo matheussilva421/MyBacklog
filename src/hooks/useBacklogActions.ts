@@ -37,6 +37,7 @@ import {
   type SessionFormState,
 } from "../backlog/shared";
 import type { AppPreferences, PreferencesDraft } from "../modules/settings/utils/preferences";
+import { settingsKeys } from "../modules/settings/utils/preferences";
 import type { CatalogAuditReport } from "../modules/settings/utils/catalogAudit";
 import {
   applyRawgMetadataToImportPayload,
@@ -933,7 +934,10 @@ export function useBacklogActions({
   const handlePreferencesSave = async (draft: PreferencesDraft) => {
     setSubmitting(true);
     try {
-      const nextPreferences = normalizePreferencesDraft(draft);
+      const nextPreferences = normalizePreferencesDraft(draft, {
+        onboardingCompleted: preferences.onboardingCompleted,
+        guidedTourCompleted: preferences.guidedTourCompleted,
+      });
       await db.transaction("rw", db.settings, async () => {
         await upsertSettingsRows(preferencesToSettingPairs(nextPreferences));
       });
@@ -949,7 +953,10 @@ export function useBacklogActions({
   const handleOnboardingSubmit = async (payload: { draft: PreferencesDraft; starterLists: string[]; goalTemplateIds: string[] }) => {
     setSubmitting(true);
     try {
-      const nextPreferences = normalizePreferencesDraft(payload.draft);
+      const nextPreferences = normalizePreferencesDraft(payload.draft, {
+        onboardingCompleted: true,
+        guidedTourCompleted: false,
+      });
       const starterLists = Array.from(new Set(payload.starterLists.map((item) => item.trim()).filter(Boolean)));
       const selectedTemplates = onboardingGoalTemplates.filter((template) => payload.goalTemplateIds.includes(template.id));
       await db.transaction("rw", db.settings, db.lists, db.goals, async () => {
@@ -1254,6 +1261,19 @@ export function useBacklogActions({
     }
   };
 
+  const handleGuidedTourComplete = async () => {
+    if (preferences.guidedTourCompleted) return true;
+
+    try {
+      await upsertSettingsRows([{ key: settingsKeys.guidedTourCompleted, value: "true" }]);
+      await refreshData();
+      return true;
+    } catch (error) {
+      setNotice(`Falha ao registrar o tutorial guiado: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+      return false;
+    }
+  };
+
   return {
     persistSession,
     handleGameSubmit,
@@ -1282,5 +1302,6 @@ export function useBacklogActions({
     handleCatalogDuplicateMerge,
     handleCatalogMetadataEnrich,
     handleCatalogMetadataEnrichQueue,
+    handleGuidedTourComplete,
   };
 }

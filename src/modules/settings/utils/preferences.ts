@@ -8,6 +8,7 @@ export type PlannerPreference =
 
 export type AppPreferences = {
   onboardingCompleted: boolean;
+  guidedTourCompleted: boolean;
   operatorName: string;
   primaryPlatforms: string[];
   defaultStores: string[];
@@ -35,6 +36,7 @@ export type OnboardingGoalTemplate = {
 export const settingsKeys = {
   displayName: "displayName",
   onboardingCompleted: "app.onboardingCompleted",
+  guidedTourCompleted: "app.guidedTourCompleted",
   primaryPlatforms: "app.primaryPlatforms",
   defaultStores: "app.defaultStores",
   rawgApiKey: "app.rawgApiKey",
@@ -134,6 +136,7 @@ export const onboardingGoalTemplates: OnboardingGoalTemplate[] = [
 
 const defaultPreferences: AppPreferences = {
   onboardingCompleted: false,
+  guidedTourCompleted: false,
   operatorName: "Operador",
   primaryPlatforms: ["PC"],
   defaultStores: ["Manual"],
@@ -189,6 +192,7 @@ export function parseAppPreferences(settingRows: DbSetting[]): AppPreferences {
 
   return {
     onboardingCompleted: parseBoolean(readSetting(settingRows, settingsKeys.onboardingCompleted)),
+    guidedTourCompleted: parseBoolean(readSetting(settingRows, settingsKeys.guidedTourCompleted)),
     operatorName,
     primaryPlatforms: parseListValue(
       readSetting(settingRows, settingsKeys.primaryPlatforms),
@@ -213,9 +217,13 @@ export function createPreferencesDraft(preferences: AppPreferences): Preferences
   };
 }
 
-export function normalizePreferencesDraft(draft: PreferencesDraft): AppPreferences {
+export function normalizePreferencesDraft(
+  draft: PreferencesDraft,
+  preserved?: Partial<Pick<AppPreferences, "onboardingCompleted" | "guidedTourCompleted">>,
+): AppPreferences {
   return {
-    onboardingCompleted: true,
+    onboardingCompleted: preserved?.onboardingCompleted ?? true,
+    guidedTourCompleted: preserved?.guidedTourCompleted ?? false,
     operatorName: draft.operatorName.trim() || defaultPreferences.operatorName,
     primaryPlatforms: normalizeTokenList(
       draft.primaryPlatforms || defaultPreferences.primaryPlatforms.join(","),
@@ -236,6 +244,10 @@ export function preferencesToSettingPairs(
     {
       key: settingsKeys.onboardingCompleted,
       value: String(preferences.onboardingCompleted),
+    },
+    {
+      key: settingsKeys.guidedTourCompleted,
+      value: String(preferences.guidedTourCompleted),
     },
     {
       key: settingsKeys.primaryPlatforms,

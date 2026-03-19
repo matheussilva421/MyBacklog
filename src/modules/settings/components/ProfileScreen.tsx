@@ -30,6 +30,7 @@ type ProfileScreenProps = {
   onListDelete: (listId: number) => Promise<void>;
   onRepairCatalog: () => Promise<void>;
   onOpenMaintenance: () => void;
+  onOpenGuidedTour: () => void;
 };
 
 export function ProfileScreen({
@@ -44,6 +45,7 @@ export function ProfileScreen({
   onListDelete,
   onRepairCatalog,
   onOpenMaintenance,
+  onOpenGuidedTour,
 }: ProfileScreenProps) {
   const [draft, setDraft] = useState<PreferencesDraft>(() => createPreferencesDraft(preferences));
   const [newListName, setNewListName] = useState("");
@@ -102,6 +104,12 @@ export function ProfileScreen({
           icon={Settings}
           title="Configurações"
           description="Preferências que afetam criação, importação e planner"
+          action={
+            <NotchButton variant="secondary" onClick={onOpenGuidedTour}>
+              <Wrench size={14} />
+              Rever tutorial
+            </NotchButton>
+          }
         />
         <div className="modal-form">
           <PreferencesFields

@@ -1,5 +1,6 @@
 import { CalendarDays, Cpu, Download, Orbit, Plus, Search, Upload, Zap } from "lucide-react";
-import { navigationItems } from "./backlog/shared";
+import { useEffect } from "react";
+import { cx, navigationItems } from "./backlog/shared";
 import {
   GameModal,
   GoalModal,
@@ -13,6 +14,7 @@ import { CatalogMaintenanceScreen } from "./modules/catalog-maintenance/componen
 import { DashboardScreen } from "./modules/dashboard/components/DashboardScreen";
 import { GamePageScreen } from "./modules/game-page/components/GamePageScreen";
 import { LibraryScreen } from "./modules/library/components/LibraryScreen";
+import { GuidedTourModal } from "./modules/onboarding/components/GuidedTourModal";
 import { OnboardingScreen } from "./modules/onboarding/components/OnboardingScreen";
 import { PlannerScreen } from "./modules/planner/components/PlannerScreen";
 import { SessionsScreen } from "./modules/sessions/components/SessionsScreen";
@@ -21,6 +23,12 @@ import { StatsScreen } from "./modules/stats/components/StatsScreen";
 
 export default function App() {
   const app = useBacklogApp();
+
+  useEffect(() => {
+    if (!app.guidedTourOpen) return;
+    if (app.screen === app.guidedTourStep.screen) return;
+    app.setScreen(app.guidedTourStep.screen);
+  }, [app.guidedTourOpen, app.guidedTourStep.screen, app.screen, app.setScreen]);
 
   if (app.loading) {
     return (
@@ -158,6 +166,7 @@ export default function App() {
         onListDelete={app.handleListDelete}
         onRepairCatalog={app.handleCatalogRepair}
         onOpenMaintenance={() => app.setScreen("maintenance")}
+        onOpenGuidedTour={() => app.openGuidedTour("profile")}
       />
     );
   } else if (app.screen === "game") {
@@ -203,7 +212,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={cx("app-shell", app.guidedTourOpen && "app-shell--touring")}>
       <div className="app-shell__backdrop" aria-hidden="true" />
       <div className="app-layout">
         <aside className="sidebar-column">
@@ -230,13 +239,14 @@ export default function App() {
                   label={item.label}
                   icon={item.icon}
                   active={app.screen === item.key || (app.screen === "game" && item.key === "library")}
+                  highlighted={app.guidedTourOpen && app.guidedTourTarget === item.key}
                   onClick={() => app.setScreen(item.key)}
                 />
               ))}
             </nav>
           </Panel>
 
-          <Panel>
+          <Panel className={cx(app.guidedTourTarget === "quick-actions" && "tour-focus")}>
             <SectionHeader icon={Zap} title="Ações rápidas" description="Atalhos do sistema" />
             <div className="quick-actions">
               <NotchButton variant="primary" onClick={app.openCreateGameModal}>
@@ -266,7 +276,7 @@ export default function App() {
             </div>
           ) : null}
 
-          <Panel className="hero-panel">
+          <Panel className={cx("hero-panel", app.guidedTourTarget === "dashboard" && "tour-focus")}>
             <div className="hero-panel__layout">
               <div className="hero-panel__copy">
                 <div className="hero-panel__badges">
@@ -322,9 +332,29 @@ export default function App() {
             </div>
           </Panel>
 
-          {screenContent}
+          <div
+            className={cx(
+              ["library", "maintenance", "sessions", "planner", "stats", "profile"].includes(app.guidedTourTarget ?? "")
+                && app.guidedTourTarget === app.screen
+                && "tour-focus",
+            )}
+          >
+            {screenContent}
+          </div>
         </main>
       </div>
+
+      <GuidedTourModal
+        open={app.guidedTourOpen}
+        step={app.guidedTourStep}
+        stepIndex={app.guidedTourStepIndex}
+        totalSteps={app.guidedTourStepCount}
+        completing={app.submitting}
+        onPrevious={app.previousGuidedTourStep}
+        onNext={app.nextGuidedTourStep}
+        onClose={app.closeGuidedTour}
+        onFinish={app.finishGuidedTour}
+      />
 
       <GameModal
         mode={app.gameModalMode}

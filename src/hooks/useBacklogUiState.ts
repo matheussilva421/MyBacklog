@@ -36,6 +36,9 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
   const [goalModalMode, setGoalModalMode] = useState<"create" | "edit" | null>(null);
   const [goalForm, setGoalForm] = useState<GoalFormState>(() => createGoalDraft());
   const [editingGoalId, setEditingGoalId] = useState<number | null>(null);
+  const [guidedTourOpen, setGuidedTourOpen] = useState(false);
+  const [guidedTourStepIndex, setGuidedTourStepIndex] = useState(0);
+  const [guidedTourOriginScreen, setGuidedTourOriginScreen] = useState<ScreenKey>("dashboard");
 
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
@@ -90,6 +93,26 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
 
   const closeGoalModal = () => setGoalModalMode(null);
 
+  const openGuidedTour = (originScreen: ScreenKey = screen) => {
+    setGuidedTourOriginScreen(originScreen);
+    setGuidedTourStepIndex(0);
+    setGuidedTourOpen(true);
+  };
+
+  const closeGuidedTour = (restoreOrigin = false) => {
+    setGuidedTourOpen(false);
+    setGuidedTourStepIndex(0);
+    if (restoreOrigin && guidedTourOriginScreen !== screen) setScreen(guidedTourOriginScreen);
+  };
+
+  const nextGuidedTourStep = (totalSteps: number) => {
+    setGuidedTourStepIndex((current) => Math.min(current + 1, Math.max(totalSteps - 1, 0)));
+  };
+
+  const previousGuidedTourStep = () => {
+    setGuidedTourStepIndex((current) => Math.max(current - 1, 0));
+  };
+
   const handleGameFormChange = <K extends keyof GameFormState>(field: K, value: GameFormState[K]) =>
     setGameForm((current) => ({ ...current, [field]: value }));
   const handleSessionFormChange = <K extends keyof SessionFormState>(field: K, value: SessionFormState[K]) =>
@@ -122,6 +145,11 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
     setGoalModalMode,
     goalForm,
     editingGoalId,
+    guidedTourOpen,
+    setGuidedTourOpen,
+    guidedTourStepIndex,
+    setGuidedTourStepIndex,
+    guidedTourOriginScreen,
     openCreateGameModal,
     closeGameModal,
     openSessionModal,
@@ -130,6 +158,10 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
     openCreateGoalModal,
     openEditGoalModal,
     closeGoalModal,
+    openGuidedTour,
+    closeGuidedTour,
+    nextGuidedTourStep,
+    previousGuidedTourStep,
     handleGameFormChange,
     handleSessionFormChange,
     handleGoalFormChange,

@@ -63,15 +63,21 @@ export function SidebarItem({
   label,
   icon: Icon,
   active,
+  highlighted = false,
   onClick,
 }: {
   label: string;
   icon: LucideIcon;
   active: boolean;
+  highlighted?: boolean;
   onClick: () => void;
 }) {
   return (
-    <button type="button" className={cx("sidebar-item", active && "sidebar-item--active")} onClick={onClick}>
+    <button
+      type="button"
+      className={cx("sidebar-item", active && "sidebar-item--active", highlighted && "tour-focus")}
+      onClick={onClick}
+    >
       <Icon className="sidebar-item__icon" />
       <span>{label}</span>
     </button>
