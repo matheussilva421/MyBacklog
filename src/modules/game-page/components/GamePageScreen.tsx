@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import {
   ArrowLeft,
   BarChart3,
@@ -96,14 +96,6 @@ export function GamePageScreen({
   const [selectedListIds, setSelectedListIds] = useState<number[]>(
     () => data.lists.map((list) => list.id).filter((listId): listId is number => listId != null),
   );
-
-  useEffect(() => {
-    setReviewForm(createReviewFormState(data));
-    setTagsValue(data.tags.map((tag) => tag.name).join(", "));
-    setSelectedListIds(
-      data.lists.map((list) => list.id).filter((listId): listId is number => listId != null),
-    );
-  }, [data]);
 
   const handleReviewSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

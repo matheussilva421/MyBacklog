@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { db } from "../core/db";
 import type { Goal as DbGoal, PlaySession as DbPlaySession } from "../core/types";
 import {
@@ -59,10 +59,9 @@ export function useBacklogApp() {
   const importState = useImportExportState(data.setNotice);
   const preferences = useAppPreferences(data.settingRows);
 
-  useEffect(() => {
-    if (selectedListFilter === "all") return;
-    if (data.listRows.some((list) => list.id === selectedListFilter)) return;
-    setSelectedListFilter("all");
+  const effectiveSelectedListFilter = useMemo<LibraryListFilter>(() => {
+    if (selectedListFilter === "all") return "all";
+    return data.listRows.some((list) => list.id === selectedListFilter) ? selectedListFilter : "all";
   }, [data.listRows, selectedListFilter]);
 
   const records = useMemo(
@@ -168,26 +167,17 @@ export function useBacklogApp() {
     libraryEntryListRows: data.libraryEntryListRows,
     query: deferredQuery,
     filter,
-    selectedListFilter,
+    selectedListFilter: effectiveSelectedListFilter,
     selectedGameId,
   });
 
-  useEffect(() => {
-    if (selectedGameId > 0 && libraryGames.some((game) => game.id === selectedGameId)) return;
-    if (libraryGames.length > 0) {
-      setSelectedGameId(libraryGames[0].id);
-      return;
-    }
-    if (selectedGameId > 0 && searchedGames.some((game) => game.id === selectedGameId)) return;
-    if (searchedGames.length > 0) {
-      setSelectedGameId(searchedGames[0].id);
-      return;
-    }
-    if (games.length > 0) {
-      setSelectedGameId(games[0].id);
-      return;
-    }
-    if (selectedGameId !== 0) setSelectedGameId(0);
+  const resolvedSelectedGameId = useMemo(() => {
+    if (selectedGameId > 0 && libraryGames.some((game) => game.id === selectedGameId)) return selectedGameId;
+    if (libraryGames.length > 0) return libraryGames[0].id;
+    if (selectedGameId > 0 && searchedGames.some((game) => game.id === selectedGameId)) return selectedGameId;
+    if (searchedGames.length > 0) return searchedGames[0].id;
+    if (games.length > 0) return games[0].id;
+    return 0;
   }, [games, libraryGames, searchedGames, selectedGameId]);
 
   const selectedGamePage = useSelectedGamePage({
@@ -204,27 +194,19 @@ export function useBacklogApp() {
     preferences,
   });
 
-  const visiblePlannerQueue = useMemo(
-    () =>
-      computedPlannerQueue.filter((entry) => {
-        const game = findGame(entry.gameId);
-        return matchesQuery([game?.title ?? "", entry.reason, entry.fit, entry.eta]);
-      }),
-    [computedPlannerQueue, deferredQuery, games],
-  );
-  const visibleSessions = useMemo(
-    () =>
-      data.sessionRows.filter((entry) => {
-        const game = findGame(entry.libraryEntryId);
-        return matchesQuery([
-          game?.title ?? "",
-          game?.platform ?? "",
-          entry.note ?? "",
-          entry.durationMinutes,
-        ]);
-      }),
-    [data.sessionRows, deferredQuery, games],
-  );
+  const visiblePlannerQueue = computedPlannerQueue.filter((entry) => {
+    const game = findGame(entry.gameId);
+    return matchesQuery([game?.title ?? "", entry.reason, entry.fit, entry.eta]);
+  });
+  const visibleSessions = data.sessionRows.filter((entry) => {
+    const game = findGame(entry.libraryEntryId);
+    return matchesQuery([
+      game?.title ?? "",
+      game?.platform ?? "",
+      entry.note ?? "",
+      entry.durationMinutes,
+    ]);
+  });
   const heroCopy = screenMeta[screen];
 
   const readBackupTables = async (): Promise<BackupTables> => {
@@ -322,7 +304,7 @@ export function useBacklogApp() {
     listRows: data.listRows,
     selectedRecord,
     selectedGame,
-    selectedListFilter,
+    selectedListFilter: effectiveSelectedListFilter,
     gameModalMode,
     gameForm,
     sessionForm,
@@ -352,9 +334,9 @@ export function useBacklogApp() {
     deferredQuery,
     filter,
     setFilter,
-    selectedListFilter,
+    selectedListFilter: effectiveSelectedListFilter,
     setSelectedListFilter,
-    selectedGameId,
+    selectedGameId: resolvedSelectedGameId,
     setSelectedGameId,
     loading: data.loading,
     notice: data.notice,

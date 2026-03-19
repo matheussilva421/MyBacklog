@@ -60,12 +60,6 @@ export function useSessionsScreenState({
   const [running, setRunning] = useState(false);
 
   useEffect(() => {
-    if (!draft.gameId && initialGameId) {
-      setDraft((current) => ({ ...current, gameId: String(initialGameId) }));
-    }
-  }, [draft.gameId, initialGameId]);
-
-  useEffect(() => {
     if (!running) return;
     const timer = window.setInterval(() => {
       setElapsedSeconds((current) => current + 1);
@@ -79,6 +73,10 @@ export function useSessionsScreenState({
     [games],
   );
   const cadenceMap = useMemo(() => buildSessionCadenceMap(sessions), [sessions]);
+  const resolvedDraft = useMemo(
+    () => (draft.gameId || !initialGameId ? draft : { ...draft, gameId: String(initialGameId) }),
+    [draft, initialGameId],
+  );
   const filteredSessions = useMemo(
     () =>
       sessions.filter((session) =>
@@ -91,7 +89,7 @@ export function useSessionsScreenState({
           query,
         }),
       ),
-    [cadenceMap, gameMap, period, platform, query, sessions, status],
+    [gameMap, period, platform, query, sessions, status],
   );
 
   const filteredGroups = useMemo(
@@ -134,7 +132,7 @@ export function useSessionsScreenState({
     status,
     setStatus,
     platformOptions,
-    draft,
+    draft: resolvedDraft,
     setDraft,
     filteredSessions,
     filteredGroups,
