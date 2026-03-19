@@ -14,6 +14,8 @@ import type {
   Tag,
 } from "./types";
 
+// Local copies of normalizeGameTitle/mergePlatformList from utils.ts —
+// kept self-contained here so the v2 migration never breaks if utils change.
 function normalizeTitle(value: string): string {
   return value.trim().toLowerCase();
 }

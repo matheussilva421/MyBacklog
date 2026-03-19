@@ -10,8 +10,8 @@ import {
   onboardingGoalTemplates,
   screenMeta,
   suggestedStarterLists,
+  buildDynamicTacticalGoals,
   systemRules,
-  tacticalGoals,
   type BackupTables,
   type GameFormState,
   type GoalFormState,
@@ -115,6 +115,10 @@ export function useBacklogApp() {
     () => buildSessionCadenceMap(data.sessionRows),
     [data.sessionRows],
   );
+  const dynamicTacticalGoals = useMemo(
+    () => buildDynamicTacticalGoals(games, data.sessionRows),
+    [games, data.sessionRows],
+  );
 
   const {
     resolvedGoalRows,
@@ -126,7 +130,7 @@ export function useBacklogApp() {
     libraryEntryRows: data.libraryEntryRows,
     sessionRows: data.sessionRows,
     goalRows: data.goalRows,
-    fallbackGoalProgress: tacticalGoals,
+    fallbackGoalProgress: dynamicTacticalGoals,
     preferences,
     sessionCadenceMap,
   });
