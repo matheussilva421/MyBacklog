@@ -1,6 +1,6 @@
 import { Activity, Clock3, LibraryBig, Sparkles, Trophy } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { parseDateInput, startOfWeek } from "../../../core/utils";
+import { parseDateInput, startOfWeek, toDateInputValue } from "../../../core/utils";
 import type { Game, UserBadge } from "../../../backlog/shared";
 import type { LibraryEntry, PlaySession } from "../../../core/types";
 
@@ -30,7 +30,7 @@ function getMaxWeeklyHours(sessionRows: PlaySession[]) {
   const totals = new Map<string, number>();
 
   for (const session of sessionRows) {
-    const weekStart = startOfWeek(session.date).toISOString().slice(0, 10);
+    const weekStart = toDateInputValue(startOfWeek(session.date));
     totals.set(weekStart, (totals.get(weekStart) || 0) + session.durationMinutes);
   }
 

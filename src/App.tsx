@@ -138,9 +138,11 @@ export default function App() {
         totalHours={app.stats.hours}
         preferences={app.preferences}
         listRows={app.listRows}
+        catalogAuditReport={app.catalogAuditReport}
         onPreferencesSave={app.handlePreferencesSave}
         onListCreate={app.handleListCreate}
         onListDelete={app.handleListDelete}
+        onRepairCatalog={app.handleCatalogRepair}
       />
     );
   } else if (app.screen === "game") {

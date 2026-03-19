@@ -36,6 +36,7 @@ import {
   type SessionFormState,
 } from "../backlog/shared";
 import type { AppPreferences, PreferencesDraft } from "../modules/settings/utils/preferences";
+import type { CatalogAuditReport } from "../modules/settings/utils/catalogAudit";
 import {
   applyRawgMetadataToImportPayload,
   fetchRawgMetadata,
@@ -62,6 +63,7 @@ type UseBacklogActionsArgs = {
   goalForm: GoalFormState;
   editingGoalId: number | null;
   preferences: AppPreferences;
+  catalogAuditReport: CatalogAuditReport;
   importState: ImportExportState;
   refreshData: (seed?: boolean) => Promise<void>;
   readBackupTables: () => Promise<BackupTables>;
@@ -143,6 +145,7 @@ export function useBacklogActions({
   goalForm,
   editingGoalId,
   preferences,
+  catalogAuditReport,
   importState,
   refreshData,
   readBackupTables,
@@ -973,6 +976,44 @@ export function useBacklogActions({
     setNotice("Sessão excluída.");
   };
 
+  const handleCatalogRepair = async () => {
+    const { entryUpdates, orphanSessionIds } = catalogAuditReport.repairPlan;
+    if (entryUpdates.length === 0 && orphanSessionIds.length === 0) {
+      setNotice("Nenhum reparo automático foi necessário no catálogo.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Executar reparo automático em ${entryUpdates.length} item(ns) e remover ${orphanSessionIds.length} sessão(ões) órfã(s)?`,
+    );
+    if (!confirmed) return;
+
+    setSubmitting(true);
+    try {
+      await db.transaction("rw", db.libraryEntries, db.playSessions, async () => {
+        for (const orphanSessionId of orphanSessionIds) {
+          await db.playSessions.delete(orphanSessionId);
+        }
+
+        for (const entryUpdate of entryUpdates) {
+          await db.libraryEntries.update(entryUpdate.libraryEntryId, {
+            ...entryUpdate.updates,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      await refreshData();
+      setNotice(
+        `Reparo concluído: ${entryUpdates.length} item(ns) ajustado(s) e ${orphanSessionIds.length} sessão(ões) órfã(s) removida(s).`,
+      );
+    } catch (error) {
+      setNotice(`Falha ao reparar o catálogo: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return {
     persistSession,
     handleGameSubmit,
@@ -997,5 +1038,6 @@ export function useBacklogActions({
     handlePreferencesSave,
     handleOnboardingSubmit,
     handleSessionDelete,
+    handleCatalogRepair,
   };
 }

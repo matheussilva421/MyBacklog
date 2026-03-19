@@ -337,7 +337,6 @@ export {
   parseEtaHours,
 } from "../core/utils";
 
-/** Maps UI status label to DB progressStatus. "Wishlist" handled separately via ownershipStatus. */
 export function statusToDbStatus(status: Status): DbProgressStatus {
   switch (status) {
     case "Jogando":
@@ -353,7 +352,6 @@ export function statusToDbStatus(status: Status): DbProgressStatus {
   }
 }
 
-/** Maps UI priority label to DB priority enum. */
 export function priorityToDbPriority(priority: Priority): DbPriority {
   switch (priority) {
     case "Alta":
@@ -366,7 +364,6 @@ export function priorityToDbPriority(priority: Priority): DbPriority {
   }
 }
 
-/** Maps DB entry to UI status label. Considers both ownershipStatus and progressStatus. */
 export function dbStatusToStatus(entry: DbLibraryEntry): Status {
   if (entry.ownershipStatus === "wishlist") return "Wishlist";
   switch (entry.progressStatus) {
@@ -382,7 +379,6 @@ export function dbStatusToStatus(entry: DbLibraryEntry): Status {
   }
 }
 
-/** Maps DB priority enum to UI priority label. */
 export function dbPriorityToPriority(priority: DbPriority): Priority {
   switch (priority) {
     case "high":

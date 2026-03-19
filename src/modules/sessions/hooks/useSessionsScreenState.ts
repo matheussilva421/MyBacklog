@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Game, Status } from "../../../backlog/shared";
+import { getTodayDateInputValue } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
 import {
   buildSessionCadenceMap,
@@ -23,7 +24,7 @@ export type QuickSessionDraft = {
 function createQuickSessionDraft(initialGameId?: number): QuickSessionDraft {
   return {
     gameId: initialGameId ? String(initialGameId) : "",
-    date: new Date().toISOString().slice(0, 10),
+    date: getTodayDateInputValue(),
     durationMinutes: "45",
     completionPercent: "",
     mood: "",

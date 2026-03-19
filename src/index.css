@@ -1069,6 +1069,51 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.catalog-audit-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.audit-list {
+  display: grid;
+  gap: 12px;
+}
+
+.audit-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line-soft);
+  background: rgba(7, 9, 13, 0.82);
+}
+
+.audit-card__head,
+.audit-card__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.audit-card__title {
+  justify-content: flex-start;
+}
+
+.audit-card__title h3,
+.audit-card p {
+  margin: 0;
+}
+
+.audit-card p {
+  color: var(--text-soft);
+}
+
+.audit-card__title svg {
+  color: var(--yellow);
+}
+
 .detail-stat {
   padding: 14px;
 }
@@ -1630,7 +1675,8 @@ button {
   .game-page-session-metrics,
   .game-page-action-grid,
   .game-page-metadata-grid,
-  .recap-grid {
+  .recap-grid,
+  .catalog-audit-summary {
     grid-template-columns: 1fr;
   }
 

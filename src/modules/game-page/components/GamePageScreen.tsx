@@ -176,9 +176,7 @@ export function GamePageScreen({
               </div>
               <div className="detail-stat">
                 <span>Última sessão</span>
-                <strong>
-                  {data.lastSession ? formatDatePtBr(data.lastSession.date) : "--"}
-                </strong>
+                <strong>{data.lastSession ? formatDatePtBr(data.lastSession.date) : "--"}</strong>
               </div>
               <div className="detail-stat">
                 <span>Frequência</span>
@@ -344,8 +342,7 @@ export function GamePageScreen({
                   key={`note-${session.id ?? `${session.date}-${session.durationMinutes}`}`}
                 >
                   <span className="detail-note__eyebrow">
-                    {formatDatePtBr(session.date)} •{" "}
-                    {formatDuration(session.durationMinutes)}
+                    {formatDatePtBr(session.date)} • {formatDuration(session.durationMinutes)}
                   </span>
                   <p>{session.note}</p>
                 </article>

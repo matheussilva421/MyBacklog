@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, List, Plus, Save, Settings, User } from "lucide-react";
+import { AlertTriangle, CheckCircle2, List, Plus, Save, Settings, ShieldAlert, User } from "lucide-react";
 import type { DbList, UserBadge } from "../../../backlog/shared";
 import {
   createPreferencesDraft,
@@ -15,6 +15,7 @@ import {
   ProgressBar,
   SectionHeader,
 } from "../../../components/cyberpunk-ui";
+import type { CatalogAuditReport } from "../utils/catalogAudit";
 import { PreferencesFields } from "./PreferencesFields";
 
 type ProfileScreenProps = {
@@ -23,9 +24,11 @@ type ProfileScreenProps = {
   totalHours: number;
   preferences: AppPreferences;
   listRows: DbList[];
+  catalogAuditReport: CatalogAuditReport;
   onPreferencesSave: (draft: PreferencesDraft) => Promise<void>;
   onListCreate: (name: string) => Promise<void>;
   onListDelete: (listId: number) => Promise<void>;
+  onRepairCatalog: () => Promise<void>;
 };
 
 export function ProfileScreen({
@@ -34,9 +37,11 @@ export function ProfileScreen({
   totalHours,
   preferences,
   listRows,
+  catalogAuditReport,
   onPreferencesSave,
   onListCreate,
   onListDelete,
+  onRepairCatalog,
 }: ProfileScreenProps) {
   const [draft, setDraft] = useState<PreferencesDraft>(() => createPreferencesDraft(preferences));
   const [newListName, setNewListName] = useState("");
@@ -94,7 +99,7 @@ export function ProfileScreen({
         <SectionHeader
           icon={Settings}
           title="Configurações"
-          description="Preferências reais que afetam criação, importação e planner"
+          description="Preferências que afetam criação, importação e planner"
         />
         <div className="modal-form">
           <PreferencesFields
@@ -107,6 +112,78 @@ export function ProfileScreen({
               Salvar preferências
             </NotchButton>
           </div>
+        </div>
+      </Panel>
+
+      <Panel>
+        <SectionHeader
+          icon={ShieldAlert}
+          title="Auditoria do catálogo"
+          description="Integridade da base local entre progresso, status, sessões e metadado"
+          action={
+            <NotchButton
+              variant={catalogAuditReport.summary.repairableIssues > 0 ? "primary" : "secondary"}
+              onClick={onRepairCatalog}
+              disabled={catalogAuditReport.summary.repairableIssues === 0}
+            >
+              Reparar catálogo
+            </NotchButton>
+          }
+        />
+
+        <div className="catalog-audit-summary">
+          <div className="detail-stat">
+            <span>Total de achados</span>
+            <strong>{catalogAuditReport.summary.totalIssues}</strong>
+          </div>
+          <div className="detail-stat">
+            <span>Reparáveis</span>
+            <strong>{catalogAuditReport.summary.repairableIssues}</strong>
+          </div>
+          <div className="detail-stat">
+            <span>Sessões órfãs</span>
+            <strong>{catalogAuditReport.summary.orphanSessions}</strong>
+          </div>
+          <div className="detail-stat">
+            <span>Metadado incompleto</span>
+            <strong>{catalogAuditReport.summary.metadataIssues}</strong>
+          </div>
+          <div className="detail-stat">
+            <span>Horas divergentes</span>
+            <strong>{catalogAuditReport.summary.playtimeIssues}</strong>
+          </div>
+          <div className="detail-stat">
+            <span>Progresso x status</span>
+            <strong>{catalogAuditReport.summary.progressIssues}</strong>
+          </div>
+        </div>
+
+        <div className="audit-list">
+          {catalogAuditReport.issues.length === 0 ? (
+            <EmptyState message="Nenhuma inconsistência encontrada no catálogo." />
+          ) : (
+            catalogAuditReport.issues.map((issue) => (
+              <article className="audit-card" key={issue.id}>
+                <div className="audit-card__head">
+                  <div className="audit-card__title">
+                    {issue.repairable ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+                    <h3>{issue.title}</h3>
+                  </div>
+                  <Pill tone={issue.tone}>{issue.repairable ? "Reparo automático" : "Revisão manual"}</Pill>
+                </div>
+                <p>{issue.description}</p>
+                {issue.missingFields?.length ? (
+                  <div className="detail-note__tags">
+                    {issue.missingFields.map((field) => (
+                      <Pill key={`${issue.id}-${field}`} tone="neutral">
+                        {field}
+                      </Pill>
+                    ))}
+                  </div>
+                ) : null}
+              </article>
+            ))
+          )}
         </div>
       </Panel>
 
@@ -157,7 +234,7 @@ export function ProfileScreen({
         <SectionHeader
           icon={CheckCircle2}
           title="Conquistas pessoais"
-          description="Badges operacionais que gamificam sua disciplina no catálogo."
+          description="Badges operacionais que gamificam sua disciplina no catálogo"
         />
         <div className="badge-grid">
           {personalBadges.map((badge) => {

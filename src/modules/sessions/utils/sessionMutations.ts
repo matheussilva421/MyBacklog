@@ -1,5 +1,5 @@
+import { recalculateLibraryEntryFromSessions } from "../../../core/catalogIntegrity";
 import { db } from "../../../core/db";
-import type { PlaySession, ProgressStatus } from "../../../core/types";
 
 export type SessionMutationInput = {
   sessionId?: number | null;
@@ -11,30 +11,11 @@ export type SessionMutationInput = {
   note?: string;
 };
 
-function sortSessionsByDateDesc(sessions: PlaySession[]) {
-  return [...sessions].sort((left, right) => right.date.localeCompare(left.date));
-}
-
-function getNextProgressStatus(currentStatus: ProgressStatus, completionPercent?: number): ProgressStatus {
-  if (completionPercent === 100) return "finished";
-  if (typeof completionPercent === "number" && completionPercent > 0) {
-    if (currentStatus === "abandoned" || currentStatus === "archived") return currentStatus;
-    return "playing";
-  }
-  if (currentStatus === "finished" || currentStatus === "completed_100") return "playing";
-  if (currentStatus === "not_started" || currentStatus === "paused") return "playing";
-  return currentStatus;
-}
-
-async function readEntrySessionSnapshot(libraryEntryId: number) {
+async function readEntrySessionSnapshot(libraryEntryId: number, forceActive = false) {
+  const entry = await db.libraryEntries.get(libraryEntryId);
+  if (!entry?.id) return null;
   const sessions = await db.playSessions.where("libraryEntryId").equals(libraryEntryId).toArray();
-  const ordered = sortSessionsByDateDesc(sessions);
-  const latestSession = ordered[0];
-  const latestCompletion = ordered.find((session) => typeof session.completionPercent === "number")?.completionPercent;
-  return {
-    latestSession,
-    latestCompletion,
-  };
+  return recalculateLibraryEntryFromSessions(entry, sessions, { forceActive });
 }
 
 export async function savePlaySession(input: SessionMutationInput): Promise<{ libraryEntryId: number; mode: "create" | "edit" }> {
@@ -55,9 +36,10 @@ export async function savePlaySession(input: SessionMutationInput): Promise<{ li
     if (!oldSession?.id) {
       throw new Error("Sessão não encontrada para edição.");
     }
+    const existingSessionId = oldSession.id;
 
     await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
-      await db.playSessions.update(oldSession.id!, {
+      await db.playSessions.update(existingSessionId, {
         date: input.date,
         durationMinutes,
         completionPercent,
@@ -65,15 +47,15 @@ export async function savePlaySession(input: SessionMutationInput): Promise<{ li
         note: input.note?.trim() || undefined,
       });
 
-      const { latestSession, latestCompletion } = await readEntrySessionSnapshot(input.libraryEntryId);
-      const timeDiff = durationMinutes - oldSession.durationMinutes;
-      const nextProgress = latestCompletion ?? completionPercent ?? currentEntry.completionPercent;
+      const snapshot = await readEntrySessionSnapshot(input.libraryEntryId);
+      if (!snapshot) return;
+
       await db.libraryEntries.update(input.libraryEntryId, {
-        playtimeMinutes: Math.max(0, currentEntry.playtimeMinutes + timeDiff),
-        completionPercent: nextProgress,
-        progressStatus: getNextProgressStatus(currentEntry.progressStatus, nextProgress),
-        mood: latestSession?.mood?.trim() || currentEntry.mood,
-        lastSessionAt: latestSession?.date,
+        playtimeMinutes: snapshot.playtimeMinutes,
+        completionPercent: snapshot.completionPercent,
+        progressStatus: snapshot.progressStatus,
+        mood: snapshot.latestSession?.mood?.trim() || currentEntry.mood,
+        lastSessionAt: snapshot.lastSessionAt,
         updatedAt: new Date().toISOString(),
       });
     });
@@ -89,16 +71,16 @@ export async function savePlaySession(input: SessionMutationInput): Promise<{ li
         note: input.note?.trim() || undefined,
       });
 
+      const snapshot = await readEntrySessionSnapshot(input.libraryEntryId, true);
+      if (!snapshot) return;
+
       await db.libraryEntries.update(input.libraryEntryId, {
         ownershipStatus: currentEntry.ownershipStatus === "wishlist" ? "owned" : currentEntry.ownershipStatus,
-        progressStatus: getNextProgressStatus(currentEntry.progressStatus, completionPercent),
-        completionPercent: completionPercent ?? currentEntry.completionPercent,
-        playtimeMinutes: currentEntry.playtimeMinutes + durationMinutes,
-        mood: input.mood?.trim() || currentEntry.mood,
-        lastSessionAt:
-          !currentEntry.lastSessionAt || currentEntry.lastSessionAt.localeCompare(input.date) < 0
-            ? input.date
-            : currentEntry.lastSessionAt,
+        progressStatus: snapshot.progressStatus,
+        completionPercent: snapshot.completionPercent,
+        playtimeMinutes: snapshot.playtimeMinutes,
+        mood: snapshot.latestSession?.mood?.trim() || input.mood?.trim() || currentEntry.mood,
+        lastSessionAt: snapshot.lastSessionAt,
         updatedAt: new Date().toISOString(),
       });
     });
@@ -122,14 +104,15 @@ export async function deletePlaySession(sessionId: number): Promise<number | nul
 
   await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
     await db.playSessions.delete(sessionId);
-    const { latestSession, latestCompletion } = await readEntrySessionSnapshot(session.libraryEntryId);
-    const nextProgress = latestCompletion ?? currentEntry.completionPercent;
+    const snapshot = await readEntrySessionSnapshot(session.libraryEntryId);
+    if (!snapshot) return;
+
     await db.libraryEntries.update(currentEntry.id!, {
-      playtimeMinutes: Math.max(0, currentEntry.playtimeMinutes - session.durationMinutes),
-      completionPercent: nextProgress,
-      progressStatus: getNextProgressStatus(currentEntry.progressStatus, nextProgress),
-      mood: latestSession?.mood?.trim() || currentEntry.mood,
-      lastSessionAt: latestSession?.date,
+      playtimeMinutes: snapshot.playtimeMinutes,
+      completionPercent: snapshot.completionPercent,
+      progressStatus: snapshot.progressStatus,
+      mood: snapshot.latestSession?.mood?.trim() || currentEntry.mood,
+      lastSessionAt: snapshot.lastSessionAt,
       updatedAt: new Date().toISOString(),
     });
   });

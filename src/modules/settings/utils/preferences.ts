@@ -165,7 +165,7 @@ function parseListValue(value: string | undefined, fallback: string[]): string[]
       return normalizeTokenList(parsed.join(","));
     }
   } catch {
-    // Fall back to plain text parsing below.
+    // Fallback para texto plano logo abaixo.
   }
 
   const tokens = normalizeTokenList(value);

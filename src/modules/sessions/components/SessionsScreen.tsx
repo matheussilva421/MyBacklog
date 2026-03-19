@@ -325,9 +325,7 @@ export function SessionsScreen({
                     <Pill tone={group.cadence.tone}>{group.cadence.label}</Pill>
                     <Pill tone="neutral">{formatDuration(group.totalMinutes)}</Pill>
                     {group.cadence.lastSessionAt ? (
-                      <Pill tone="cyan">
-                        {formatDatePtBr(group.cadence.lastSessionAt)}
-                      </Pill>
+                      <Pill tone="cyan">{formatDatePtBr(group.cadence.lastSessionAt)}</Pill>
                     ) : null}
                   </div>
                 </div>

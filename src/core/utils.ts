@@ -60,11 +60,16 @@ export function formatDatePtBr(value: string | Date): string {
   return parseDateInput(value).toLocaleDateString("pt-BR");
 }
 
-export function getTodayDateInputValue(now = new Date()): string {
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
+export function toDateInputValue(value: string | Date): string {
+  const date = parseDateInput(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+export function getTodayDateInputValue(now = new Date()): string {
+  return toDateInputValue(now);
 }
 
 export function formatRemainingEta(raw: string, progressPercent: number, loggedHours = 0): string {

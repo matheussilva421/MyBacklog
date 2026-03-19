@@ -1,5 +1,5 @@
 import type { BarPoint, Game, Status } from "../../../backlog/shared";
-import { formatMonthLabel, parseDateInput, startOfLocalDay, startOfWeek } from "../../../core/utils";
+import { formatMonthLabel, parseDateInput, startOfLocalDay, startOfWeek, toDateInputValue } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
 
 export type SessionPeriod = "7d" | "30d" | "90d" | "all";
@@ -54,8 +54,7 @@ function getDaysSince(dateValue: string, now: Date): number {
 }
 
 function buildWeekKey(value: string | Date): string {
-  const weekStart = startOfWeek(value);
-  return weekStart.toISOString().slice(0, 10);
+  return toDateInputValue(startOfWeek(value));
 }
 
 function countWeeklyStreak(sessions: PlaySession[], now: Date): number {
