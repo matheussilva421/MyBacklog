@@ -1,5 +1,5 @@
 import type { BarPoint, Game, Status } from "../../../backlog/shared";
-import { formatMonthLabel, parseDateInput, startOfLocalDay } from "../../../core/utils";
+import { formatMonthLabel, parseDateInput, startOfLocalDay, startOfWeek } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
 
 export type SessionPeriod = "7d" | "30d" | "90d" | "all";
@@ -36,14 +36,6 @@ export type SessionOverview = {
   averageMinutes: number;
   notedSessions: number;
 };
-
-function startOfWeek(value: string | Date): Date {
-  const date = startOfLocalDay(value);
-  const day = date.getDay();
-  const diff = (day + 6) % 7;
-  date.setDate(date.getDate() - diff);
-  return date;
-}
 
 function getPeriodStart(period: SessionPeriod, now: Date): Date | null {
   const end = startOfLocalDay(now);

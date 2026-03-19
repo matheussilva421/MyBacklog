@@ -397,7 +397,7 @@ export function dbPriorityToPriority(priority: DbPriority): Priority {
 
 export { composeLibraryRecords, dbGameToUiGame } from "../modules/library/utils";
 export { createDbGameFromForm, createGameFormState } from "../modules/game-page/utils/formState";
-export { createSessionFormState, defaultSessionToDbSession } from "../modules/sessions/utils/sessionForm";
+export { createSessionFormState } from "../modules/sessions/utils/sessionForm";
 export { buildPlannerFit, buildPlannerReason, computePlannerScore } from "../modules/planner/utils/scoring";
 export {
   attachRawgCandidatesToPreview,

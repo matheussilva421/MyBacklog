@@ -28,7 +28,7 @@ import { useImportExportState } from "../modules/import-export/hooks/useImportEx
 import { useLibraryState } from "../modules/library/hooks/useLibraryState";
 import { usePlannerInsights } from "../modules/planner/hooks/usePlannerInsights";
 import { useAppPreferences } from "../modules/settings/hooks/useAppPreferences";
-import { buildSessionCadenceMap } from "../modules/sessions/utils/sessionAnalytics";
+import { buildSessionCadenceMap, buildSessionMonthlyHours } from "../modules/sessions/utils/sessionAnalytics";
 
 function createGoalDraft(goal?: DbGoal): GoalFormState {
   return {
@@ -108,6 +108,10 @@ export function useBacklogApp() {
   }, [data.goalRows]);
 
   const findGame = (id: number) => games.find((game) => game.id === id);
+  const monthlyHours = useMemo(
+    () => buildSessionMonthlyHours(data.sessionRows),
+    [data.sessionRows],
+  );
   const sessionCadenceMap = useMemo(
     () => buildSessionCadenceMap(data.sessionRows),
     [data.sessionRows],
@@ -369,6 +373,7 @@ export function useBacklogApp() {
     selectedGamePage,
     monthlyProgress,
     platformData,
+    monthlyHours,
     durationBuckets,
     visibleSessions,
     visiblePlannerQueue,

@@ -122,6 +122,8 @@ export default function App() {
     screenContent = (
       <StatsScreen
         durationBuckets={app.durationBuckets}
+        monthlyHours={app.monthlyHours}
+        platformData={app.platformData}
         visibleSessions={app.visibleSessions}
         findGame={app.findGame}
         onEditSession={app.openEditSessionModal}
@@ -209,7 +211,7 @@ export default function App() {
           </Panel>
 
           <Panel>
-            <SectionHeader icon={Zap} title="Quick actions" description="Atalhos do sistema" />
+            <SectionHeader icon={Zap} title="Ações rápidas" description="Atalhos do sistema" />
             <div className="quick-actions">
               <NotchButton variant="primary" onClick={app.openCreateGameModal}>
                 <Plus size={15} />
@@ -301,6 +303,7 @@ export default function App() {
       <GameModal
         mode={app.gameModalMode}
         form={app.gameForm}
+        submitting={app.submitting}
         onClose={app.closeGameModal}
         onChange={app.handleGameFormChange}
         onSubmit={app.handleGameSubmit}
@@ -311,6 +314,7 @@ export default function App() {
         mode={app.sessionEditId != null ? "edit" : "create"}
         form={app.sessionForm}
         libraryGames={app.games}
+        submitting={app.submitting}
         onClose={app.closeSessionModal}
         onChange={app.handleSessionFormChange}
         onSubmit={app.handleSessionSubmit}
@@ -319,6 +323,7 @@ export default function App() {
       <GoalModal
         mode={app.goalModalMode}
         form={app.goalForm}
+        submitting={app.submitting}
         onClose={app.closeGoalModal}
         onChange={app.handleGoalFormChange}
         onSubmit={app.handleGoalSubmit}
@@ -332,6 +337,7 @@ export default function App() {
         preview={app.importPreview}
         summary={app.importPreviewSummary}
         fileInputRef={app.importFileInputRef}
+        submitting={app.submitting}
         onClose={app.closeImportFlow}
         onSourceChange={app.handleImportSourceChange}
         onTextChange={app.handleImportTextChange}
@@ -350,6 +356,7 @@ export default function App() {
         preview={app.restorePreview}
         totals={app.restorePreviewTotals}
         fileInputRef={app.restoreFileInputRef}
+        submitting={app.submitting}
         onClose={app.closeRestoreFlow}
         onModeChange={app.handleRestoreModeChange}
         onTextChange={app.handleRestoreTextChange}

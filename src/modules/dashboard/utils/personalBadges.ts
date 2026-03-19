@@ -1,6 +1,6 @@
 import { Activity, Clock3, LibraryBig, Sparkles, Trophy } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { parseDateInput } from "../../../core/utils";
+import { parseDateInput, startOfWeek } from "../../../core/utils";
 import type { Game, UserBadge } from "../../../backlog/shared";
 import type { LibraryEntry, PlaySession } from "../../../core/types";
 
@@ -25,15 +25,6 @@ type BadgeBlueprint = {
   icon: LucideIcon;
   resolve: (context: BadgeContext) => BadgeMetric;
 };
-
-function startOfWeek(value: string | Date) {
-  const clone = parseDateInput(value);
-  const day = clone.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  clone.setDate(clone.getDate() + diff);
-  clone.setHours(0, 0, 0, 0);
-  return clone;
-}
 
 function getMaxWeeklyHours(sessionRows: PlaySession[]) {
   const totals = new Map<string, number>();
