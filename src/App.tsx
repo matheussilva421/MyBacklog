@@ -20,15 +20,51 @@ import { PlannerScreen } from "./modules/planner/components/PlannerScreen";
 import { SessionsScreen } from "./modules/sessions/components/SessionsScreen";
 import { ProfileScreen } from "./modules/settings/components/ProfileScreen";
 import { StatsScreen } from "./modules/stats/components/StatsScreen";
+import { useAuth } from "./contexts/AuthContext";
+import { LoginScreen } from "./components/LoginScreen";
+import { useCloudSync } from "./hooks/useCloudSync";
 
 export default function App() {
+  const { user, loading: authLoading, logout } = useAuth();
   const app = useBacklogApp();
+
+  const { isSyncing, triggerSyncToCloud } = useCloudSync(
+    user,
+    app.readBackupTables,
+    app.refreshData,
+    app.setNotice
+  );
+
+  useEffect(() => {
+    if (user && !app.loading) {
+      triggerSyncToCloud();
+    }
+  }, [user, triggerSyncToCloud, app.games, app.sessionRows, app.goalRows, app.listRows, app.preferences, app.importPreview]);
 
   useEffect(() => {
     if (!app.guidedTourOpen) return;
     if (app.screen === app.guidedTourStep.screen) return;
     app.setScreen(app.guidedTourStep.screen);
   }, [app.guidedTourOpen, app.guidedTourStep.screen, app.screen, app.setScreen]);
+
+  if (authLoading) {
+    return (
+      <div className="app-shell">
+        <div className="app-shell__backdrop" aria-hidden="true" />
+        <div className="app-layout">
+          <main className="main-column">
+            <div className="system-banner">
+              <span>Autenticando na interface neural...</span>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen />;
+  }
 
   if (app.loading) {
     return (
@@ -244,6 +280,14 @@ export default function App() {
                 />
               ))}
             </nav>
+            <div className="sidebar-nav" style={{ marginTop: 'auto', paddingTop: '1rem' }}>
+              <SidebarItem
+                label="Desconectar"
+                icon={Zap}
+                active={false}
+                onClick={logout}
+              />
+            </div>
           </Panel>
 
           <Panel className={cx(app.guidedTourTarget === "quick-actions" && "tour-focus")}>
@@ -275,6 +319,12 @@ export default function App() {
               <span>{app.loading ? "Sincronizando biblioteca local..." : app.notice}</span>
             </div>
           ) : null}
+          
+          {isSyncing && !app.loading && !app.notice && (
+            <div className="system-banner">
+              <span>Realizando backup na nuvem...</span>
+            </div>
+          )}
 
           <Panel className={cx("hero-panel", app.guidedTourTarget === "dashboard" && "tour-focus")}>
             <div className="hero-panel__layout">
