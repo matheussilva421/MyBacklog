@@ -591,7 +591,7 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
 
   let gameCreate = 0;
   let gameUpdate = 0;
-  let gameSkip = 0;
+  const gameSkip = 0;
   const currentGamesByName = new Map(games.map((game) => [game.normalizedTitle, game]));
   for (const game of payload.games) {
     if (currentGamesByName.has(normalizeGameTitle(game.title))) gameUpdate += 1;
