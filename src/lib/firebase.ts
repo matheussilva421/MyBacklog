@@ -1,6 +1,10 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
+import { initializeApp, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
+import {
+  enableMultiTabIndexedDbPersistence,
+  getFirestore,
+  type Firestore,
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -8,23 +12,24 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Inicializa o Firebase
-const app = initializeApp(firebaseConfig);
+export const isFirebaseConfigured = Object.values(firebaseConfig).every(
+  (value) => typeof value === "string" && value.trim().length > 0,
+);
 
-// Inicializa o Firebase Auth e Firestore
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+const app: FirebaseApp | null = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
 
-// Habilita persistência offline do Firestore e suporte para multicamadas (opcional, útil para PWA)
-enableMultiTabIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    // Múltiplas abas ativas e este suporte não está disponível
-    console.warn("Múltiplas abas ativas, persistência no banco ativada apenas na primeira.")
-  } else if (err.code === 'unimplemented') {
-    // Browser não suporta IndexedDB
-    console.warn("O navegador não suporta persistência offline.")
-  }
-});
+export const auth: Auth | null = app ? getAuth(app) : null;
+export const cloudDb: Firestore | null = app ? getFirestore(app) : null;
+
+if (cloudDb) {
+  enableMultiTabIndexedDbPersistence(cloudDb).catch((err) => {
+    if (err.code === "failed-precondition") {
+      console.warn("Multiplas abas ativas; persistencia offline mantida apenas na primeira.");
+    } else if (err.code === "unimplemented") {
+      console.warn("O navegador nao suporta persistencia offline do Firestore.");
+    }
+  });
+}

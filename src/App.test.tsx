@@ -2,9 +2,17 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 
 const useBacklogAppMock = vi.fn();
+const useAuthMock = vi.fn();
+const useCloudSyncMock = vi.fn();
 
 vi.mock("./hooks/useBacklogApp", () => ({
   useBacklogApp: () => useBacklogAppMock(),
+}));
+vi.mock("./contexts/AuthContext", () => ({
+  useAuth: () => useAuthMock(),
+}));
+vi.mock("./hooks/useCloudSync", () => ({
+  useCloudSync: () => useCloudSyncMock(),
 }));
 
 vi.mock("./modules/dashboard/components/DashboardScreen", () => ({
@@ -235,7 +243,29 @@ function createAppState(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function createAuthState(overrides: Record<string, unknown> = {}) {
+  return {
+    user: null,
+    loading: false,
+    isAuthEnabled: false,
+    logout: vi.fn(),
+    login: vi.fn(),
+    register: vi.fn(),
+    loginWithGoogle: vi.fn(),
+    ...overrides,
+  };
+}
+
 describe("App", () => {
+  beforeEach(() => {
+    useAuthMock.mockReturnValue(createAuthState());
+    useCloudSyncMock.mockReturnValue({
+      isSyncing: false,
+      isSyncBlockedByConflict: false,
+      triggerSyncToCloud: vi.fn(),
+    });
+  });
+
   it("renders the matching screen", () => {
     useBacklogAppMock.mockReturnValue(createAppState({ screen: "profile" }));
 
@@ -282,5 +312,14 @@ describe("App", () => {
     expect(screen.getByText("guided-tour")).toBeInTheDocument();
     expect(nextGuidedTourStep).toHaveBeenCalled();
     expect(closeGuidedTour).toHaveBeenCalled();
+  });
+
+  it("renders login when cloud auth is enabled and there is no user", () => {
+    useAuthMock.mockReturnValue(createAuthState({ isAuthEnabled: true, user: null }));
+    useBacklogAppMock.mockReturnValue(createAppState());
+
+    render(<App />);
+
+    expect(screen.getByText("Acesso ao Sistema")).toBeInTheDocument();
   });
 });

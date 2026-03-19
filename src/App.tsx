@@ -25,21 +25,21 @@ import { LoginScreen } from "./components/LoginScreen";
 import { useCloudSync } from "./hooks/useCloudSync";
 
 export default function App() {
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, isAuthEnabled } = useAuth();
   const app = useBacklogApp();
 
   const { isSyncing, triggerSyncToCloud } = useCloudSync(
-    user,
+    isAuthEnabled ? user : null,
     app.readBackupTables,
     app.refreshData,
-    app.setNotice
+    app.setNotice,
   );
 
   useEffect(() => {
-    if (user && !app.loading) {
+    if (isAuthEnabled && user && !app.loading) {
       triggerSyncToCloud();
     }
-  }, [user, triggerSyncToCloud, app.games, app.sessionRows, app.goalRows, app.listRows, app.preferences, app.importPreview]);
+  }, [isAuthEnabled, user, triggerSyncToCloud, app.games, app.sessionRows, app.goalRows, app.listRows, app.preferences]);
 
   useEffect(() => {
     if (!app.guidedTourOpen) return;
@@ -62,7 +62,7 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  if (isAuthEnabled && !user) {
     return <LoginScreen />;
   }
 
@@ -280,14 +280,11 @@ export default function App() {
                 />
               ))}
             </nav>
-            <div className="sidebar-nav" style={{ marginTop: 'auto', paddingTop: '1rem' }}>
-              <SidebarItem
-                label="Desconectar"
-                icon={Zap}
-                active={false}
-                onClick={logout}
-              />
-            </div>
+            {isAuthEnabled && user ? (
+              <div className="sidebar-nav" style={{ marginTop: "auto", paddingTop: "1rem" }}>
+                <SidebarItem label="Desconectar" icon={Zap} active={false} onClick={logout} />
+              </div>
+            ) : null}
           </Panel>
 
           <Panel className={cx(app.guidedTourTarget === "quick-actions" && "tour-focus")}>
