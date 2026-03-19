@@ -17,6 +17,11 @@ function sortSessionsByDateDesc(sessions: PlaySession[]) {
 
 function getNextProgressStatus(currentStatus: ProgressStatus, completionPercent?: number): ProgressStatus {
   if (completionPercent === 100) return "finished";
+  if (typeof completionPercent === "number" && completionPercent > 0) {
+    if (currentStatus === "abandoned" || currentStatus === "archived") return currentStatus;
+    return "playing";
+  }
+  if (currentStatus === "finished" || currentStatus === "completed_100") return "playing";
   if (currentStatus === "not_started" || currentStatus === "paused") return "playing";
   return currentStatus;
 }

@@ -78,6 +78,33 @@ function buildArcPath(
   ].join(" ");
 }
 
+function buildDonutSegments(params: {
+  data: PiePoint[];
+  total: number;
+  centerX: number;
+  centerY: number;
+  radius: number;
+  colors: string[];
+}) {
+  const { data, total, centerX, centerY, radius, colors } = params;
+  const segments: Array<{ name: string; path: string; color: string }> = [];
+  let cursor = 0;
+
+  for (const [index, entry] of data.entries()) {
+    const sweep = (entry.value / total) * 360;
+    const gap = Math.min(3, sweep * 0.08);
+    const path = buildArcPath(centerX, centerY, radius, cursor + gap / 2, cursor + sweep - gap / 2);
+    segments.push({
+      name: entry.name,
+      path,
+      color: colors[index % colors.length],
+    });
+    cursor += sweep;
+  }
+
+  return segments;
+}
+
 export function TrendLineChart({
   width,
   height,
@@ -176,36 +203,14 @@ export function DonutChart({
   const radius = Math.max(24, Math.min(width, height) / 2 - strokeWidth);
   const centerX = width / 2;
   const centerY = height / 2;
-  const segments = data.reduce<{
-    cursor: number;
-    values: Array<{ name: string; path: string; color: string }>;
-  }>(
-    (accumulator, entry, index) => {
-      const sweep = (entry.value / total) * 360;
-      const gap = Math.min(3, sweep * 0.08);
-      const startAngle = accumulator.cursor;
-      const path = buildArcPath(
-        centerX,
-        centerY,
-        radius,
-        startAngle + gap / 2,
-        startAngle + sweep - gap / 2,
-      );
-
-      return {
-        cursor: startAngle + sweep,
-        values: [
-          ...accumulator.values,
-          {
-            name: entry.name,
-            path,
-            color: colors[index % colors.length],
-          },
-        ],
-      };
-    },
-    { cursor: 0, values: [] },
-  ).values;
+  const segments = buildDonutSegments({
+    data,
+    total,
+    centerX,
+    centerY,
+    radius,
+    colors,
+  });
 
   return (
     <svg className="chart-svg" viewBox={`0 0 ${width} ${height}`} aria-label="Distribuição por plataformas">

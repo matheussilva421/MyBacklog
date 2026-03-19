@@ -146,7 +146,15 @@ export default function App() {
   } else if (app.screen === "game") {
     screenContent = app.selectedGamePage ? (
       <GamePageScreen
-        key={app.selectedGamePage.game.id}
+        key={[
+          app.selectedGamePage.game.id,
+          app.selectedGamePage.review?.score ?? "",
+          app.selectedGamePage.review?.shortReview ?? "",
+          app.selectedGamePage.review?.longReview ?? "",
+          app.selectedGamePage.tags.map((tag) => tag.id).join(","),
+          app.selectedGamePage.lists.map((list) => list.id).join(","),
+          app.selectedGamePage.sessions.length,
+        ].join("|")}
         data={app.selectedGamePage}
         availableLists={app.listOptions.map((list) => ({ id: list.id, name: list.name }))}
         onBack={() => app.openLibraryGame(app.selectedGamePage?.game.id)}
