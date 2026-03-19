@@ -176,7 +176,36 @@ export function DonutChart({
   const radius = Math.max(24, Math.min(width, height) / 2 - strokeWidth);
   const centerX = width / 2;
   const centerY = height / 2;
-  let angleCursor = 0;
+  const segments = data.reduce<{
+    cursor: number;
+    values: Array<{ name: string; path: string; color: string }>;
+  }>(
+    (accumulator, entry, index) => {
+      const sweep = (entry.value / total) * 360;
+      const gap = Math.min(3, sweep * 0.08);
+      const startAngle = accumulator.cursor;
+      const path = buildArcPath(
+        centerX,
+        centerY,
+        radius,
+        startAngle + gap / 2,
+        startAngle + sweep - gap / 2,
+      );
+
+      return {
+        cursor: startAngle + sweep,
+        values: [
+          ...accumulator.values,
+          {
+            name: entry.name,
+            path,
+            color: colors[index % colors.length],
+          },
+        ],
+      };
+    },
+    { cursor: 0, values: [] },
+  ).values;
 
   return (
     <svg className="chart-svg" viewBox={`0 0 ${width} ${height}`} aria-label="Distribuição por plataformas">
@@ -188,23 +217,16 @@ export function DonutChart({
         strokeWidth={strokeWidth}
       />
 
-      {data.map((entry, index) => {
-        const sweep = (entry.value / total) * 360;
-        const gap = Math.min(3, sweep * 0.08);
-        const path = buildArcPath(centerX, centerY, radius, angleCursor + gap / 2, angleCursor + sweep - gap / 2);
-        angleCursor += sweep;
-
-        return (
-          <path
-            key={entry.name}
-            d={path}
-            fill="none"
-            stroke={colors[index % colors.length]}
-            strokeWidth={strokeWidth}
-            strokeLinecap="butt"
-          />
-        );
-      })}
+      {segments.map((segment) => (
+        <path
+          key={segment.name}
+          d={segment.path}
+          fill="none"
+          stroke={segment.color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="butt"
+        />
+      ))}
     </svg>
   );
 }
