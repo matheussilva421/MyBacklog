@@ -55,7 +55,7 @@ function getDaysSince(dateValue: string, now: Date): number {
 
 function buildWeekKey(value: string | Date): string {
   const weekStart = startOfWeek(value);
-  return `${weekStart.getFullYear()}-${weekStart.getMonth()}-${weekStart.getDate()}`;
+  return weekStart.toISOString().slice(0, 10);
 }
 
 function countWeeklyStreak(sessions: PlaySession[], now: Date): number {

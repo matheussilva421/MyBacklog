@@ -1,6 +1,4 @@
-import type { Goal, PlannerEntry, Rule } from "../../../backlog/shared";
-
-export const plannerQueue: PlannerEntry[] = [];
+import type { Goal, Rule } from "../../../backlog/shared";
 
 export const tacticalGoals: Goal[] = [
   { label: "Finalizar 1 jogo curto", value: 70, tone: "sunset" },

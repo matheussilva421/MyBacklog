@@ -91,6 +91,8 @@ async function fetchRawgCandidateMap(
   for (const result of results) {
     if (result.status === "fulfilled") {
       candidateMap.set(result.value.key, result.value.candidates);
+    } else {
+      console.warn("[RAWG] Falha ao buscar candidatos:", result.reason);
     }
   }
 
@@ -119,6 +121,8 @@ async function fetchSelectedRawgMetadata(
   for (const result of results) {
     if (result.status === "fulfilled") {
       metadataMap.set(result.value.rawgId, result.value.metadata);
+    } else {
+      console.warn("[RAWG] Falha ao buscar metadados:", result.reason);
     }
   }
 
@@ -207,8 +211,8 @@ export function useBacklogActions({
               };
             }
           }
-        } catch {
-          // Keep local save resilient even if enrichment fails.
+        } catch (rawgError) {
+          console.warn("[RAWG] Enriquecimento de metadados falhou:", rawgError);
         }
       }
 
