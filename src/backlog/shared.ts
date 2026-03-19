@@ -409,7 +409,7 @@ export {
   recordToImportPayload,
 } from "../modules/import-export/utils/importExport";
 export { backlogByDuration, platformDistribution, yearlyEvolution } from "../modules/dashboard/utils/dashboardData";
-export { systemRules, tacticalGoals } from "../modules/planner/utils/plannerData";
+export { buildDynamicTacticalGoals, systemRules } from "../modules/planner/utils/plannerData";
 export { screenMeta } from "../modules/dashboard/utils/navigationData";
 export { defaultGameToDbGame, defaultGameToDbLibraryEntry, defaultGames, defaultSessions } from "../core/defaults";
 export { createDbGameFromImport, mergeImportedGame } from "../modules/import-export/utils/importExport";
