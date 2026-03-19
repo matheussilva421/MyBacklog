@@ -235,13 +235,25 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
     screenContent = (
       <LibraryScreen
         libraryGames={app.libraryGames}
+        groupedLibraryGames={app.groupedLibraryGames}
         selectedGame={app.selectedGame}
         selectedGameLists={app.selectedGameLists}
         filter={app.filter}
         selectedListFilter={app.selectedListFilter}
+        sortBy={app.librarySortBy}
+        sortDirection={app.librarySortDirection}
+        groupBy={app.libraryGroupBy}
         listOptions={app.listOptions}
+        savedViews={app.savedViewRows}
+        activeSavedView={app.activeSavedView}
         onFilterChange={(value: typeof app.filter) => app.setFilter(value)}
         onListFilterChange={(value: typeof app.selectedListFilter) => app.setSelectedListFilter(value)}
+        onSortByChange={app.setLibrarySortBy}
+        onSortDirectionChange={app.setLibrarySortDirection}
+        onGroupByChange={app.setLibraryGroupBy}
+        onSaveCurrentView={() => void app.handleSaveLibraryView()}
+        onApplySavedView={app.handleApplySavedView}
+        onDeleteSavedView={(viewId: number) => void app.handleDeleteSavedView(viewId)}
         onSelectGame={(gameId: number) => app.setSelectedGameId(gameId)}
         onExport={app.handleExport}
         onBackupExport={app.handleBackupExport}

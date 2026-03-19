@@ -13,11 +13,13 @@ import type {
   Platform,
   PlaySession,
   Review,
+  SavedView,
   Setting,
   Store,
   Tag,
 } from "./types";
 import { buildStructuredTablesFromLegacy } from "./structuredTables";
+import { classifyAccessSource } from "./libraryEntryDerived";
 
 // Local copies of normalizeGameTitle/mergePlatformList from utils.ts —
 // kept self-contained here so the v2 migration never breaks if utils change.
@@ -64,6 +66,7 @@ class MyBacklogDB extends Dexie {
   gameTags!: Table<GameTag, number>;
   goals!: Table<Goal, number>;
   settings!: Table<Setting, number>;
+  savedViews!: Table<SavedView, number>;
   importJobs!: Table<ImportJob, number>;
 
   constructor() {
@@ -262,6 +265,41 @@ class MyBacklogDB extends Dexie {
         }
         if (structuredSnapshot.gamePlatforms.length > 0) {
           await tx.table("gamePlatforms").bulkPut(structuredSnapshot.gamePlatforms);
+        }
+      });
+
+    this.version(5)
+      .stores({
+        games: "++id, normalizedTitle, title, rawgId, releaseYear",
+        libraryEntries:
+          "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
+        stores: "++id, normalizedName, name, sourceKey, updatedAt",
+        libraryEntryStores:
+          "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
+        platforms: "++id, normalizedName, name, updatedAt",
+        gamePlatforms:
+          "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
+        playSessions: "++id, libraryEntryId, date",
+        reviews: "++id, libraryEntryId",
+        lists: "++id, name",
+        libraryEntryLists:
+          "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
+        tags: "++id, name",
+        gameTags: "++id, libraryEntryId, tagId",
+        goals: "++id, type, period",
+        settings: "++id, key, updatedAt",
+        savedViews: "++id, scope, name, [scope+name], updatedAt",
+        importJobs: "++id, source, status, createdAt, updatedAt",
+      })
+      .upgrade(async (tx) => {
+        const storeRows = (await tx.table("stores").toArray()) as Store[];
+        if (storeRows.length > 0) {
+          await tx.table("stores").bulkPut(
+            storeRows.map((store) => ({
+              ...store,
+              sourceKey: store.sourceKey ?? classifyAccessSource(store.name),
+            })),
+          );
         }
       });
   }

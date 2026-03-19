@@ -10,15 +10,21 @@
   type LucideIcon,
 } from "lucide-react";
 import type {
+  AccessModel,
+  AccessSource,
   Game as DbGameMetadata,
   GamePlatform as DbGamePlatform,
   GameFormat,
   GameTag as DbGameTag,
   Goal as DbGoal,
   GoalType,
+  LibrarySavedStatusFilter,
   LibraryEntry as DbLibraryEntry,
   LibraryEntryStore as DbLibraryEntryStore,
   LibraryEntryList as DbLibraryEntryList,
+  LibraryViewGroupBy,
+  LibraryViewSortBy,
+  LibraryViewSortDirection,
   List as DbList,
   OwnershipStatus,
   Period,
@@ -27,10 +33,13 @@ import type {
   Priority as DbPriority,
   ProgressStatus as DbProgressStatus,
   Review as DbReview,
+  SavedView as DbSavedView,
+  SavedViewScope,
   Setting as DbSetting,
   Store as DbStore,
   Tag as DbTag,
 } from "../core/types";
+import { isCompleted, isCurrentlyPlaying, isPaused, isWishlistEntry } from "../core/libraryEntryDerived";
 
 export type {
   DbGamePlatform,
@@ -39,10 +48,18 @@ export type {
   DbLibraryEntryStore,
   DbList,
   DbPlatform,
+  DbSavedView,
   DbSetting,
   DbStore,
+  AccessModel,
+  AccessSource,
   GoalType,
+  LibrarySavedStatusFilter,
+  LibraryViewGroupBy,
+  LibraryViewSortBy,
+  LibraryViewSortDirection,
   Period,
+  SavedViewScope,
 };
 
 export type ImportSource = "csv" | "steam" | "playnite";
@@ -321,6 +338,7 @@ export type BackupPayload = {
   gameTags: DbGameTag[];
   goals: DbGoal[];
   settings: DbSetting[];
+  savedViews: DbSavedView[];
 };
 
 export type BackupTables = Omit<BackupPayload, "version" | "exportedAt" | "source">;
@@ -408,18 +426,11 @@ export function priorityToDbPriority(priority: Priority): DbPriority {
 }
 
 export function dbStatusToStatus(entry: DbLibraryEntry): Status {
-  if (entry.ownershipStatus === "wishlist") return "Wishlist";
-  switch (entry.progressStatus) {
-    case "playing":
-      return "Jogando";
-    case "paused":
-      return "Pausado";
-    case "finished":
-    case "completed_100":
-      return "Terminado";
-    default:
-      return "Backlog";
-  }
+  if (isWishlistEntry(entry)) return "Wishlist";
+  if (isCurrentlyPlaying(entry)) return "Jogando";
+  if (isPaused(entry)) return "Pausado";
+  if (isCompleted(entry)) return "Terminado";
+  return "Backlog";
 }
 
 export function dbPriorityToPriority(priority: DbPriority): Priority {

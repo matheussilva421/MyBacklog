@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { classifyAccessSource } from "./libraryEntryDerived";
 import { buildStructuredTablesFromLegacy, type StructuredTablesSnapshot } from "./structuredTables";
 import type {
   Game,
@@ -27,6 +28,7 @@ async function ensureStores(storeNames: string[]): Promise<Map<string, Store>> {
       await db.stores.add({
         name: storeName,
         normalizedName,
+        sourceKey: classifyAccessSource(storeName),
         createdAt: now,
         updatedAt: now,
       }),
@@ -35,6 +37,7 @@ async function ensureStores(storeNames: string[]): Promise<Map<string, Store>> {
       id: nextId,
       name: storeName,
       normalizedName,
+      sourceKey: classifyAccessSource(storeName),
       createdAt: now,
       updatedAt: now,
     });

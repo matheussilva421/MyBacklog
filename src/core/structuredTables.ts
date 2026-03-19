@@ -6,6 +6,7 @@ import type {
   Platform,
   Store,
 } from "./types";
+import { classifyAccessSource } from "./libraryEntryDerived";
 import { normalizeToken, splitCsvTokens } from "./utils";
 
 export type StructuredTablesSnapshot = {
@@ -64,6 +65,7 @@ export function buildStructuredTablesFromLegacy({
     id: index + 1,
     name,
     normalizedName: normalizeToken(name),
+    sourceKey: classifyAccessSource(name),
     createdAt: now,
     updatedAt: now,
   }));

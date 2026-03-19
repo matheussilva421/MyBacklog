@@ -1,5 +1,11 @@
 import { useDeferredValue, useState } from "react";
-import type { Goal as DbGoal, PlaySession as DbPlaySession } from "../core/types";
+import type {
+  Goal as DbGoal,
+  LibraryViewGroupBy,
+  LibraryViewSortBy,
+  LibraryViewSortDirection,
+  PlaySession as DbPlaySession,
+} from "../core/types";
 import {
   createGameFormState,
   createSessionFormState,
@@ -26,6 +32,9 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("Todos");
   const [selectedListFilter, setSelectedListFilter] = useState<LibraryListFilter>("all");
+  const [librarySortBy, setLibrarySortBy] = useState<LibraryViewSortBy>("updatedAt");
+  const [librarySortDirection, setLibrarySortDirection] = useState<LibraryViewSortDirection>("desc");
+  const [libraryGroupBy, setLibraryGroupBy] = useState<LibraryViewGroupBy>("none");
   const [selectedGameId, setSelectedGameId] = useState(0);
 
   const [gameModalMode, setGameModalMode] = useState<"create" | "edit" | null>(null);
@@ -130,6 +139,12 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
     setFilter,
     selectedListFilter,
     setSelectedListFilter,
+    librarySortBy,
+    setLibrarySortBy,
+    librarySortDirection,
+    setLibrarySortDirection,
+    libraryGroupBy,
+    setLibraryGroupBy,
     selectedGameId,
     setSelectedGameId,
     gameModalMode,

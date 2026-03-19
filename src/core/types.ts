@@ -1,4 +1,20 @@
 export type OwnershipStatus = "wishlist" | "owned" | "subscription" | "borrowed" | "emulated";
+export type AccessModel = "wishlist" | "purchase" | "subscription" | "borrowed" | "emulated" | "unknown";
+export type AccessSource =
+  | "steam"
+  | "epic"
+  | "gog"
+  | "ea_app"
+  | "ubisoft_connect"
+  | "game_pass"
+  | "ps_store"
+  | "ps_plus"
+  | "nintendo_eshop"
+  | "nintendo_online"
+  | "apple_arcade"
+  | "netflix_games"
+  | "manual"
+  | "other";
 export type GoalType = "finished" | "started" | "playtime" | "backlog_reduction";
 export type Period = "monthly" | "yearly" | "total";
 
@@ -14,6 +30,18 @@ export type ProgressStatus =
 
 export type Priority = "low" | "medium" | "high";
 export type GameFormat = "digital" | "physical" | "subscription" | "emulated";
+export type SavedViewScope = "library";
+export type LibrarySavedStatusFilter = "all" | "backlog" | "playing" | "paused" | "completed" | "wishlist";
+export type LibraryViewSortBy =
+  | "updatedAt"
+  | "title"
+  | "progress"
+  | "hours"
+  | "priority"
+  | "year"
+  | "completionDate";
+export type LibraryViewSortDirection = "asc" | "desc";
+export type LibraryViewGroupBy = "none" | "status" | "priority" | "platform" | "sourceStore" | "ownership";
 
 export interface Game {
   id?: number;
@@ -92,6 +120,7 @@ export interface Store {
   id?: number;
   name: string;
   normalizedName: string;
+  sourceKey?: AccessSource;
   createdAt: string;
   updatedAt: string;
 }
@@ -149,6 +178,20 @@ export interface Setting {
   id?: number;
   key: string;
   value: string;
+  updatedAt: string;
+}
+
+export interface SavedView {
+  id?: number;
+  scope: SavedViewScope;
+  name: string;
+  statusFilter: LibrarySavedStatusFilter;
+  listId?: number;
+  query?: string;
+  sortBy: LibraryViewSortBy;
+  sortDirection: LibraryViewSortDirection;
+  groupBy: LibraryViewGroupBy;
+  createdAt: string;
   updatedAt: string;
 }
 

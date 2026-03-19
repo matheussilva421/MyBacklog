@@ -8,8 +8,12 @@ import type {
   Goal as DbGoal,
   GoalType,
   LibraryEntry as DbLibraryEntry,
+  LibraryViewGroupBy,
+  LibraryViewSortBy,
+  LibraryViewSortDirection,
   List as DbList,
   Period,
+  SavedView as DbSavedView,
 } from "../core/types";
 import {
   attachRawgCandidatesToPreview,
@@ -38,10 +42,12 @@ import {
   type LibraryRecord,
   type ScreenKey,
   type SessionFormState,
+  type StatusFilter,
 } from "../backlog/shared";
 import type { AppPreferences, PreferencesDraft } from "../modules/settings/utils/preferences";
 import { settingsKeys } from "../modules/settings/utils/preferences";
 import type { CatalogAuditReport } from "../modules/settings/utils/catalogAudit";
+import { buildSavedViewPayload, type LibraryViewState } from "../modules/library/utils/savedViews";
 import {
   applyRawgMetadataToImportPayload,
   fetchRawgMetadata,
@@ -65,9 +71,11 @@ type UseBacklogActionsArgs = {
   records: LibraryRecord[];
   libraryEntryRows: DbLibraryEntry[];
   listRows: DbList[];
+  savedViewRows: DbSavedView[];
   selectedRecord?: LibraryRecord;
   selectedGame?: Game;
   selectedListFilter: LibraryListFilter;
+  currentLibraryView: LibraryViewState;
   gameModalMode: "create" | "edit" | null;
   gameForm: GameFormState;
   sessionForm: SessionFormState;
@@ -83,8 +91,13 @@ type UseBacklogActionsArgs = {
   setNotice: (value: string | null) => void;
   setSubmitting: (value: boolean) => void;
   setScreen: (screen: ScreenKey) => void;
+  setFilter: (value: StatusFilter) => void;
   setSelectedGameId: (value: number) => void;
   setSelectedListFilter: (value: LibraryListFilter) => void;
+  setLibrarySortBy: (value: LibraryViewSortBy) => void;
+  setLibrarySortDirection: (value: LibraryViewSortDirection) => void;
+  setLibraryGroupBy: (value: LibraryViewGroupBy) => void;
+  setQuery: (value: string) => void;
   setGameModalMode: (value: "create" | "edit" | null) => void;
   setSessionModalOpen: (value: boolean) => void;
   setSessionEditId: (value: number | null) => void;
@@ -148,9 +161,11 @@ export function useBacklogActions({
   records,
   libraryEntryRows,
   listRows,
+  savedViewRows,
   selectedRecord,
   selectedGame,
   selectedListFilter,
+  currentLibraryView,
   gameModalMode,
   gameForm,
   sessionForm,
@@ -166,8 +181,13 @@ export function useBacklogActions({
   setNotice,
   setSubmitting,
   setScreen,
+  setFilter,
   setSelectedGameId,
   setSelectedListFilter,
+  setLibrarySortBy,
+  setLibrarySortDirection,
+  setLibraryGroupBy,
+  setQuery,
   setGameModalMode,
   setSessionModalOpen,
   setSessionEditId,
@@ -470,7 +490,8 @@ export function useBacklogActions({
       tables.tags.length +
       tables.gameTags.length +
       tables.goals.length +
-      tables.settings.length;
+      tables.settings.length +
+      tables.savedViews.length;
 
     if (totalRecords === 0) {
       setNotice("A base local está vazia para backup.");
@@ -478,7 +499,7 @@ export function useBacklogActions({
     }
 
     const payload: BackupPayload = {
-      version: 5,
+      version: 6,
       exportedAt: new Date().toISOString(),
       source: "mybacklog",
       ...tables,
@@ -536,6 +557,7 @@ export function useBacklogActions({
           db.gameTags,
           db.goals,
           db.settings,
+          db.savedViews,
           db.importJobs,
         ],
         async () => {
@@ -554,6 +576,7 @@ export function useBacklogActions({
             await db.libraryEntries.clear();
             await db.games.clear();
             await db.settings.clear();
+            await db.savedViews.clear();
             await db.importJobs.clear();
 
             if (payload.games.length) await db.games.bulkPut(payload.games);
@@ -570,6 +593,7 @@ export function useBacklogActions({
             if (payload.gameTags.length) await db.gameTags.bulkPut(payload.gameTags);
             if (payload.goals.length) await db.goals.bulkPut(payload.goals);
             if (payload.settings.length) await db.settings.bulkPut(payload.settings);
+            if (payload.savedViews.length) await db.savedViews.bulkPut(payload.savedViews);
             return;
           }
 
@@ -588,6 +612,7 @@ export function useBacklogActions({
             existingSessions,
             existingGameTags,
             existingSettings,
+            existingSavedViews,
           ] = await Promise.all([
             db.games.toArray(),
             db.libraryEntries.toArray(),
@@ -603,6 +628,7 @@ export function useBacklogActions({
             db.playSessions.toArray(),
             db.gameTags.toArray(),
             db.settings.toArray(),
+            db.savedViews.toArray(),
           ]);
 
           const existingGamesByTitle = new Map(
@@ -642,6 +668,9 @@ export function useBacklogActions({
             existingGamePlatforms.map((relation) => `${relation.gameId}::${relation.platformId}`),
           );
           const existingSettingMap = new Map(existingSettings.map((setting) => [setting.key, setting] as const));
+          const existingSavedViewMap = new Map<string, DbSavedView>(
+            existingSavedViews.map((view) => [`${view.scope}::${view.name.trim().toLowerCase()}`, view] as const),
+          );
           const payloadGamesById = new Map(payload.games.map((game) => [game.id, game] as const));
           const resolvedGameIdByPayloadId = new Map<number, number>();
           const resolvedEntryIdByPayloadId = new Map<number, number>();
@@ -850,6 +879,23 @@ export function useBacklogActions({
             const existing = existingSettingMap.get(setting.key);
             if (existing?.id != null) await db.settings.put({ ...existing, ...setting, id: existing.id });
             else await db.settings.add({ ...setting, id: undefined });
+          }
+
+          for (const view of payload.savedViews) {
+            const key = `${view.scope}::${view.name.trim().toLowerCase()}`;
+            const existing = existingSavedViewMap.get(key);
+            if (existing?.id != null) {
+              await db.savedViews.put({
+                ...existing,
+                ...view,
+                id: existing.id,
+                createdAt: existing.createdAt || view.createdAt,
+                updatedAt: existing.updatedAt > view.updatedAt ? existing.updatedAt : view.updatedAt,
+              });
+            } else {
+              const nextId = Number(await db.savedViews.add({ ...view, id: undefined }));
+              existingSavedViewMap.set(key, { ...view, id: nextId });
+            }
           }
         },
       );
@@ -1119,6 +1165,54 @@ export function useBacklogActions({
     if (selectedListFilter === listId) setSelectedListFilter("all");
     await refreshData();
     setNotice("Lista removida.");
+  };
+
+  const handleSaveLibraryView = async (name?: string) => {
+    const normalizedName = String(name ?? window.prompt("Nome da view salva:", "") ?? "").trim();
+    if (!normalizedName) {
+      setNotice("Informe um nome para salvar a view.");
+      return;
+    }
+
+    const existing = savedViewRows.find(
+      (view) => view.scope === "library" && view.name.trim().toLowerCase() === normalizedName.toLowerCase(),
+    );
+    const payload = buildSavedViewPayload(currentLibraryView, normalizedName, existing);
+
+    await db.savedViews.put(payload);
+    await refreshData();
+    setNotice(existing ? "View salva atualizada." : "View salva criada.");
+  };
+
+  const handleDeleteSavedView = async (viewId: number) => {
+    const confirmed = window.confirm("Excluir esta view salva?");
+    if (!confirmed) return;
+    await db.savedViews.delete(viewId);
+    await refreshData();
+    setNotice("View salva removida.");
+  };
+
+  const handleApplySavedView = (view: DbSavedView) => {
+    setQuery(view.query ?? "");
+    setSelectedListFilter(view.listId ?? "all");
+    setLibrarySortBy(view.sortBy);
+    setLibrarySortDirection(view.sortDirection);
+    setLibraryGroupBy(view.groupBy);
+    const nextFilter: StatusFilter =
+      view.statusFilter === "backlog"
+        ? "Backlog"
+        : view.statusFilter === "playing"
+          ? "Jogando"
+          : view.statusFilter === "paused"
+            ? "Pausado"
+            : view.statusFilter === "completed"
+              ? "Terminado"
+              : view.statusFilter === "wishlist"
+                ? "Wishlist"
+                : "Todos";
+    setFilter(nextFilter);
+    setScreen("library");
+    setNotice(`View aplicada: ${view.name}.`);
   };
 
   const handleSettingSave = async (key: string, value: string) => {
@@ -1527,6 +1621,9 @@ export function useBacklogActions({
     handleGoalDelete,
     handleListCreate,
     handleListDelete,
+    handleSaveLibraryView,
+    handleDeleteSavedView,
+    handleApplySavedView,
     handleSettingSave,
     handlePreferencesSave,
     handleOnboardingSubmit,

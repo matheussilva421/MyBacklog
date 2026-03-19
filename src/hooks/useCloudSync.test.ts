@@ -77,11 +77,12 @@ const baseTables = {
   gameTags: [],
   goals: [],
   settings: [],
+  savedViews: [],
 };
 
 function createPayload(overrides: Partial<BackupPayload> = {}): BackupPayload {
   return {
-    version: 5,
+    version: 6,
     exportedAt: "2026-03-19T12:00:00.000Z",
     source: "mybacklog",
     ...baseTables,
@@ -133,6 +134,7 @@ describe("syncEngine helpers", () => {
         gameTags: [],
         goals: [],
         settings: [],
+        savedViews: [],
       },
       createPayload(),
     );

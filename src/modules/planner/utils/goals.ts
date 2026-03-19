@@ -1,4 +1,5 @@
 import type { Goal as GoalCard } from "../../../backlog/shared";
+import { hasStarted, isCompleted, isWishlistEntry } from "../../../core/libraryEntryDerived";
 import { parseDateInput } from "../../../core/utils";
 import type { Goal as DbGoal, LibraryEntry as DbLibraryEntry, PlaySession as DbPlaySession } from "../../../core/types";
 
@@ -59,20 +60,6 @@ function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function hasStarted(entry: DbLibraryEntry): boolean {
-  return (
-    entry.progressStatus === "playing" ||
-    entry.progressStatus === "paused" ||
-    entry.progressStatus === "finished" ||
-    entry.progressStatus === "completed_100" ||
-    entry.completionPercent > 0
-  );
-}
-
-function isFinished(entry: DbLibraryEntry): boolean {
-  return entry.progressStatus === "finished" || entry.progressStatus === "completed_100";
-}
-
 function formatGoalCurrent(goal: DbGoal["type"], current: number, target: number): string {
   if (goal === "playtime") {
     return `${current.toFixed(1)}h / ${target}h`;
@@ -90,7 +77,7 @@ function computeGoalCurrent(
   switch (goal.type) {
     case "finished":
       return libraryEntries.filter(
-        (entry) => isFinished(entry) && isWithinPeriod(entry.lastSessionAt ?? entry.updatedAt, goal.period, now),
+        (entry) => isCompleted(entry) && isWithinPeriod(entry.lastSessionAt ?? entry.updatedAt, goal.period, now),
       ).length;
     case "started": {
       const startedBySession = new Set(
@@ -112,7 +99,7 @@ function computeGoalCurrent(
     }
     case "backlog_reduction":
       return libraryEntries.filter((entry) => {
-        if (entry.ownershipStatus === "wishlist") return false;
+        if (isWishlistEntry(entry)) return false;
         if (entry.progressStatus === "not_started") return false;
         return isWithinPeriod(entry.lastSessionAt ?? entry.updatedAt, goal.period, now);
       }).length;

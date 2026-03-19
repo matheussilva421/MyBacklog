@@ -1,6 +1,7 @@
 import { parseDateInput } from "../../../core/utils";
 import type { Game, MonthlyRecap } from "../../../backlog/shared";
 import type { LibraryEntry, PlaySession } from "../../../core/types";
+import { isCompleted } from "../../../core/libraryEntryDerived";
 
 function isSameMonth(value: string | Date, target: Date) {
   const date = parseDateInput(value);
@@ -35,7 +36,7 @@ export function buildMonthlyRecap(
   const topGameEntry = Array.from(minutesByGame.entries()).sort((left, right) => right[1] - left[1])[0];
   const topGame = topGameEntry ? games.find((game) => game.id === topGameEntry[0]) : undefined;
   const completedGames = libraryEntryRows.filter((entry) => {
-    if (entry.progressStatus !== "finished" && entry.progressStatus !== "completed_100") return false;
+    if (!isCompleted(entry)) return false;
     return isSameMonth(entry.updatedAt, now);
   }).length;
   const addedGames = libraryEntryRows.filter((entry) => isSameMonth(entry.createdAt, now)).length;

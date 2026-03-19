@@ -11,6 +11,7 @@ import type {
   Platform,
   PlaySession,
   Review,
+  SavedView,
   Setting,
   Store,
   Tag,
@@ -41,7 +42,8 @@ export type SyncBlockKey =
   | "tags"
   | "gameTags"
   | "goals"
-  | "settings";
+  | "settings"
+  | "savedViews";
 
 export type SyncBlockDiff = {
   key: SyncBlockKey;
@@ -75,6 +77,7 @@ const syncBlockLabels: Record<SyncBlockKey, string> = {
   gameTags: "Relações de tag",
   goals: "Metas",
   settings: "Configurações",
+  savedViews: "Views salvas",
 };
 
 function sortRows<T>(rows: T[]): T[] {
@@ -100,7 +103,8 @@ function hasSyncData(tables: SyncTables) {
     tables.tags.length > 0 ||
     tables.gameTags.length > 0 ||
     tables.goals.length > 0 ||
-    tables.settings.length > 0
+    tables.settings.length > 0 ||
+    tables.savedViews.length > 0
   );
 }
 
@@ -123,6 +127,7 @@ type ScopedLibraryEntryList = Scoped<LibraryEntryList>;
 type ScopedGameTag = Scoped<GameTag>;
 type ScopedLibraryEntryStore = Scoped<LibraryEntryStore>;
 type ScopedGamePlatform = Scoped<GamePlatform>;
+type ScopedSavedView = Scoped<SavedView>;
 
 export function sanitizeSyncTables(tables: SyncTables): SyncTables {
   return {
@@ -132,6 +137,7 @@ export function sanitizeSyncTables(tables: SyncTables): SyncTables {
     platforms: tables.platforms ?? [],
     gamePlatforms: tables.gamePlatforms ?? [],
     settings: tables.settings.filter((setting) => !localOnlySyncSettingKeys.has(setting.key)),
+    savedViews: tables.savedViews ?? [],
   };
 }
 
@@ -151,6 +157,7 @@ export function stripBackupMeta(payload: BackupPayload): SyncTables {
     gameTags: payload.gameTags,
     goals: payload.goals,
     settings: payload.settings,
+    savedViews: Array.isArray(payload.savedViews) ? payload.savedViews : [],
   });
 }
 
@@ -172,6 +179,7 @@ export function buildSyncFingerprint(tables: SyncTables): string {
     gameTags: sortRows(sanitizedTables.gameTags),
     goals: sortRows(sanitizedTables.goals),
     settings: sortRows(sanitizedTables.settings),
+    savedViews: sortRows(sanitizedTables.savedViews),
   });
 }
 
@@ -179,7 +187,7 @@ export function buildBackupPayload(tables: SyncTables): BackupPayload {
   const sanitizedTables = sanitizeSyncTables(tables);
 
   return {
-    version: 5,
+    version: 6,
     exportedAt: new Date().toISOString(),
     source: "mybacklog",
     ...sanitizedTables,
@@ -290,6 +298,32 @@ function mergeSettingRows(rows: Setting[]): Setting[] {
   return Array.from(byKey.values()).sort((left, right) => left.key.localeCompare(right.key));
 }
 
+function mergeSavedViewRows(rows: ScopedSavedView[]) {
+  const byKey = new Map<string, SavedView>();
+
+  for (const item of rows) {
+    const key = `${item.row.scope}::${item.row.name.trim().toLowerCase()}`;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, { ...item.row });
+      continue;
+    }
+
+    if (item.row.updatedAt > existing.updatedAt) {
+      byKey.set(key, {
+        ...existing,
+        ...item.row,
+        id: undefined,
+        createdAt: existing.createdAt || item.row.createdAt,
+      });
+    }
+  }
+
+  return Array.from(byKey.values()).sort((left, right) =>
+    `${left.scope}::${left.name}`.localeCompare(`${right.scope}::${right.name}`, "pt-BR"),
+  );
+}
+
 function mergeListRows(rows: ScopedList[]) {
   const groups = new Map<string, ScopedList[]>();
 
@@ -384,6 +418,7 @@ function mergeStoreRows(rows: ScopedStore[]) {
       id: nextIdValue,
       name: primary.name,
       normalizedName: primary.normalizedName || primary.name.trim().toLowerCase(),
+      sourceKey: group.find((item) => item.row.sourceKey)?.row.sourceKey ?? primary.sourceKey,
       createdAt: primary.createdAt,
       updatedAt: primary.updatedAt,
     });
@@ -790,6 +825,14 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
     id: index + 1,
   }));
 
+  const mergedSavedViews = mergeSavedViewRows([
+    ...sanitizedLocalTables.savedViews.map((row) => ({ scope: "local" as const, row })),
+    ...sanitizedCloudTables.savedViews.map((row) => ({ scope: "cloud" as const, row })),
+  ]).map((view, index) => ({
+    ...view,
+    id: index + 1,
+  }));
+
   return {
     games: mergedGames,
     libraryEntries: mergedEntries,
@@ -805,5 +848,6 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
     gameTags: mergedGameTags,
     goals: mergedGoals,
     settings: mergedSettings,
+    savedViews: mergedSavedViews,
   };
 }

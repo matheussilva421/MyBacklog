@@ -9,6 +9,7 @@ import type {
   Goal as DbGoal,
   List as DbList,
   Review as DbReview,
+  SavedView as DbSavedView,
   Setting as DbSetting,
   Store as DbStore,
   Tag as DbTag,
@@ -686,6 +687,7 @@ type RestoreTables = {
   gameTags: Array<{ libraryEntryId: number; tagId: number }>;
   goals: DbGoal[];
   settings: DbSetting[];
+  savedViews: DbSavedView[];
 };
 
 export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, tables: RestoreTables): RestorePreview {
@@ -704,6 +706,7 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
     gameTags,
     goals,
     settings,
+    savedViews,
   } = tables;
 
   const currentSessions = new Set(
@@ -727,6 +730,9 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
   const currentGameTags = new Set(gameTags.map((entry) => `${entry.libraryEntryId}::${entry.tagId}`));
   const currentGoalsByKey = new Map(goals.map((goal) => [`${goal.type}::${goal.period}`, goal]));
   const currentSettingsByKey = new Map(settings.map((setting) => [setting.key, setting]));
+  const currentSavedViewsByKey = new Map(
+    savedViews.map((view) => [`${view.scope}::${view.name.trim().toLowerCase()}`, view]),
+  );
   const currentEntryByKey = new Map(
     composeLibraryRecords(games, libraryEntries).map((record) => [
       createImportKey(record.game.title, record.libraryEntry.platform),
@@ -984,6 +990,9 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
   let settingCreate = 0;
   let settingUpdate = 0;
   let settingSkip = 0;
+  let savedViewCreate = 0;
+  let savedViewUpdate = 0;
+  let savedViewSkip = 0;
   const seenSettings = new Set<string>();
   for (const setting of payload.settings) {
     const key = setting.key.trim();
@@ -994,6 +1003,24 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
     seenSettings.add(key);
     if (currentSettingsByKey.has(key)) settingUpdate += 1;
     else settingCreate += 1;
+  }
+
+  for (const view of payload.savedViews) {
+    const key = `${view.scope}::${view.name.trim().toLowerCase()}`;
+    const current = currentSavedViewsByKey.get(key);
+    if (!current) savedViewCreate += 1;
+    else if (
+      current.query !== view.query ||
+      current.statusFilter !== view.statusFilter ||
+      current.listId !== view.listId ||
+      current.sortBy !== view.sortBy ||
+      current.sortDirection !== view.sortDirection ||
+      current.groupBy !== view.groupBy
+    ) {
+      savedViewUpdate += 1;
+    } else {
+      savedViewSkip += 1;
+    }
   }
 
   return {
@@ -1016,6 +1043,7 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
       { label: "Relações tag", create: gameTagCreate, update: 0, skip: gameTagSkip },
       { label: "Metas", create: goalCreate, update: goalUpdate, skip: goalSkip },
       { label: "Configurações", create: settingCreate, update: settingUpdate, skip: settingSkip },
+      { label: "Views salvas", create: savedViewCreate, update: savedViewUpdate, skip: savedViewSkip },
     ],
   };
 }
@@ -1072,6 +1100,7 @@ export function parseBackupText(text: string): BackupPayload | null {
       gameTags: Array.isArray(data.gameTags) ? data.gameTags : [],
       goals: Array.isArray(data.goals) ? data.goals : [],
       settings: Array.isArray(data.settings) ? data.settings : [],
+      savedViews: Array.isArray(data.savedViews) ? (data.savedViews as DbSavedView[]) : [],
     };
   } catch {
     return null;

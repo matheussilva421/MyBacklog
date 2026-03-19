@@ -8,6 +8,7 @@ import type {
   List as DbList,
   PlaySession as DbPlaySession,
   Review as DbReview,
+  SavedView as DbSavedView,
   Setting as DbSetting,
   Tag as DbTag,
 } from "../core/types";
@@ -60,6 +61,7 @@ export function useBacklogDataState() {
   const [goalRows, setGoalRows] = useState<DbGoal[]>([]);
   const [listRows, setListRows] = useState<DbList[]>([]);
   const [settingRows, setSettingRows] = useState<DbSetting[]>([]);
+  const [savedViewRows, setSavedViewRows] = useState<DbSavedView[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -81,6 +83,7 @@ export function useBacklogDataState() {
       storedLists,
       storedLibraryEntryLists,
       storedSettings,
+      storedSavedViews,
     ] = await Promise.all([
       db.games.toArray(),
       db.playSessions.orderBy("date").reverse().toArray(),
@@ -91,6 +94,7 @@ export function useBacklogDataState() {
       db.lists.toArray(),
       db.libraryEntryLists.toArray(),
       db.settings.toArray(),
+      db.savedViews.toArray(),
     ]);
 
     setGameRows(sortByUpdatedAtDesc(storedGames));
@@ -103,6 +107,7 @@ export function useBacklogDataState() {
     setListRows(storedLists);
     setLibraryEntryListRows(storedLibraryEntryLists);
     setSettingRows(storedSettings);
+    setSavedViewRows(sortByUpdatedAtDesc(storedSavedViews));
   };
 
   useEffect(() => {
@@ -140,6 +145,7 @@ export function useBacklogDataState() {
     goalRows,
     listRows,
     settingRows,
+    savedViewRows,
     loading,
     notice,
     submitting,

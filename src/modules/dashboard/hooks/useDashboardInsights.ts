@@ -7,6 +7,7 @@ import {
   type Game,
   type PiePoint,
 } from "../../../backlog/shared";
+import { isCompleted, isWishlistEntry } from "../../../core/libraryEntryDerived";
 import { parseDateInput } from "../../../core/utils";
 import type { LibraryEntry as DbLibraryEntry, PlaySession as DbPlaySession } from "../../../core/types";
 import type { PlannerGoalSignals } from "../../planner/utils/goals";
@@ -69,11 +70,11 @@ export function useDashboardInsights({
     for (const entry of libraryEntryRows) {
       const createdAt = parseDateInput(entry.createdAt);
       const createdBucket = monthMap.get(`${createdAt.getFullYear()}-${createdAt.getMonth()}`);
-      if (createdBucket && entry.ownershipStatus !== "wishlist") {
+      if (createdBucket && !isWishlistEntry(entry)) {
         createdBucket.started += 1;
       }
 
-      if (entry.progressStatus === "finished" || entry.progressStatus === "completed_100") {
+      if (isCompleted(entry)) {
         const finishedAt = parseDateInput(entry.updatedAt);
         const finishedBucket = monthMap.get(`${finishedAt.getFullYear()}-${finishedAt.getMonth()}`);
         if (finishedBucket) finishedBucket.finished += 1;
@@ -142,7 +143,7 @@ export function useDashboardInsights({
         .reduce((totalMinutes, session) => totalMinutes + session.durationMinutes, 0) / 60,
     );
     const finishedThisYear = libraryEntryRows.filter((entry) => {
-      if (entry.progressStatus !== "finished" && entry.progressStatus !== "completed_100") return false;
+      if (!isCompleted(entry)) return false;
       return parseDateInput(entry.updatedAt).getFullYear() === now.getFullYear();
     }).length;
 

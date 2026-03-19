@@ -123,7 +123,7 @@ describe("importExport", () => {
 
   it("counts settings, stores and list relations in restore preview", () => {
     const payload: BackupPayload = {
-      version: 5,
+      version: 6,
       exportedAt: "2026-03-01T00:00:00.000Z",
       source: "mybacklog",
       games: [createGame({ id: 10, title: "Hades", normalizedTitle: "hades" })],
@@ -164,6 +164,7 @@ describe("importExport", () => {
       gameTags: [],
       goals: [],
       settings: [{ id: 40, key: "displayName", value: "Matheus", updatedAt: "2026-03-01T00:00:00.000Z" }],
+      savedViews: [],
     };
 
     const preview = buildRestorePreview(payload, "merge", {
@@ -205,6 +206,7 @@ describe("importExport", () => {
       gameTags: [],
       goals: [],
       settings: [{ id: 5, key: "displayName", value: "Operador", updatedAt: "2026-02-01T00:00:00.000Z" }] as Setting[],
+      savedViews: [],
     });
 
     const settingsRow = preview.items.find((item) => item.label === "Configurações");

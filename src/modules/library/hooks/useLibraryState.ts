@@ -1,6 +1,20 @@
 import { useMemo } from "react";
 import type { Game, LibraryListFilter, LibraryRecord, StatusFilter } from "../../../backlog/shared";
-import type { GameTag, LibraryEntryList, List, Tag } from "../../../core/types";
+import type {
+  GameTag,
+  LibraryEntryList,
+  LibraryViewGroupBy,
+  LibraryViewSortBy,
+  LibraryViewSortDirection,
+  List,
+  SavedView,
+  Tag,
+} from "../../../core/types";
+import {
+  doesSavedViewMatchLibraryState,
+  groupLibraryGames,
+  sortLibraryGames,
+} from "../utils/savedViews";
 
 type UseLibraryStateArgs = {
   games: Game[];
@@ -10,8 +24,13 @@ type UseLibraryStateArgs = {
   gameTagRows: GameTag[];
   libraryEntryListRows: LibraryEntryList[];
   query: string;
+  searchQuery: string;
   filter: StatusFilter;
   selectedListFilter: LibraryListFilter;
+  sortBy: LibraryViewSortBy;
+  sortDirection: LibraryViewSortDirection;
+  groupBy: LibraryViewGroupBy;
+  savedViews: SavedView[];
   selectedGameId: number;
 };
 
@@ -28,8 +47,13 @@ export function useLibraryState({
   gameTagRows,
   libraryEntryListRows,
   query,
+  searchQuery,
   filter,
   selectedListFilter,
+  sortBy,
+  sortDirection,
+  groupBy,
+  savedViews,
   selectedGameId,
 }: UseLibraryStateArgs) {
   const tagNamesByEntryId = useMemo(() => {
@@ -91,10 +115,10 @@ export function useLibraryState({
             tagNamesByEntryId.get(game.id) ?? "",
             listNamesByEntryId.get(game.id) ?? "",
           ],
-          query,
+          searchQuery,
         ),
       ),
-    [games, listNamesByEntryId, query, tagNamesByEntryId],
+    [games, listNamesByEntryId, searchQuery, tagNamesByEntryId],
   );
 
   const libraryGames = useMemo(
@@ -110,8 +134,45 @@ export function useLibraryState({
     [filter, listIdsByEntryId, searchedGames, selectedListFilter],
   );
 
+  const sortedLibraryGames = useMemo(
+    () => sortLibraryGames(libraryGames, recordsByEntryId, sortBy, sortDirection),
+    [libraryGames, recordsByEntryId, sortBy, sortDirection],
+  );
+
+  const groupedLibraryGames = useMemo(
+    () => groupLibraryGames(sortedLibraryGames, recordsByEntryId, groupBy),
+    [groupBy, recordsByEntryId, sortedLibraryGames],
+  );
+
+  const activeSavedView = useMemo(
+    () =>
+      savedViews.find((view) =>
+        doesSavedViewMatchLibraryState(view, {
+          query,
+          filter,
+          selectedListFilter,
+          sortBy,
+          sortDirection,
+          groupBy,
+        }),
+      ),
+    [filter, groupBy, query, savedViews, selectedListFilter, sortBy, sortDirection],
+  );
+
+  const currentViewDraft = useMemo(
+    () => ({
+      query,
+      filter,
+      selectedListFilter,
+      sortBy,
+      sortDirection,
+      groupBy,
+    }),
+    [filter, groupBy, query, selectedListFilter, sortBy, sortDirection],
+  );
+
   const selectedGame =
-    libraryGames.find((game) => game.id === selectedGameId) ??
+    sortedLibraryGames.find((game) => game.id === selectedGameId) ??
     searchedGames.find((game) => game.id === selectedGameId) ??
     games.find((game) => game.id === selectedGameId) ??
     games[0];
@@ -130,9 +191,12 @@ export function useLibraryState({
     listIdsByEntryId,
     listOptions,
     searchedGames,
-    libraryGames,
+    libraryGames: sortedLibraryGames,
+    groupedLibraryGames,
     selectedGame,
     selectedRecord,
     selectedGameLists,
+    activeSavedView,
+    currentViewDraft,
   };
 }

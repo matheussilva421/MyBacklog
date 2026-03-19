@@ -9,7 +9,14 @@ import {
   type StatusFilter,
 } from "../../../backlog/shared";
 import type { DbList } from "../../../backlog/shared";
+import type {
+  LibraryViewGroupBy,
+  LibraryViewSortBy,
+  LibraryViewSortDirection,
+  SavedView,
+} from "../../../core/types";
 import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
+import type { GroupedLibraryGames } from "../utils/savedViews";
 
 type ListOption = {
   id: number;
@@ -19,13 +26,25 @@ type ListOption = {
 
 type LibraryScreenProps = {
   libraryGames: Game[];
+  groupedLibraryGames: GroupedLibraryGames[];
   selectedGame?: Game;
   selectedGameLists: DbList[];
   filter: StatusFilter;
   selectedListFilter: LibraryListFilter;
+  sortBy: LibraryViewSortBy;
+  sortDirection: LibraryViewSortDirection;
+  groupBy: LibraryViewGroupBy;
   listOptions: ListOption[];
+  savedViews: SavedView[];
+  activeSavedView?: SavedView;
   onFilterChange: (value: StatusFilter) => void;
   onListFilterChange: (value: LibraryListFilter) => void;
+  onSortByChange: (value: LibraryViewSortBy) => void;
+  onSortDirectionChange: (value: LibraryViewSortDirection) => void;
+  onGroupByChange: (value: LibraryViewGroupBy) => void;
+  onSaveCurrentView: () => void;
+  onApplySavedView: (view: SavedView) => void;
+  onDeleteSavedView: (viewId: number) => void;
   onSelectGame: (gameId: number) => void;
   onExport: () => void;
   onBackupExport: () => void;
@@ -42,13 +61,25 @@ type LibraryScreenProps = {
 
 export function LibraryScreen({
   libraryGames,
+  groupedLibraryGames,
   selectedGame,
   selectedGameLists,
   filter,
   selectedListFilter,
+  sortBy,
+  sortDirection,
+  groupBy,
   listOptions,
+  savedViews,
+  activeSavedView,
   onFilterChange,
   onListFilterChange,
+  onSortByChange,
+  onSortDirectionChange,
+  onGroupByChange,
+  onSaveCurrentView,
+  onApplySavedView,
+  onDeleteSavedView,
   onSelectGame,
   onExport,
   onBackupExport,
@@ -62,6 +93,47 @@ export function LibraryScreen({
   onOpenGamePage,
   onSendSelectedToPlanner,
 }: LibraryScreenProps) {
+  const renderLibraryCard = (game: Game) => (
+    <button
+      type="button"
+      key={game.id}
+      className={cx("library-card", selectedGame?.id === game.id && "library-card--active")}
+      onClick={() => onSelectGame(game.id)}
+    >
+      <div className="library-card__platform">
+        <span>{game.platform}</span>
+        <ArrowUpRight size={15} />
+      </div>
+      <h3>{game.title}</h3>
+      <p className="library-card__genre">{game.genre}</p>
+      <div className="library-card__chips">
+        <Pill tone={statusTone[game.status]}>{game.status}</Pill>
+        <Pill tone={priorityTone[game.priority]}>{game.priority}</Pill>
+      </div>
+      <div className="library-card__progress">
+        <div className="library-card__progress-head">
+          <span>Progresso</span>
+          <strong>{game.progress}%</strong>
+        </div>
+        <ProgressBar value={game.progress} tone="cyan" thin />
+      </div>
+      <div className="library-card__metrics">
+        <div>
+          <span>Nota</span>
+          <strong>{game.score.toFixed(1)}</strong>
+        </div>
+        <div>
+          <span>Horas</span>
+          <strong>{game.hours}h</strong>
+        </div>
+        <div>
+          <span>ETA</span>
+          <strong>{game.eta}</strong>
+        </div>
+      </div>
+    </button>
+  );
+
   return (
     <div className="library-layout">
       <Panel>
@@ -130,51 +202,95 @@ export function LibraryScreen({
               ))}
             </div>
           </div>
+
+          <div className="filter-group">
+            <span className="filter-group__label">Organização</span>
+            <div className="filter-control-row">
+              <label className="filter-select">
+                <span>Ordenar</span>
+                <select value={sortBy} onChange={(event) => onSortByChange(event.target.value as LibraryViewSortBy)}>
+                  <option value="updatedAt">Atualização</option>
+                  <option value="title">Título</option>
+                  <option value="progress">Progresso</option>
+                  <option value="hours">Horas</option>
+                  <option value="priority">Prioridade</option>
+                  <option value="year">Ano</option>
+                  <option value="completionDate">Conclusão</option>
+                </select>
+              </label>
+              <label className="filter-select">
+                <span>Direção</span>
+                <select
+                  value={sortDirection}
+                  onChange={(event) => onSortDirectionChange(event.target.value as LibraryViewSortDirection)}
+                >
+                  <option value="desc">Descendente</option>
+                  <option value="asc">Ascendente</option>
+                </select>
+              </label>
+              <label className="filter-select">
+                <span>Agrupar</span>
+                <select value={groupBy} onChange={(event) => onGroupByChange(event.target.value as LibraryViewGroupBy)}>
+                  <option value="none">Sem grupo</option>
+                  <option value="status">Status</option>
+                  <option value="priority">Prioridade</option>
+                  <option value="platform">Plataforma</option>
+                  <option value="sourceStore">Store</option>
+                  <option value="ownership">Acesso</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div className="filter-group">
+            <div className="filter-group__header">
+              <span className="filter-group__label">Views salvas</span>
+              <NotchButton variant="secondary" onClick={onSaveCurrentView}>
+                Salvar view atual
+              </NotchButton>
+            </div>
+            {savedViews.length === 0 ? (
+              <p className="filter-empty-copy">Nenhuma view salva ainda. Use os filtros e salve a combinação atual.</p>
+            ) : (
+              <div className="saved-view-list">
+                {savedViews.map((view) => (
+                  <div
+                    key={view.id ?? `${view.scope}-${view.name}`}
+                    className={cx("saved-view-card", activeSavedView?.id === view.id && "saved-view-card--active")}
+                  >
+                    <button type="button" className="saved-view-card__main" onClick={() => onApplySavedView(view)}>
+                      <strong>{view.name}</strong>
+                      <span>
+                        {view.query ? `Busca: ${view.query}` : "Sem busca"} •{" "}
+                        {view.groupBy === "none" ? "Sem agrupamento" : `Grupo: ${view.groupBy}`}
+                      </span>
+                    </button>
+                    {view.id != null ? (
+                      <button
+                        type="button"
+                        className="saved-view-card__delete"
+                        onClick={() => onDeleteSavedView(view.id!)}
+                        aria-label={`Excluir view ${view.name}`}
+                      >
+                        ×
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {libraryGames.length === 0 ? (
           <EmptyState message="Nenhum jogo encontrado para o filtro e a busca atual." />
         ) : (
-          <div className="library-grid">
-            {libraryGames.map((game) => (
-              <button
-                type="button"
-                key={game.id}
-                className={cx("library-card", selectedGame?.id === game.id && "library-card--active")}
-                onClick={() => onSelectGame(game.id)}
-              >
-                <div className="library-card__platform">
-                  <span>{game.platform}</span>
-                  <ArrowUpRight size={15} />
-                </div>
-                <h3>{game.title}</h3>
-                <p className="library-card__genre">{game.genre}</p>
-                <div className="library-card__chips">
-                  <Pill tone={statusTone[game.status]}>{game.status}</Pill>
-                  <Pill tone={priorityTone[game.priority]}>{game.priority}</Pill>
-                </div>
-                <div className="library-card__progress">
-                  <div className="library-card__progress-head">
-                    <span>Progresso</span>
-                    <strong>{game.progress}%</strong>
-                  </div>
-                  <ProgressBar value={game.progress} tone="cyan" thin />
-                </div>
-                <div className="library-card__metrics">
-                  <div>
-                    <span>Nota</span>
-                    <strong>{game.score.toFixed(1)}</strong>
-                  </div>
-                  <div>
-                    <span>Horas</span>
-                    <strong>{game.hours}h</strong>
-                  </div>
-                  <div>
-                    <span>ETA</span>
-                    <strong>{game.eta}</strong>
-                  </div>
-                </div>
-              </button>
+          <div className="library-groups">
+            {groupedLibraryGames.map((group) => (
+              <section key={group.key} className="library-group-block">
+                {groupBy !== "none" ? <h3 className="library-group-title">{group.label}</h3> : null}
+                <div className="library-grid">{group.games.map(renderLibraryCard)}</div>
+              </section>
             ))}
           </div>
         )}

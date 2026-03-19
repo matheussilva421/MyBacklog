@@ -971,6 +971,112 @@ button {
   text-transform: uppercase;
 }
 
+.filter-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.filter-control-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.filter-select {
+  display: grid;
+  gap: 6px;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.filter-select span {
+  color: var(--text-faint);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.filter-select select {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(244, 239, 27, 0.16);
+  background: rgba(9, 11, 16, 0.92);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.filter-empty-copy {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.saved-view-list {
+  display: grid;
+  gap: 10px;
+}
+
+.saved-view-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(244, 239, 27, 0.12);
+  background: rgba(10, 13, 19, 0.82);
+}
+
+.saved-view-card--active {
+  border-color: rgba(38, 216, 255, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(38, 216, 255, 0.08);
+}
+
+.saved-view-card__main,
+.saved-view-card__delete {
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.saved-view-card__main {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+
+.saved-view-card__main strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.saved-view-card__main span {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.saved-view-card__delete {
+  align-self: start;
+  color: var(--text-faint);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.library-groups,
+.library-group-block {
+  display: grid;
+  gap: 16px;
+}
+
+.library-group-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1084,6 +1190,12 @@ button {
 .catalog-maintenance-layout,
 .catalog-audit-summary {
   display: grid;
+}
+
+@media (max-width: 1080px) {
+  .filter-control-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .catalog-maintenance-layout {
