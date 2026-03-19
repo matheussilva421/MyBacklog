@@ -12,6 +12,7 @@ import type {
   Tag as DbTag,
 } from "../core/types";
 import { db } from "../core/db";
+import { syncStructuredRelationsForRecord } from "../core/structuredDataSync";
 import {
   defaultGameToDbGame,
   defaultGameToDbLibraryEntry,
@@ -23,14 +24,29 @@ function sortByUpdatedAtDesc<T extends { updatedAt: string }>(rows: T[]) {
 }
 
 async function seedDefaultLibrary() {
-  await db.transaction("rw", db.games, db.libraryEntries, async () => {
-    for (const template of defaultGames) {
-      const game = defaultGameToDbGame(template);
-      const gameId = Number(await db.games.add(game));
-      const libraryEntry = defaultGameToDbLibraryEntry(template);
-      await db.libraryEntries.add({ ...libraryEntry, gameId });
-    }
-  });
+  await db.transaction(
+    "rw",
+    [
+      db.games,
+      db.libraryEntries,
+      db.stores,
+      db.libraryEntryStores,
+      db.platforms,
+      db.gamePlatforms,
+    ],
+    async () => {
+      for (const template of defaultGames) {
+        const game = defaultGameToDbGame(template);
+        const gameId = Number(await db.games.add(game));
+        const libraryEntry = defaultGameToDbLibraryEntry(template);
+        const libraryEntryId = Number(await db.libraryEntries.add({ ...libraryEntry, gameId }));
+        await syncStructuredRelationsForRecord({
+          game: { ...game, id: gameId },
+          libraryEntry: { ...libraryEntry, id: libraryEntryId },
+        });
+      }
+    },
+  );
 }
 
 export function useBacklogDataState() {

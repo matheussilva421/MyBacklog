@@ -41,6 +41,34 @@ const baseTables = {
       updatedAt: "2026-03-10T10:00:00.000Z",
     },
   ],
+  stores: [
+    {
+      id: 1,
+      name: "Steam",
+      normalizedName: "steam",
+      createdAt: "2026-03-01T10:00:00.000Z",
+      updatedAt: "2026-03-01T10:00:00.000Z",
+    },
+  ],
+  libraryEntryStores: [
+    {
+      id: 1,
+      libraryEntryId: 1,
+      storeId: 1,
+      isPrimary: true,
+      createdAt: "2026-03-01T10:00:00.000Z",
+    },
+  ],
+  platforms: [
+    {
+      id: 1,
+      name: "PC",
+      normalizedName: "pc",
+      createdAt: "2026-03-01T10:00:00.000Z",
+      updatedAt: "2026-03-01T10:00:00.000Z",
+    },
+  ],
+  gamePlatforms: [{ id: 1, gameId: 1, platformId: 1, createdAt: "2026-03-01T10:00:00.000Z" }],
   playSessions: [],
   reviews: [],
   lists: [],
@@ -53,7 +81,7 @@ const baseTables = {
 
 function createPayload(overrides: Partial<BackupPayload> = {}): BackupPayload {
   return {
-    version: 4,
+    version: 5,
     exportedAt: "2026-03-19T12:00:00.000Z",
     source: "mybacklog",
     ...baseTables,
@@ -90,7 +118,22 @@ describe("syncEngine helpers", () => {
 
   it("puxa da nuvem quando a base local está vazia", () => {
     const decision = resolveInitialSyncDecision(
-      { ...baseTables, games: [], libraryEntries: [] },
+      {
+        games: [],
+        libraryEntries: [],
+        stores: [],
+        libraryEntryStores: [],
+        platforms: [],
+        gamePlatforms: [],
+        playSessions: [],
+        reviews: [],
+        lists: [],
+        libraryEntryLists: [],
+        tags: [],
+        gameTags: [],
+        goals: [],
+        settings: [],
+      },
       createPayload(),
     );
 

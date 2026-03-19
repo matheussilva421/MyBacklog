@@ -18,7 +18,7 @@ export function composeLibraryRecords(
 
 export function dbGameToUiGame(record: LibraryRecord): Game {
   const { game, libraryEntry } = record;
-  const genre = game.genres?.split(",")[0]?.trim() || game.genres || "Catálogo tático";
+  const genre = game.genres?.split(",")[0]?.trim() || game.genres || "CatÃ¡logo tÃ¡tico";
 
   return {
     id: libraryEntry.id ?? Date.now(),
@@ -31,11 +31,12 @@ export function dbGameToUiGame(record: LibraryRecord): Game {
     hours: Math.max(0, Math.round((libraryEntry.playtimeMinutes || 0) / 60)),
     eta: game.estimatedTime || "Sem dado",
     priority: dbPriorityToPriority(libraryEntry.priority),
-    mood: libraryEntry.mood || "Tático",
+    mood: libraryEntry.mood || "TÃ¡tico",
     score:
       typeof libraryEntry.personalRating === "number" ? Number(libraryEntry.personalRating) : 0,
     year: game.releaseYear || new Date(game.createdAt || Date.now()).getFullYear(),
     notes: libraryEntry.notes || "Sem leitura registrada no sistema.",
-    difficulty: game.difficulty || "Média",
+    difficulty: game.difficulty || "MÃ©dia",
+    completionDate: libraryEntry.completionDate,
   };
 }

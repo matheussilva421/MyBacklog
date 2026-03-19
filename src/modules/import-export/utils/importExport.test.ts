@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { buildImportPreview, buildRestorePreview, parseImportText } from "./importExport";
-import { applyRawgMetadataToImportPayload } from "./rawg";
 import type { BackupPayload } from "../../../backlog/shared";
-import type { Game, LibraryEntry, LibraryEntryList, List, Setting } from "../../../core/types";
+import type {
+  Game,
+  LibraryEntry,
+  LibraryEntryList,
+  List,
+  Setting,
+} from "../../../core/types";
+import { applyRawgMetadataToImportPayload } from "./rawg";
+import {
+  buildImportPreview,
+  buildRestorePreview,
+  parseBackupText,
+  parseImportText,
+} from "./importExport";
 
 function createGame(partial: Partial<Game>): Game {
   return {
@@ -42,6 +53,8 @@ describe("importExport", () => {
     expect(parsed).toHaveLength(1);
     expect(parsed[0]?.platform).toBe("Switch");
     expect(parsed[0]?.sourceStore).toBe("Nintendo eShop");
+    expect(parsed[0]?.platforms).toEqual(["Switch"]);
+    expect(parsed[0]?.stores).toEqual(["Nintendo eShop"]);
     expect(parsed[0]?.progressStatus).toBe("playing");
     expect(parsed[0]?.playtimeMinutes).toBe(120);
   });
@@ -63,7 +76,9 @@ describe("importExport", () => {
         {
           title: "Cyberpunk 2077",
           platform: "PC",
+          platforms: ["PC"],
           sourceStore: "Steam",
+          stores: ["Steam"],
           format: "digital",
           ownershipStatus: "owned",
           progressStatus: "playing",
@@ -74,7 +89,9 @@ describe("importExport", () => {
         {
           title: "Sea of Stars",
           platform: "PC",
+          platforms: ["PC"],
           sourceStore: "Steam",
+          stores: ["Steam"],
           format: "digital",
           ownershipStatus: "owned",
           progressStatus: "not_started",
@@ -104,13 +121,41 @@ describe("importExport", () => {
     );
   });
 
-  it("counts settings and list relations in restore preview", () => {
+  it("counts settings, stores and list relations in restore preview", () => {
     const payload: BackupPayload = {
-      version: 4,
+      version: 5,
       exportedAt: "2026-03-01T00:00:00.000Z",
       source: "mybacklog",
       games: [createGame({ id: 10, title: "Hades", normalizedTitle: "hades" })],
       libraryEntries: [createEntry({ id: 20, gameId: 10, platform: "PC" })],
+      stores: [
+        {
+          id: 21,
+          name: "Steam",
+          normalizedName: "steam",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        },
+      ],
+      libraryEntryStores: [
+        {
+          id: 22,
+          libraryEntryId: 20,
+          storeId: 21,
+          isPrimary: true,
+          createdAt: "2026-03-01T00:00:00.000Z",
+        },
+      ],
+      platforms: [
+        {
+          id: 23,
+          name: "PC",
+          normalizedName: "pc",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        },
+      ],
+      gamePlatforms: [{ id: 24, gameId: 10, platformId: 23, createdAt: "2026-03-01T00:00:00.000Z" }],
       playSessions: [],
       reviews: [],
       lists: [{ id: 30, name: "Campanha principal", createdAt: "2026-03-01T00:00:00.000Z" }],
@@ -124,6 +169,34 @@ describe("importExport", () => {
     const preview = buildRestorePreview(payload, "merge", {
       games: [createGame({ id: 1, title: "Hades", normalizedTitle: "hades" })],
       libraryEntries: [createEntry({ id: 2, gameId: 1, platform: "PC" })],
+      stores: [
+        {
+          id: 4,
+          name: "Steam",
+          normalizedName: "steam",
+          createdAt: "2026-02-01T00:00:00.000Z",
+          updatedAt: "2026-02-01T00:00:00.000Z",
+        },
+      ],
+      libraryEntryStores: [
+        {
+          id: 6,
+          libraryEntryId: 2,
+          storeId: 4,
+          isPrimary: true,
+          createdAt: "2026-02-01T00:00:00.000Z",
+        },
+      ],
+      platforms: [
+        {
+          id: 7,
+          name: "PC",
+          normalizedName: "pc",
+          createdAt: "2026-02-01T00:00:00.000Z",
+          updatedAt: "2026-02-01T00:00:00.000Z",
+        },
+      ],
+      gamePlatforms: [{ id: 8, gameId: 1, platformId: 7, createdAt: "2026-02-01T00:00:00.000Z" }],
       playSessions: [],
       reviews: [],
       lists: [{ id: 3, name: "Campanha principal", createdAt: "2026-02-01T00:00:00.000Z" }] as List[],
@@ -136,16 +209,20 @@ describe("importExport", () => {
 
     const settingsRow = preview.items.find((item) => item.label === "Configurações");
     const listRelationRow = preview.items.find((item) => item.label === "Relações de lista");
+    const storeRow = preview.items.find((item) => item.label === "Stores");
 
     expect(settingsRow).toEqual({ label: "Configurações", create: 0, update: 1, skip: 0 });
     expect(listRelationRow).toEqual({ label: "Relações de lista", create: 1, update: 0, skip: 0 });
+    expect(storeRow).toEqual({ label: "Stores", create: 0, update: 1, skip: 0 });
   });
 
   it("applies RAWG enrichment without overwriting manual metadata", () => {
     const payload = {
       title: "Hades",
       platform: "PC",
+      platforms: ["PC"],
       sourceStore: "Steam",
+      stores: ["Steam"],
       format: "digital" as const,
       ownershipStatus: "owned" as const,
       progressStatus: "playing" as const,
@@ -171,5 +248,32 @@ describe("importExport", () => {
     expect(enriched.genres).toBe("Roguelike");
     expect(enriched.developer).toBe("Supergiant Games");
     expect(enriched.publisher).toBe("RAWG Pub");
+  });
+
+  it("hydrates structured tables when reading a legacy backup", () => {
+    const payload = parseBackupText(
+      JSON.stringify({
+        version: 4,
+        exportedAt: "2026-03-01T00:00:00.000Z",
+        source: "mybacklog",
+        games: [createGame({ id: 1, title: "Hades", normalizedTitle: "hades", platforms: "PC, Switch" })],
+        libraryEntries: [
+          createEntry({
+            id: 2,
+            gameId: 1,
+            platform: "PC",
+            sourceStore: "Steam",
+            completionDate: "2026-03-01",
+          }),
+        ],
+      }),
+    );
+
+    expect(payload).not.toBeNull();
+    expect(payload?.stores).toHaveLength(1);
+    expect(payload?.libraryEntryStores).toHaveLength(1);
+    expect(payload?.platforms).toHaveLength(2);
+    expect(payload?.gamePlatforms).toHaveLength(2);
+    expect(payload?.libraryEntries[0]?.completionDate).toBe("2026-03-01");
   });
 });

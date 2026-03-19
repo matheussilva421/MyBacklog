@@ -392,6 +392,7 @@ export function mergeLibraryEntries(
       checklist: mergeCsvValues(current.checklist, duplicate.checklist),
       mood: pickPreferredText(current.mood, duplicate.mood),
       favorite: Boolean(current.favorite || duplicate.favorite),
+      completionDate: current.completionDate || duplicate.completionDate,
       updatedAt: new Date().toISOString(),
     }),
     { ...primary },
@@ -410,6 +411,7 @@ export function mergeLibraryEntries(
     playtimeMinutes: recalculated.playtimeMinutes,
     completionPercent: recalculated.completionPercent,
     lastSessionAt: recalculated.lastSessionAt,
+    completionDate: recalculated.completionDate,
     progressStatus: reviewBackedStatus,
   };
 }

@@ -56,6 +56,7 @@ export async function savePlaySession(input: SessionMutationInput): Promise<{ li
         progressStatus: snapshot.progressStatus,
         mood: snapshot.latestSession?.mood?.trim() || currentEntry.mood,
         lastSessionAt: snapshot.lastSessionAt,
+        completionDate: snapshot.completionDate,
         updatedAt: new Date().toISOString(),
       });
     });
@@ -81,6 +82,7 @@ export async function savePlaySession(input: SessionMutationInput): Promise<{ li
         playtimeMinutes: snapshot.playtimeMinutes,
         mood: snapshot.latestSession?.mood?.trim() || input.mood?.trim() || currentEntry.mood,
         lastSessionAt: snapshot.lastSessionAt,
+        completionDate: snapshot.completionDate,
         updatedAt: new Date().toISOString(),
       });
     });
@@ -113,6 +115,7 @@ export async function deletePlaySession(sessionId: number): Promise<number | nul
       progressStatus: snapshot.progressStatus,
       mood: snapshot.latestSession?.mood?.trim() || currentEntry.mood,
       lastSessionAt: snapshot.lastSessionAt,
+      completionDate: snapshot.completionDate,
       updatedAt: new Date().toISOString(),
     });
   });

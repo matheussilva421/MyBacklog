@@ -53,6 +53,7 @@ export interface LibraryEntry {
   mood?: string;
   favorite?: boolean;
   lastSessionAt?: string;
+  completionDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -87,6 +88,22 @@ export interface List {
   createdAt: string;
 }
 
+export interface Store {
+  id?: number;
+  name: string;
+  normalizedName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LibraryEntryStore {
+  id?: number;
+  libraryEntryId: number;
+  storeId: number;
+  isPrimary: boolean;
+  createdAt: string;
+}
+
 export interface LibraryEntryList {
   id?: number;
   libraryEntryId: number;
@@ -103,6 +120,21 @@ export interface GameTag {
   id?: number;
   libraryEntryId: number;
   tagId: number;
+}
+
+export interface Platform {
+  id?: number;
+  name: string;
+  normalizedName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GamePlatform {
+  id?: number;
+  gameId: number;
+  platformId: number;
+  createdAt: string;
 }
 
 export interface Goal {
@@ -156,6 +188,7 @@ export interface LegacyGameRecord {
   difficulty?: string;
   releaseYear?: number;
   favorite?: boolean;
+  completionDate?: string;
   updatedAt: string;
   createdAt: string;
 }

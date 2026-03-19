@@ -1,6 +1,7 @@
 import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../../../core/types";
 import { mergePlatformList, normalizeGameTitle, priorityToDbPriority, statusToDbStatus } from "../../../backlog/shared";
 import type { Game, GameFormState } from "../../../backlog/shared";
+import { deriveCompletionDate } from "../../../core/catalogIntegrity";
 
 type GameFormDefaults = {
   platform?: string;
@@ -32,6 +33,8 @@ export function createDbGameFromForm(form: GameFormState, current?: { game: DbGa
   const title = form.title.trim();
   const platform = form.platform.trim() || "PC";
   const now = new Date().toISOString();
+  const progressStatus = statusToDbStatus(form.status);
+  const completionPercent = form.status === "Terminado" ? 100 : progress;
 
   return {
     game: {
@@ -59,11 +62,11 @@ export function createDbGameFromForm(form: GameFormState, current?: { game: DbGa
       edition: current?.libraryEntry.edition,
       format: current?.libraryEntry.format || "digital",
       ownershipStatus: form.status === "Wishlist" ? "wishlist" : "owned",
-      progressStatus: statusToDbStatus(form.status),
+      progressStatus,
       purchaseDate: current?.libraryEntry.purchaseDate,
       pricePaid: current?.libraryEntry.pricePaid,
       playtimeMinutes: Math.round(hours * 60),
-      completionPercent: form.status === "Terminado" ? 100 : progress,
+      completionPercent,
       priority: priorityToDbPriority(form.priority),
       personalRating: form.score ? Number(form.score) : undefined,
       notes: form.notes.trim() || undefined,
@@ -71,6 +74,13 @@ export function createDbGameFromForm(form: GameFormState, current?: { game: DbGa
       mood: form.mood.trim() || undefined,
       favorite: current?.libraryEntry.favorite ?? form.priority === "Alta",
       lastSessionAt: current?.libraryEntry.lastSessionAt,
+      completionDate: deriveCompletionDate({
+        currentCompletionDate: current?.libraryEntry.completionDate,
+        completionPercent,
+        progressStatus,
+        completedAt: current?.libraryEntry.lastSessionAt,
+        fallbackDate: now,
+      }),
       createdAt: current?.libraryEntry.createdAt || now,
       updatedAt: now,
     },

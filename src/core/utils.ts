@@ -2,14 +2,31 @@ export function normalizeGameTitle(title: string): string {
   return title.trim().toLowerCase();
 }
 
-export function mergePlatformList(current: string | undefined, platform: string): string {
+export function normalizeToken(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+export function splitCsvTokens(value: string | Array<string | undefined> | undefined): string[] {
+  const rawValues = Array.isArray(value) ? value : [value];
   const tokens = new Set(
-    [current, platform]
-      .flatMap((value) => String(value || "").split(","))
-      .map((value) => value.trim())
+    rawValues
+      .flatMap((entry) => String(entry || "").split(","))
+      .map((entry) => entry.trim())
       .filter(Boolean),
   );
-  return Array.from(tokens).join(", ");
+
+  return Array.from(tokens);
+}
+
+export function getPrimaryCsvToken(
+  value: string | Array<string | undefined> | undefined,
+  fallback: string,
+): string {
+  return splitCsvTokens(value)[0] || fallback;
+}
+
+export function mergePlatformList(current: string | undefined, platform: string): string {
+  return splitCsvTokens([current, platform]).join(", ");
 }
 
 export function parseEtaHours(raw: string): number {

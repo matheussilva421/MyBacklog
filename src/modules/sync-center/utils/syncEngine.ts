@@ -1,14 +1,18 @@
 import type { BackupPayload } from "../../../backlog/shared";
 import type {
   Game,
+  GamePlatform,
   GameTag,
   Goal,
   LibraryEntry,
+  LibraryEntryStore,
   LibraryEntryList,
   List,
+  Platform,
   PlaySession,
   Review,
   Setting,
+  Store,
   Tag,
 } from "../../../core/types";
 import { normalizeGameTitle } from "../../../core/utils";
@@ -26,6 +30,10 @@ export type InitialSyncDecision = "idle" | "pull-cloud" | "push-local" | "match"
 export type SyncBlockKey =
   | "games"
   | "libraryEntries"
+  | "stores"
+  | "libraryEntryStores"
+  | "platforms"
+  | "gamePlatforms"
   | "playSessions"
   | "reviews"
   | "lists"
@@ -55,6 +63,10 @@ export type SyncComparison = {
 const syncBlockLabels: Record<SyncBlockKey, string> = {
   games: "Jogos",
   libraryEntries: "Biblioteca",
+  stores: "Stores",
+  libraryEntryStores: "Relações de store",
+  platforms: "Plataformas",
+  gamePlatforms: "Relações de plataforma",
   playSessions: "Sessões",
   reviews: "Reviews",
   lists: "Listas",
@@ -77,6 +89,10 @@ function hasSyncData(tables: SyncTables) {
   return (
     tables.games.length > 0 ||
     tables.libraryEntries.length > 0 ||
+    tables.stores.length > 0 ||
+    tables.libraryEntryStores.length > 0 ||
+    tables.platforms.length > 0 ||
+    tables.gamePlatforms.length > 0 ||
     tables.playSessions.length > 0 ||
     tables.reviews.length > 0 ||
     tables.lists.length > 0 ||
@@ -98,15 +114,23 @@ type ScopedLibraryEntry = Scoped<LibraryEntry> & {
   normalizedTitle: string;
 };
 type ScopedList = Scoped<List>;
+type ScopedStore = Scoped<Store>;
+type ScopedPlatform = Scoped<Platform>;
 type ScopedTag = Scoped<Tag>;
 type ScopedSession = Scoped<PlaySession>;
 type ScopedReview = Scoped<Review>;
 type ScopedLibraryEntryList = Scoped<LibraryEntryList>;
 type ScopedGameTag = Scoped<GameTag>;
+type ScopedLibraryEntryStore = Scoped<LibraryEntryStore>;
+type ScopedGamePlatform = Scoped<GamePlatform>;
 
 export function sanitizeSyncTables(tables: SyncTables): SyncTables {
   return {
     ...tables,
+    stores: tables.stores ?? [],
+    libraryEntryStores: tables.libraryEntryStores ?? [],
+    platforms: tables.platforms ?? [],
+    gamePlatforms: tables.gamePlatforms ?? [],
     settings: tables.settings.filter((setting) => !localOnlySyncSettingKeys.has(setting.key)),
   };
 }
@@ -115,6 +139,10 @@ export function stripBackupMeta(payload: BackupPayload): SyncTables {
   return sanitizeSyncTables({
     games: payload.games,
     libraryEntries: payload.libraryEntries,
+    stores: Array.isArray(payload.stores) ? payload.stores : [],
+    libraryEntryStores: Array.isArray(payload.libraryEntryStores) ? payload.libraryEntryStores : [],
+    platforms: Array.isArray(payload.platforms) ? payload.platforms : [],
+    gamePlatforms: Array.isArray(payload.gamePlatforms) ? payload.gamePlatforms : [],
     playSessions: payload.playSessions,
     reviews: payload.reviews,
     lists: payload.lists,
@@ -132,6 +160,10 @@ export function buildSyncFingerprint(tables: SyncTables): string {
   return JSON.stringify({
     games: sortRows(sanitizedTables.games),
     libraryEntries: sortRows(sanitizedTables.libraryEntries),
+    stores: sortRows(sanitizedTables.stores),
+    libraryEntryStores: sortRows(sanitizedTables.libraryEntryStores),
+    platforms: sortRows(sanitizedTables.platforms),
+    gamePlatforms: sortRows(sanitizedTables.gamePlatforms),
     playSessions: sortRows(sanitizedTables.playSessions),
     reviews: sortRows(sanitizedTables.reviews),
     lists: sortRows(sanitizedTables.lists),
@@ -147,7 +179,7 @@ export function buildBackupPayload(tables: SyncTables): BackupPayload {
   const sanitizedTables = sanitizeSyncTables(tables);
 
   return {
-    version: 4,
+    version: 5,
     exportedAt: new Date().toISOString(),
     source: "mybacklog",
     ...sanitizedTables,
@@ -324,6 +356,72 @@ function mergeTagRows(rows: ScopedTag[]) {
       if (item.row.id != null) {
         idMap.set(`${item.scope}:${item.row.id}`, nextIdValue);
       }
+    }
+  }
+
+  return { rows: mergedRows, idMap };
+}
+
+function mergeStoreRows(rows: ScopedStore[]) {
+  const groups = new Map<string, ScopedStore[]>();
+
+  for (const row of rows) {
+    const key = row.row.normalizedName || row.row.name.trim().toLowerCase();
+    if (!key) continue;
+    const current = groups.get(key);
+    if (current) current.push(row);
+    else groups.set(key, [row]);
+  }
+
+  const mergedRows: Store[] = [];
+  const idMap = new Map<string, number>();
+  let nextId = 1;
+
+  for (const [, group] of Array.from(groups.entries()).sort((left, right) => left[0].localeCompare(right[0]))) {
+    const primary = [...group].sort((left, right) => left.row.name.localeCompare(right.row.name))[0].row;
+    const nextIdValue = nextId++;
+    mergedRows.push({
+      id: nextIdValue,
+      name: primary.name,
+      normalizedName: primary.normalizedName || primary.name.trim().toLowerCase(),
+      createdAt: primary.createdAt,
+      updatedAt: primary.updatedAt,
+    });
+    for (const item of group) {
+      if (item.row.id != null) idMap.set(`${item.scope}:${item.row.id}`, nextIdValue);
+    }
+  }
+
+  return { rows: mergedRows, idMap };
+}
+
+function mergePlatformRows(rows: ScopedPlatform[]) {
+  const groups = new Map<string, ScopedPlatform[]>();
+
+  for (const row of rows) {
+    const key = row.row.normalizedName || row.row.name.trim().toLowerCase();
+    if (!key) continue;
+    const current = groups.get(key);
+    if (current) current.push(row);
+    else groups.set(key, [row]);
+  }
+
+  const mergedRows: Platform[] = [];
+  const idMap = new Map<string, number>();
+  let nextId = 1;
+
+  for (const [, group] of Array.from(groups.entries()).sort((left, right) => left[0].localeCompare(right[0]))) {
+    const primary = [...group].sort((left, right) => left.row.name.localeCompare(right.row.name))[0].row;
+    const nextIdValue = nextId++;
+    mergedRows.push({
+      id: nextIdValue,
+      name: primary.name,
+      normalizedName: primary.normalizedName || primary.name.trim().toLowerCase(),
+      createdAt: primary.createdAt,
+      updatedAt: primary.updatedAt,
+    });
+    for (const item of group) {
+      if (item.row.id != null) idMap.set(`${item.scope}:${item.row.id}`, nextIdValue);
     }
   }
 
@@ -530,6 +628,61 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
     gameIdMap,
   });
 
+  const { rows: mergedStores, idMap: storeIdMap } = mergeStoreRows([
+    ...sanitizedLocalTables.stores.map((row) => ({ scope: "local" as const, row })),
+    ...sanitizedCloudTables.stores.map((row) => ({ scope: "cloud" as const, row })),
+  ]);
+
+  const mergedLibraryEntryStores: LibraryEntryStore[] = [];
+  let nextLibraryEntryStoreId = 1;
+  const libraryEntryStoreKeys = new Set<string>();
+  const libraryEntryStores: ScopedLibraryEntryStore[] = [
+    ...sanitizedLocalTables.libraryEntryStores.map((row) => ({ scope: "local" as const, row })),
+    ...sanitizedCloudTables.libraryEntryStores.map((row) => ({ scope: "cloud" as const, row })),
+  ];
+  for (const relation of libraryEntryStores) {
+    const nextEntryId = entryIdMap.get(`${relation.scope}:${relation.row.libraryEntryId}`);
+    const nextStoreId = storeIdMap.get(`${relation.scope}:${relation.row.storeId}`);
+    if (!nextEntryId || !nextStoreId) continue;
+    const key = `${nextEntryId}::${nextStoreId}`;
+    if (libraryEntryStoreKeys.has(key)) continue;
+    libraryEntryStoreKeys.add(key);
+    mergedLibraryEntryStores.push({
+      id: nextLibraryEntryStoreId++,
+      libraryEntryId: nextEntryId,
+      storeId: nextStoreId,
+      isPrimary: relation.row.isPrimary,
+      createdAt: relation.row.createdAt,
+    });
+  }
+
+  const { rows: mergedPlatforms, idMap: platformIdMap } = mergePlatformRows([
+    ...sanitizedLocalTables.platforms.map((row) => ({ scope: "local" as const, row })),
+    ...sanitizedCloudTables.platforms.map((row) => ({ scope: "cloud" as const, row })),
+  ]);
+
+  const mergedGamePlatforms: GamePlatform[] = [];
+  let nextGamePlatformId = 1;
+  const gamePlatformKeys = new Set<string>();
+  const gamePlatforms: ScopedGamePlatform[] = [
+    ...sanitizedLocalTables.gamePlatforms.map((row) => ({ scope: "local" as const, row })),
+    ...sanitizedCloudTables.gamePlatforms.map((row) => ({ scope: "cloud" as const, row })),
+  ];
+  for (const relation of gamePlatforms) {
+    const nextGameId = gameIdMap.get(`${relation.scope}:${relation.row.gameId}`);
+    const nextPlatformId = platformIdMap.get(`${relation.scope}:${relation.row.platformId}`);
+    if (!nextGameId || !nextPlatformId) continue;
+    const key = `${nextGameId}::${nextPlatformId}`;
+    if (gamePlatformKeys.has(key)) continue;
+    gamePlatformKeys.add(key);
+    mergedGamePlatforms.push({
+      id: nextGamePlatformId++,
+      gameId: nextGameId,
+      platformId: nextPlatformId,
+      createdAt: relation.row.createdAt,
+    });
+  }
+
   const mergedSessions: PlaySession[] = [];
   let nextSessionId = 1;
   const sessionSignatures = new Set<string>();
@@ -640,6 +793,10 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
   return {
     games: mergedGames,
     libraryEntries: mergedEntries,
+    stores: mergedStores,
+    libraryEntryStores: mergedLibraryEntryStores,
+    platforms: mergedPlatforms,
+    gamePlatforms: mergedGamePlatforms,
     playSessions: mergedSessions,
     reviews: mergedReviews,
     lists: mergedLists,

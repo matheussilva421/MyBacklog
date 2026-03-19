@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveProgressStatus, recalculateLibraryEntryFromSessions } from "./catalogIntegrity";
+import { deriveCompletionDate, deriveProgressStatus, recalculateLibraryEntryFromSessions } from "./catalogIntegrity";
 import type { LibraryEntry, PlaySession } from "./types";
 
 function createEntry(partial: Partial<LibraryEntry> = {}): LibraryEntry {
@@ -77,6 +77,30 @@ describe("catalogIntegrity", () => {
     });
   });
 
+  describe("deriveCompletionDate", () => {
+    it("sets completion date when an entry becomes complete", () => {
+      expect(
+        deriveCompletionDate({
+          currentCompletionDate: undefined,
+          completionPercent: 100,
+          progressStatus: "finished",
+          completedAt: "2026-03-18",
+        }),
+      ).toBe("2026-03-18");
+    });
+
+    it("clears completion date when progress falls below complete", () => {
+      expect(
+        deriveCompletionDate({
+          currentCompletionDate: "2026-03-18",
+          completionPercent: 62,
+          progressStatus: "playing",
+          completedAt: "2026-03-18",
+        }),
+      ).toBeUndefined();
+    });
+  });
+
   describe("recalculateLibraryEntryFromSessions", () => {
     it("rebuilds completion, hours and status from session history", () => {
       const recalculated = recalculateLibraryEntryFromSessions(createEntry(), [
@@ -88,6 +112,16 @@ describe("catalogIntegrity", () => {
       expect(recalculated.completionPercent).toBe(62);
       expect(recalculated.lastSessionAt).toBe("2026-03-18");
       expect(recalculated.progressStatus).toBe("playing");
+      expect(recalculated.completionDate).toBeUndefined();
+    });
+
+    it("sets completion date from the latest completed session", () => {
+      const recalculated = recalculateLibraryEntryFromSessions(createEntry({ completionPercent: 82, progressStatus: "playing" }), [
+        createSession({ date: "2026-03-19", durationMinutes: 60, completionPercent: 100 }),
+      ]);
+
+      expect(recalculated.progressStatus).toBe("finished");
+      expect(recalculated.completionDate).toBe("2026-03-19");
     });
   });
 });

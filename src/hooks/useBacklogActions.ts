@@ -1,5 +1,8 @@
 import type { FormEvent } from "react";
 import { db } from "../core/db";
+import {
+  syncStructuredRelationsForRecord,
+} from "../core/structuredDataSync";
 import type {
   Game as DbGameMetadata,
   Goal as DbGoal,
@@ -231,36 +234,55 @@ export function useBacklogActions({
       }
 
       let entryId = payload.libraryEntry.id;
-      await db.transaction("rw", db.games, db.libraryEntries, async () => {
-        let gameId = payload.game.id;
-        if (gameId == null) {
-          const existingMetadata = await db.games
-            .where("normalizedTitle")
-            .equals(payload.game.normalizedTitle)
-            .first();
+      await db.transaction(
+        "rw",
+        [
+          db.games,
+          db.libraryEntries,
+          db.stores,
+          db.libraryEntryStores,
+          db.platforms,
+          db.gamePlatforms,
+        ],
+        async () => {
+          let gameId = payload.game.id;
+          let persistedGame = payload.game;
+          if (gameId == null) {
+            const existingMetadata = await db.games
+              .where("normalizedTitle")
+              .equals(payload.game.normalizedTitle)
+              .first();
 
-          if (existingMetadata?.id != null) {
-            gameId = existingMetadata.id;
-            await db.games.put({
-              ...existingMetadata,
-              ...payload.game,
-              id: existingMetadata.id,
-              platforms: mergePlatformList(existingMetadata.platforms, payload.libraryEntry.platform),
-            });
+            if (existingMetadata?.id != null) {
+              gameId = existingMetadata.id;
+              persistedGame = {
+                ...existingMetadata,
+                ...payload.game,
+                id: existingMetadata.id,
+                platforms: mergePlatformList(existingMetadata.platforms, payload.libraryEntry.platform),
+              };
+              await db.games.put(persistedGame);
+            } else {
+              gameId = Number(await db.games.add(payload.game));
+              persistedGame = { ...payload.game, id: gameId };
+            }
           } else {
-            gameId = Number(await db.games.add(payload.game));
+            await db.games.put(payload.game);
+            persistedGame = payload.game;
           }
-        } else {
-          await db.games.put(payload.game);
-        }
 
-        entryId = Number(
-          await db.libraryEntries.put({
-            ...payload.libraryEntry,
-            gameId,
-          }),
-        );
-      });
+          entryId = Number(
+            await db.libraryEntries.put({
+              ...payload.libraryEntry,
+              gameId,
+            }),
+          );
+          await syncStructuredRelationsForRecord({
+            game: { ...persistedGame, id: gameId },
+            libraryEntry: { ...payload.libraryEntry, id: entryId },
+          });
+        },
+      );
 
       await refreshData();
       setGameModalMode(null);
@@ -316,66 +338,94 @@ export function useBacklogActions({
       let updated = 0;
       let ignored = 0;
 
-      await db.transaction("rw", db.games, db.libraryEntries, async () => {
-        for (const previewEntry of importState.importPreview ?? []) {
-          if (previewEntry.action === "ignore") {
-            ignored += 1;
-            continue;
-          }
-
-          let payload: ImportPayload = previewEntry.payload;
-          if (previewEntry.selectedRawgId) {
-            payload = applyRawgMetadataToImportPayload(
-              payload,
-              rawgMetadataMap.get(previewEntry.selectedRawgId) ?? null,
-            );
-          }
-
-          const targetEntryId = previewEntry.selectedMatchId ?? previewEntry.existingId;
-          if (previewEntry.action === "create" || targetEntryId == null) {
-            const selectedGame =
-              previewEntry.selectedGameId != null ? await db.games.get(previewEntry.selectedGameId) : undefined;
-            const existingMetadata =
-              selectedGame ??
-              (await db.games
-                .where("normalizedTitle")
-                .equals(normalizeGameTitle(payload.title))
-                .first());
-            const createdRecord = createDbGameFromImport(payload, existingMetadata);
-            let gameId = existingMetadata?.id;
-
-            if (gameId == null) {
-              gameId = Number(await db.games.add(createdRecord.game));
-            } else if (existingMetadata) {
-              await db.games.put({
-                ...existingMetadata,
-                ...createdRecord.game,
-                id: existingMetadata.id,
-                platforms: mergePlatformList(existingMetadata.platforms, createdRecord.libraryEntry.platform),
-              });
+      await db.transaction(
+        "rw",
+        [
+          db.games,
+          db.libraryEntries,
+          db.stores,
+          db.libraryEntryStores,
+          db.platforms,
+          db.gamePlatforms,
+        ],
+        async () => {
+          for (const previewEntry of importState.importPreview ?? []) {
+            if (previewEntry.action === "ignore") {
+              ignored += 1;
+              continue;
             }
 
-            await db.libraryEntries.add({ ...createdRecord.libraryEntry, gameId });
-            created += 1;
-            continue;
-          }
+            let payload: ImportPayload = previewEntry.payload;
+            if (previewEntry.selectedRawgId) {
+              payload = applyRawgMetadataToImportPayload(
+                payload,
+                rawgMetadataMap.get(previewEntry.selectedRawgId) ?? null,
+              );
+            }
 
-          const currentEntry = await db.libraryEntries.get(targetEntryId);
-          const currentGame = currentEntry ? await db.games.get(currentEntry.gameId) : undefined;
-          if (!currentEntry || !currentGame) {
-            ignored += 1;
-            continue;
-          }
+            const targetEntryId = previewEntry.selectedMatchId ?? previewEntry.existingId;
+            if (previewEntry.action === "create" || targetEntryId == null) {
+              const selectedGame =
+                previewEntry.selectedGameId != null ? await db.games.get(previewEntry.selectedGameId) : undefined;
+              const existingMetadata =
+                selectedGame ??
+                (await db.games
+                  .where("normalizedTitle")
+                  .equals(normalizeGameTitle(payload.title))
+                  .first());
+              const createdRecord = createDbGameFromImport(payload, existingMetadata);
+              let gameId = existingMetadata?.id;
+              let persistedGame = createdRecord.game;
 
-          const merged = mergeImportedGame({ game: currentGame, libraryEntry: currentEntry }, payload);
-          await db.games.put(merged.game);
-          await db.libraryEntries.put({
-            ...merged.libraryEntry,
-            gameId: merged.game.id ?? currentEntry.gameId,
-          });
-          updated += 1;
-        }
-      });
+              if (gameId == null) {
+                gameId = Number(await db.games.add(createdRecord.game));
+                persistedGame = { ...createdRecord.game, id: gameId };
+              } else if (existingMetadata) {
+                persistedGame = {
+                  ...existingMetadata,
+                  ...createdRecord.game,
+                  id: existingMetadata.id,
+                  platforms: mergePlatformList(existingMetadata.platforms, createdRecord.libraryEntry.platform),
+                };
+                await db.games.put(persistedGame);
+              }
+
+              const libraryEntryId = Number(await db.libraryEntries.add({ ...createdRecord.libraryEntry, gameId }));
+              await syncStructuredRelationsForRecord({
+                game: { ...persistedGame, id: gameId },
+                libraryEntry: { ...createdRecord.libraryEntry, id: libraryEntryId },
+                extraStoreNames: payload.stores,
+                extraPlatformNames: payload.platforms,
+              });
+              created += 1;
+              continue;
+            }
+
+            const currentEntry = await db.libraryEntries.get(targetEntryId);
+            const currentGame = currentEntry ? await db.games.get(currentEntry.gameId) : undefined;
+            if (!currentEntry || !currentGame) {
+              ignored += 1;
+              continue;
+            }
+
+            const merged = mergeImportedGame({ game: currentGame, libraryEntry: currentEntry }, payload);
+            await db.games.put(merged.game);
+            const libraryEntryId = Number(
+              await db.libraryEntries.put({
+                ...merged.libraryEntry,
+                gameId: merged.game.id ?? currentEntry.gameId,
+              }),
+            );
+            await syncStructuredRelationsForRecord({
+              game: merged.game,
+              libraryEntry: { ...merged.libraryEntry, id: libraryEntryId },
+              extraStoreNames: payload.stores,
+              extraPlatformNames: payload.platforms,
+            });
+            updated += 1;
+          }
+        },
+      );
 
       await refreshData();
       importState.closeImportFlow();
@@ -409,6 +459,10 @@ export function useBacklogActions({
     const totalRecords =
       tables.games.length +
       tables.libraryEntries.length +
+      tables.stores.length +
+      tables.libraryEntryStores.length +
+      tables.platforms.length +
+      tables.gamePlatforms.length +
       tables.playSessions.length +
       tables.reviews.length +
       tables.lists.length +
@@ -424,7 +478,7 @@ export function useBacklogActions({
     }
 
     const payload: BackupPayload = {
-      version: 4,
+      version: 5,
       exportedAt: new Date().toISOString(),
       source: "mybacklog",
       ...tables,
@@ -470,6 +524,10 @@ export function useBacklogActions({
         [
           db.games,
           db.libraryEntries,
+          db.stores,
+          db.libraryEntryStores,
+          db.platforms,
+          db.gamePlatforms,
           db.playSessions,
           db.reviews,
           db.lists,
@@ -482,6 +540,10 @@ export function useBacklogActions({
         ],
         async () => {
           if (importState.restorePreview?.mode === "replace") {
+            await db.gamePlatforms.clear();
+            await db.platforms.clear();
+            await db.libraryEntryStores.clear();
+            await db.stores.clear();
             await db.libraryEntryLists.clear();
             await db.gameTags.clear();
             await db.reviews.clear();
@@ -496,6 +558,10 @@ export function useBacklogActions({
 
             if (payload.games.length) await db.games.bulkPut(payload.games);
             if (payload.libraryEntries.length) await db.libraryEntries.bulkPut(payload.libraryEntries);
+            if (payload.stores.length) await db.stores.bulkPut(payload.stores);
+            if (payload.libraryEntryStores.length) await db.libraryEntryStores.bulkPut(payload.libraryEntryStores);
+            if (payload.platforms.length) await db.platforms.bulkPut(payload.platforms);
+            if (payload.gamePlatforms.length) await db.gamePlatforms.bulkPut(payload.gamePlatforms);
             if (payload.playSessions.length) await db.playSessions.bulkPut(payload.playSessions);
             if (payload.reviews.length) await db.reviews.bulkPut(payload.reviews);
             if (payload.lists.length) await db.lists.bulkPut(payload.lists);
@@ -510,6 +576,10 @@ export function useBacklogActions({
           const [
             existingGames,
             existingEntries,
+            existingStores,
+            existingLibraryEntryStores,
+            existingPlatforms,
+            existingGamePlatforms,
             existingTags,
             existingLists,
             existingLibraryEntryLists,
@@ -521,6 +591,10 @@ export function useBacklogActions({
           ] = await Promise.all([
             db.games.toArray(),
             db.libraryEntries.toArray(),
+            db.stores.toArray(),
+            db.libraryEntryStores.toArray(),
+            db.platforms.toArray(),
+            db.gamePlatforms.toArray(),
             db.tags.toArray(),
             db.lists.toArray(),
             db.libraryEntryLists.toArray(),
@@ -535,6 +609,12 @@ export function useBacklogActions({
             existingGames.map((game) => [game.normalizedTitle || normalizeGameTitle(game.title), game] as const),
           );
           const existingGamesById = new Map(existingGames.map((game) => [game.id, game] as const));
+          const existingStoreMap = new Map(
+            existingStores.map((store) => [store.name.trim().toLowerCase(), store] as const),
+          );
+          const existingPlatformMap = new Map(
+            existingPlatforms.map((platform) => [platform.name.trim().toLowerCase(), platform] as const),
+          );
           const existingEntryByKey = new Map(
             existingEntries.map((entry) => {
               const game = existingGamesById.get(entry.gameId);
@@ -555,10 +635,18 @@ export function useBacklogActions({
             ),
           );
           const gameTagSet = new Set(existingGameTags.map((entry) => `${entry.libraryEntryId}::${entry.tagId}`));
+          const libraryEntryStoreSet = new Set(
+            existingLibraryEntryStores.map((relation) => `${relation.libraryEntryId}::${relation.storeId}`),
+          );
+          const gamePlatformSet = new Set(
+            existingGamePlatforms.map((relation) => `${relation.gameId}::${relation.platformId}`),
+          );
           const existingSettingMap = new Map(existingSettings.map((setting) => [setting.key, setting] as const));
           const payloadGamesById = new Map(payload.games.map((game) => [game.id, game] as const));
           const resolvedGameIdByPayloadId = new Map<number, number>();
           const resolvedEntryIdByPayloadId = new Map<number, number>();
+          const resolvedStoreIdByPayloadId = new Map<number, number>();
+          const resolvedPlatformIdByPayloadId = new Map<number, number>();
           const resolvedListIdByPayloadId = new Map<number, number>();
           const resolvedTagIdByPayloadId = new Map<number, number>();
 
@@ -595,6 +683,95 @@ export function useBacklogActions({
               const nextId = Number(await db.libraryEntries.add({ ...entry, id: undefined, gameId }));
               if (entry.id != null) resolvedEntryIdByPayloadId.set(entry.id, nextId);
             }
+          }
+
+          for (const store of payload.stores) {
+            const key = store.name.trim().toLowerCase();
+            if (!key) continue;
+            const existing = existingStoreMap.get(key);
+            if (existing?.id != null) {
+              if (store.id != null) resolvedStoreIdByPayloadId.set(store.id, existing.id);
+              await db.stores.put({ ...existing, ...store, id: existing.id, normalizedName: key });
+            } else {
+              const nextId = Number(
+                await db.stores.add({ ...store, id: undefined, name: store.name.trim(), normalizedName: key }),
+              );
+              existingStoreMap.set(key, { ...store, id: nextId, name: store.name.trim(), normalizedName: key });
+              if (store.id != null) resolvedStoreIdByPayloadId.set(store.id, nextId);
+            }
+          }
+
+          for (const platform of payload.platforms) {
+            const key = platform.name.trim().toLowerCase();
+            if (!key) continue;
+            const existing = existingPlatformMap.get(key);
+            if (existing?.id != null) {
+              if (platform.id != null) resolvedPlatformIdByPayloadId.set(platform.id, existing.id);
+              await db.platforms.put({ ...existing, ...platform, id: existing.id, normalizedName: key });
+            } else {
+              const nextId = Number(
+                await db.platforms.add({
+                  ...platform,
+                  id: undefined,
+                  name: platform.name.trim(),
+                  normalizedName: key,
+                }),
+              );
+              existingPlatformMap.set(key, {
+                ...platform,
+                id: nextId,
+                name: platform.name.trim(),
+                normalizedName: key,
+              });
+              if (platform.id != null) resolvedPlatformIdByPayloadId.set(platform.id, nextId);
+            }
+          }
+
+          for (const relation of payload.libraryEntryStores) {
+            const libraryEntryId = resolvedEntryIdByPayloadId.get(relation.libraryEntryId);
+            const storeId = resolvedStoreIdByPayloadId.get(relation.storeId);
+            if (!libraryEntryId || !storeId) continue;
+            const key = `${libraryEntryId}::${storeId}`;
+            if (libraryEntryStoreSet.has(key)) {
+              if (relation.isPrimary) {
+                const existingPrimary = await db.libraryEntryStores.where("libraryEntryId").equals(libraryEntryId).toArray();
+                for (const item of existingPrimary) {
+                  if (item.id != null) {
+                    await db.libraryEntryStores.update(item.id, { isPrimary: item.storeId === storeId });
+                  }
+                }
+              }
+              continue;
+            }
+            if (relation.isPrimary) {
+              const existingPrimary = await db.libraryEntryStores.where("libraryEntryId").equals(libraryEntryId).toArray();
+              for (const item of existingPrimary) {
+                if (item.id != null && item.isPrimary) {
+                  await db.libraryEntryStores.update(item.id, { isPrimary: false });
+                }
+              }
+            }
+            libraryEntryStoreSet.add(key);
+            await db.libraryEntryStores.add({
+              libraryEntryId,
+              storeId,
+              isPrimary: relation.isPrimary,
+              createdAt: relation.createdAt || new Date().toISOString(),
+            });
+          }
+
+          for (const relation of payload.gamePlatforms) {
+            const gameId = resolvedGameIdByPayloadId.get(relation.gameId);
+            const platformId = resolvedPlatformIdByPayloadId.get(relation.platformId);
+            if (!gameId || !platformId) continue;
+            const key = `${gameId}::${platformId}`;
+            if (gamePlatformSet.has(key)) continue;
+            gamePlatformSet.add(key);
+            await db.gamePlatforms.add({
+              gameId,
+              platformId,
+              createdAt: relation.createdAt || new Date().toISOString(),
+            });
           }
 
           for (const list of payload.lists) {
@@ -825,16 +1002,35 @@ export function useBacklogActions({
     const confirmed = window.confirm(`Excluir ${selectedGame.title} da biblioteca?`);
     if (!confirmed) return;
 
-    await db.transaction("rw", [db.games, db.libraryEntries, db.playSessions, db.reviews, db.gameTags, db.libraryEntryLists], async () => {
+    await db.transaction(
+      "rw",
+      [
+        db.games,
+        db.libraryEntries,
+        db.stores,
+        db.libraryEntryStores,
+        db.platforms,
+        db.gamePlatforms,
+        db.playSessions,
+        db.reviews,
+        db.gameTags,
+        db.libraryEntryLists,
+      ],
+      async () => {
       const entryId = selectedRecord.libraryEntry.id!;
       await db.playSessions.where("libraryEntryId").equals(entryId).delete();
       await db.reviews.where("libraryEntryId").equals(entryId).delete();
       await db.gameTags.where("libraryEntryId").equals(entryId).delete();
       await db.libraryEntryLists.where("libraryEntryId").equals(entryId).delete();
+      await db.libraryEntryStores.where("libraryEntryId").equals(entryId).delete();
       await db.libraryEntries.delete(entryId);
       const siblingCount = await db.libraryEntries.where("gameId").equals(selectedRecord.game.id!).count();
-      if (siblingCount === 0) await db.games.delete(selectedRecord.game.id!);
-    });
+      if (siblingCount === 0) {
+        await db.gamePlatforms.where("gameId").equals(selectedRecord.game.id!).delete();
+        await db.games.delete(selectedRecord.game.id!);
+      }
+    },
+    );
 
     await refreshData();
     setScreen("library");
@@ -1051,7 +1247,18 @@ export function useBacklogActions({
     try {
       await db.transaction(
         "rw",
-        [db.games, db.libraryEntries, db.playSessions, db.reviews, db.gameTags, db.libraryEntryLists],
+        [
+          db.games,
+          db.libraryEntries,
+          db.stores,
+          db.libraryEntryStores,
+          db.platforms,
+          db.gamePlatforms,
+          db.playSessions,
+          db.reviews,
+          db.gameTags,
+          db.libraryEntryLists,
+        ],
         async () => {
           const allEntryIds = [primaryEntryId, ...uniqueMergedIds];
           const entries = (await db.libraryEntries.bulkGet(allEntryIds)).filter(
@@ -1071,6 +1278,25 @@ export function useBacklogActions({
               .map((game) => [game.id, game] as const),
           );
           const primaryGame = gamesById.get(primaryEntry.gameId);
+          const duplicateGameIds = Array.from(
+            new Set(duplicateEntries.map((entry) => entry.gameId).filter((gameId) => gameId !== primaryGame?.id)),
+          );
+          const storeNameById = new Map(
+            (await db.stores.toArray()).map((store) => [store.id, store.name] as const),
+          );
+          const extraStoreNames = (
+            await db.libraryEntryStores.where("libraryEntryId").anyOf(allEntryIds).toArray()
+          )
+            .map((relation) => storeNameById.get(relation.storeId))
+            .filter((name): name is string => Boolean(name));
+          const platformNameById = new Map(
+            (await db.platforms.toArray()).map((platform) => [platform.id, platform.name] as const),
+          );
+          const extraPlatformNames = (
+            await db.gamePlatforms.where("gameId").anyOf([primaryGame?.id ?? 0, ...duplicateGameIds]).toArray()
+          )
+            .map((relation) => platformNameById.get(relation.platformId))
+            .filter((name): name is string => Boolean(name));
           if (!primaryGame?.id) throw new Error("Metadado principal do jogo não encontrado.");
 
           const primarySessions = await db.playSessions.where("libraryEntryId").equals(primaryEntryId).toArray();
@@ -1152,17 +1378,24 @@ export function useBacklogActions({
             gameId: primaryGame.id,
             updatedAt: new Date().toISOString(),
           });
+          await syncStructuredRelationsForRecord({
+            game: { ...mergedGame, id: primaryGame.id },
+            libraryEntry: { ...mergedEntry, id: primaryEntryId },
+            extraStoreNames,
+            extraPlatformNames,
+          });
 
           for (const duplicateEntry of duplicateEntries) {
             if (duplicateEntry.id != null) await db.libraryEntries.delete(duplicateEntry.id);
           }
+          await db.libraryEntryStores.where("libraryEntryId").anyOf(uniqueMergedIds).delete();
 
-          const duplicateGameIds = Array.from(
-            new Set(duplicateEntries.map((entry) => entry.gameId).filter((gameId) => gameId !== primaryGame.id)),
-          );
           for (const duplicateGameId of duplicateGameIds) {
             const remainingEntries = await db.libraryEntries.where("gameId").equals(duplicateGameId).count();
-            if (remainingEntries === 0) await db.games.delete(duplicateGameId);
+            if (remainingEntries === 0) {
+              await db.gamePlatforms.where("gameId").equals(duplicateGameId).delete();
+              await db.games.delete(duplicateGameId);
+            }
           }
         },
       );

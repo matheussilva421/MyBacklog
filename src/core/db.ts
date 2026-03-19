@@ -1,18 +1,23 @@
 import Dexie, { type Table } from "dexie";
 import type {
   Game,
+  GamePlatform,
   GameTag,
   Goal,
   ImportJob,
   LegacyGameRecord,
   LibraryEntry,
+  LibraryEntryStore,
   LibraryEntryList,
   List,
+  Platform,
   PlaySession,
   Review,
   Setting,
+  Store,
   Tag,
 } from "./types";
+import { buildStructuredTablesFromLegacy } from "./structuredTables";
 
 // Local copies of normalizeGameTitle/mergePlatformList from utils.ts —
 // kept self-contained here so the v2 migration never breaks if utils change.
@@ -30,9 +35,27 @@ function mergePlatforms(current: string | undefined, incoming: string): string {
   return Array.from(tokens).join(", ");
 }
 
+function toDateOnly(value?: string): string | undefined {
+  const raw = String(value || "").trim();
+  if (!raw) return undefined;
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 class MyBacklogDB extends Dexie {
   games!: Table<Game, number>;
   libraryEntries!: Table<LibraryEntry, number>;
+  stores!: Table<Store, number>;
+  libraryEntryStores!: Table<LibraryEntryStore, number>;
+  platforms!: Table<Platform, number>;
+  gamePlatforms!: Table<GamePlatform, number>;
   playSessions!: Table<PlaySession, number>;
   reviews!: Table<Review, number>;
   lists!: Table<List, number>;
@@ -181,6 +204,66 @@ class MyBacklogDB extends Dexie {
       settings: "++id, key, updatedAt",
       importJobs: "++id, source, status, createdAt, updatedAt",
     });
+
+    this.version(4)
+      .stores({
+        games: "++id, normalizedTitle, title, rawgId, releaseYear",
+        libraryEntries:
+          "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
+        stores: "++id, normalizedName, name, updatedAt",
+        libraryEntryStores:
+          "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
+        platforms: "++id, normalizedName, name, updatedAt",
+        gamePlatforms:
+          "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
+        playSessions: "++id, libraryEntryId, date",
+        reviews: "++id, libraryEntryId",
+        lists: "++id, name",
+        libraryEntryLists:
+          "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
+        tags: "++id, name",
+        gameTags: "++id, libraryEntryId, tagId",
+        goals: "++id, type, period",
+        settings: "++id, key, updatedAt",
+        importJobs: "++id, source, status, createdAt, updatedAt",
+      })
+      .upgrade(async (tx) => {
+        const [games, libraryEntries] = await Promise.all([
+          tx.table("games").toArray() as Promise<Game[]>,
+          tx.table("libraryEntries").toArray() as Promise<LibraryEntry[]>,
+        ]);
+
+        const migratedEntries = libraryEntries.map((entry) => ({
+          ...entry,
+          completionDate:
+            entry.completionDate ||
+            (entry.completionPercent >= 100 || entry.progressStatus === "finished" || entry.progressStatus === "completed_100"
+              ? toDateOnly(entry.lastSessionAt || entry.updatedAt)
+              : undefined),
+        }));
+
+        if (migratedEntries.length > 0) {
+          await tx.table("libraryEntries").bulkPut(migratedEntries);
+        }
+
+        const structuredSnapshot = buildStructuredTablesFromLegacy({
+          games,
+          libraryEntries: migratedEntries,
+        });
+
+        if (structuredSnapshot.stores.length > 0) {
+          await tx.table("stores").bulkPut(structuredSnapshot.stores);
+        }
+        if (structuredSnapshot.libraryEntryStores.length > 0) {
+          await tx.table("libraryEntryStores").bulkPut(structuredSnapshot.libraryEntryStores);
+        }
+        if (structuredSnapshot.platforms.length > 0) {
+          await tx.table("platforms").bulkPut(structuredSnapshot.platforms);
+        }
+        if (structuredSnapshot.gamePlatforms.length > 0) {
+          await tx.table("gamePlatforms").bulkPut(structuredSnapshot.gamePlatforms);
+        }
+      });
   }
 }
 

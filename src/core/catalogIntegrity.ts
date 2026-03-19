@@ -1,4 +1,5 @@
 import type { LibraryEntry, PlaySession, ProgressStatus } from "./types";
+import { toDateInputValue } from "./utils";
 
 export type ProgressStatusDerivationOptions = {
   currentStatus: ProgressStatus;
@@ -17,6 +18,7 @@ export type LibraryEntrySessionRecalculation = {
   completionPercent: number;
   playtimeMinutes: number;
   lastSessionAt?: string;
+  completionDate?: string;
   progressStatus: ProgressStatus;
 };
 
@@ -54,6 +56,38 @@ export function deriveProgressStatus({
   return "playing";
 }
 
+function normalizeCompletionDate(value?: string): string | undefined {
+  const raw = String(value || "").trim();
+  if (!raw) return undefined;
+  try {
+    return toDateInputValue(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+export function deriveCompletionDate(args: {
+  currentCompletionDate?: string;
+  completionPercent?: number | null;
+  progressStatus: ProgressStatus;
+  completedAt?: string;
+  fallbackDate?: string;
+}): string | undefined {
+  const completionPercent = clampCompletionPercent(args.completionPercent);
+  const isCompleted =
+    completionPercent >= 100 ||
+    args.progressStatus === "finished" ||
+    args.progressStatus === "completed_100";
+
+  if (!isCompleted) return undefined;
+
+  return (
+    normalizeCompletionDate(args.currentCompletionDate) ||
+    normalizeCompletionDate(args.completedAt) ||
+    normalizeCompletionDate(args.fallbackDate)
+  );
+}
+
 export function recalculateLibraryEntryFromSessions(
   entry: LibraryEntry,
   sessions: PlaySession[],
@@ -69,6 +103,13 @@ export function recalculateLibraryEntryFromSessions(
   const playtimeMinutes = hasSessions
     ? sumSessionMinutes(ordered)
     : Math.max(0, Math.round(entry.playtimeMinutes || 0));
+  const progressStatus = deriveProgressStatus({
+    currentStatus: entry.progressStatus,
+    completionPercent,
+    playtimeMinutes,
+    hasSessions,
+    forceActive: options?.forceActive ?? false,
+  });
 
   return {
     sessions: ordered,
@@ -77,12 +118,13 @@ export function recalculateLibraryEntryFromSessions(
     completionPercent,
     playtimeMinutes,
     lastSessionAt: latestSession?.date,
-    progressStatus: deriveProgressStatus({
-      currentStatus: entry.progressStatus,
+    progressStatus,
+    completionDate: deriveCompletionDate({
+      currentCompletionDate: entry.completionDate,
       completionPercent,
-      playtimeMinutes,
-      hasSessions,
-      forceActive: options?.forceActive ?? false,
+      progressStatus,
+      completedAt: latestSession?.date,
+      fallbackDate: entry.lastSessionAt,
     }),
   };
 }

@@ -11,24 +11,39 @@
 } from "lucide-react";
 import type {
   Game as DbGameMetadata,
+  GamePlatform as DbGamePlatform,
   GameFormat,
   GameTag as DbGameTag,
   Goal as DbGoal,
   GoalType,
   LibraryEntry as DbLibraryEntry,
+  LibraryEntryStore as DbLibraryEntryStore,
   LibraryEntryList as DbLibraryEntryList,
   List as DbList,
   OwnershipStatus,
   Period,
+  Platform as DbPlatform,
   PlaySession as DbPlaySession,
   Priority as DbPriority,
   ProgressStatus as DbProgressStatus,
   Review as DbReview,
   Setting as DbSetting,
+  Store as DbStore,
   Tag as DbTag,
 } from "../core/types";
 
-export type { DbGoal, DbLibraryEntryList, DbList, DbSetting, GoalType, Period };
+export type {
+  DbGamePlatform,
+  DbGoal,
+  DbLibraryEntryList,
+  DbLibraryEntryStore,
+  DbList,
+  DbPlatform,
+  DbSetting,
+  DbStore,
+  GoalType,
+  Period,
+};
 
 export type ImportSource = "csv" | "steam" | "playnite";
 
@@ -36,11 +51,14 @@ export type ImportPayload = {
   title: string;
   platform: string;
   sourceStore: string;
+  platforms?: string[];
+  stores?: string[];
   format: GameFormat;
   ownershipStatus: OwnershipStatus;
   progressStatus: DbProgressStatus;
   playtimeMinutes: number;
   completionPercent: number;
+  completionDate?: string;
   priority: DbPriority;
   personalRating?: number;
   notes?: string;
@@ -106,6 +124,7 @@ export type Game = {
   year: number;
   notes: string;
   difficulty: string;
+  completionDate?: string;
 };
 
 export type LibraryRecord = {
@@ -290,6 +309,10 @@ export type BackupPayload = {
   source: "mybacklog";
   games: DbGameMetadata[];
   libraryEntries: DbLibraryEntry[];
+  stores: DbStore[];
+  libraryEntryStores: DbLibraryEntryStore[];
+  platforms: DbPlatform[];
+  gamePlatforms: DbGamePlatform[];
   playSessions: DbPlaySession[];
   reviews: DbReview[];
   lists: DbList[];

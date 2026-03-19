@@ -216,9 +216,28 @@ export function useBacklogApp() {
   const catalogAuditReport = catalogMaintenanceReport.audit;
 
   const readBackupTables = async (): Promise<BackupTables> => {
-    const [gamesRows, libraryEntries, playSessions, reviews, lists, libraryEntryLists, tags, gameTags, goals, settings] = await Promise.all([
+    const [
+      gamesRows,
+      libraryEntries,
+      stores,
+      libraryEntryStores,
+      platforms,
+      gamePlatforms,
+      playSessions,
+      reviews,
+      lists,
+      libraryEntryLists,
+      tags,
+      gameTags,
+      goals,
+      settings,
+    ] = await Promise.all([
       db.games.toArray(),
       db.libraryEntries.toArray(),
+      db.stores.toArray(),
+      db.libraryEntryStores.toArray(),
+      db.platforms.toArray(),
+      db.gamePlatforms.toArray(),
       db.playSessions.toArray(),
       db.reviews.toArray(),
       db.lists.toArray(),
@@ -228,7 +247,22 @@ export function useBacklogApp() {
       db.goals.toArray(),
       db.settings.toArray(),
     ]);
-    return { games: gamesRows, libraryEntries, playSessions, reviews, lists, libraryEntryLists, tags, gameTags, goals, settings };
+    return {
+      games: gamesRows,
+      libraryEntries,
+      stores,
+      libraryEntryStores,
+      platforms,
+      gamePlatforms,
+      playSessions,
+      reviews,
+      lists,
+      libraryEntryLists,
+      tags,
+      gameTags,
+      goals,
+      settings,
+    };
   };
 
   const actions = useBacklogActions({

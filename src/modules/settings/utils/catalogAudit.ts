@@ -194,6 +194,9 @@ export function buildCatalogAuditReport(args: {
     if ((entry.lastSessionAt || "") !== (nextState.lastSessionAt || "")) {
       updates.lastSessionAt = nextState.lastSessionAt;
     }
+    if ((entry.completionDate || "") !== (nextState.completionDate || "")) {
+      updates.completionDate = nextState.completionDate;
+    }
 
     if (Object.keys(updates).length > 0) {
       repairPlan.entryUpdates.push({
