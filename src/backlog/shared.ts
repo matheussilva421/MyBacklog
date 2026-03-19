@@ -1,6 +1,7 @@
 import {
   BarChart3,
   CalendarDays,
+  Wrench,
   FolderKanban,
   LayoutDashboard,
   Library,
@@ -58,6 +59,7 @@ export type ImportPayload = {
 export type ScreenKey =
   | "dashboard"
   | "library"
+  | "maintenance"
   | "sessions"
   | "planner"
   | "stats"
@@ -73,6 +75,7 @@ export const navigationItems: Array<{
 }> = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "library", label: "Biblioteca", icon: Library },
+  { key: "maintenance", label: "Manutenção", icon: Wrench },
   { key: "sessions", label: "Sessões", icon: CalendarDays },
   { key: "planner", label: "Planner", icon: FolderKanban },
   { key: "stats", label: "Estatísticas", icon: BarChart3 },
@@ -240,6 +243,16 @@ export type ImportMatchCandidate = {
   confidence: "exact" | "title";
 };
 
+export type ImportGameCandidate = {
+  gameId: number;
+  title: string;
+  releaseYear?: number;
+  platforms: string[];
+  developer?: string;
+  publisher?: string;
+  confidence: "exact" | "metadata";
+};
+
 export type ImportRawgCandidate = {
   rawgId: number;
   title: string;
@@ -254,14 +267,18 @@ export type ImportPreviewEntry = {
   payload: ImportPayload;
   status: "new" | "existing" | "review";
   action: ImportPreviewAction;
+  suggestedAction: ImportPreviewAction;
   existingId?: number;
   existingTitle?: string;
   duplicateCount: number;
   matchCandidates: ImportMatchCandidate[];
   selectedMatchId: number | null;
+  gameCandidates: ImportGameCandidate[];
+  selectedGameId: number | null;
   rawgCandidates: ImportRawgCandidate[];
   selectedRawgId: number | null;
   enrichmentStatus: "idle" | "matched" | "ambiguous" | "missing";
+  reviewReasons: string[];
 };
 
 export type BackupPayload = {

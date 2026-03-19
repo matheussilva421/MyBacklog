@@ -9,6 +9,7 @@ import {
 } from "./components/backlog-modals";
 import { NotchButton, Panel, SectionHeader, SidebarItem, Tag } from "./components/cyberpunk-ui";
 import { useBacklogApp } from "./hooks/useBacklogApp";
+import { CatalogMaintenanceScreen } from "./modules/catalog-maintenance/components/CatalogMaintenanceScreen";
 import { DashboardScreen } from "./modules/dashboard/components/DashboardScreen";
 import { GamePageScreen } from "./modules/game-page/components/GamePageScreen";
 import { LibraryScreen } from "./modules/library/components/LibraryScreen";
@@ -92,6 +93,19 @@ export default function App() {
         onSendSelectedToPlanner={app.handleSendSelectedToPlanner}
       />
     );
+  } else if (app.screen === "maintenance") {
+    screenContent = (
+      <CatalogMaintenanceScreen
+        report={app.catalogMaintenanceReport}
+        hasRawgApiKey={Boolean(app.preferences.rawgApiKey.trim())}
+        onRepairStructural={app.handleCatalogRepair}
+        onMergeDuplicateGroup={app.handleCatalogDuplicateMerge}
+        onEnrichMetadata={app.handleCatalogMetadataEnrich}
+        onEnrichMetadataQueue={app.handleCatalogMetadataEnrichQueue}
+        onOpenGamePage={app.openGamePage}
+        onOpenEditGame={app.openEditGameModalFor}
+      />
+    );
   } else if (app.screen === "planner") {
     screenContent = (
       <PlannerScreen
@@ -143,6 +157,7 @@ export default function App() {
         onListCreate={app.handleListCreate}
         onListDelete={app.handleListDelete}
         onRepairCatalog={app.handleCatalogRepair}
+        onOpenMaintenance={() => app.setScreen("maintenance")}
       />
     );
   } else if (app.screen === "game") {
@@ -355,6 +370,7 @@ export default function App() {
         onFileChange={app.handleImportFileChange}
         onActionChange={app.handleImportPreviewActionChange}
         onMatchChange={app.handleImportPreviewMatchChange}
+        onGameChange={app.handleImportPreviewGameChange}
         onRawgChange={app.handleImportPreviewRawgChange}
         onSubmit={app.handleImportSubmit}
       />

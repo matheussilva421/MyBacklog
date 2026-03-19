@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { db } from "../core/db";
 import type {
+  Game as DbGameMetadata,
   Goal as DbGoal,
   GoalType,
   LibraryEntry as DbLibraryEntry,
@@ -40,12 +41,19 @@ import type { CatalogAuditReport } from "../modules/settings/utils/catalogAudit"
 import {
   applyRawgMetadataToImportPayload,
   fetchRawgMetadata,
+  mergeRawgMetadataIntoGame,
   resolveBestRawgCandidate,
   searchRawgCandidates,
 } from "../modules/import-export/utils/rawg";
 import type { useImportExportState } from "../modules/import-export/hooks/useImportExportState";
 import { deletePlaySession, savePlaySession } from "../modules/sessions/utils/sessionMutations";
 import { upsertSettingsRows } from "../modules/settings/utils/settingsStorage";
+import {
+  mergeGameMetadata,
+  mergeLibraryEntries,
+  mergeReviewRecords,
+  type CatalogMaintenanceReport,
+} from "../modules/catalog-maintenance/utils/catalogMaintenance";
 
 type ImportExportState = ReturnType<typeof useImportExportState>;
 
@@ -64,6 +72,7 @@ type UseBacklogActionsArgs = {
   editingGoalId: number | null;
   preferences: AppPreferences;
   catalogAuditReport: CatalogAuditReport;
+  catalogMaintenanceReport: CatalogMaintenanceReport;
   importState: ImportExportState;
   refreshData: (seed?: boolean) => Promise<void>;
   readBackupTables: () => Promise<BackupTables>;
@@ -146,6 +155,7 @@ export function useBacklogActions({
   editingGoalId,
   preferences,
   catalogAuditReport,
+  catalogMaintenanceReport,
   importState,
   refreshData,
   readBackupTables,
@@ -322,10 +332,14 @@ export function useBacklogActions({
 
           const targetEntryId = previewEntry.selectedMatchId ?? previewEntry.existingId;
           if (previewEntry.action === "create" || targetEntryId == null) {
-            const existingMetadata = await db.games
-              .where("normalizedTitle")
-              .equals(normalizeGameTitle(payload.title))
-              .first();
+            const selectedGame =
+              previewEntry.selectedGameId != null ? await db.games.get(previewEntry.selectedGameId) : undefined;
+            const existingMetadata =
+              selectedGame ??
+              (await db.games
+                .where("normalizedTitle")
+                .equals(normalizeGameTitle(payload.title))
+                .first());
             const createdRecord = createDbGameFromImport(payload, existingMetadata);
             let gameId = existingMetadata?.id;
 
@@ -1014,6 +1028,232 @@ export function useBacklogActions({
     }
   };
 
+  const handleCatalogDuplicateMerge = async (primaryEntryId: number, mergedEntryIds: number[]) => {
+    const uniqueMergedIds = Array.from(new Set(mergedEntryIds)).filter((entryId) => entryId !== primaryEntryId);
+    if (uniqueMergedIds.length === 0) {
+      setNotice("Nenhum item auxiliar foi selecionado para mesclagem.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Mesclar ${uniqueMergedIds.length} entrada(s) no item principal #${primaryEntryId}? Sessões, review, tags e listas serão consolidadas.`,
+    );
+    if (!confirmed) return;
+
+    setSubmitting(true);
+    try {
+      await db.transaction(
+        "rw",
+        [db.games, db.libraryEntries, db.playSessions, db.reviews, db.gameTags, db.libraryEntryLists],
+        async () => {
+          const allEntryIds = [primaryEntryId, ...uniqueMergedIds];
+          const entries = (await db.libraryEntries.bulkGet(allEntryIds)).filter(
+            (entry): entry is DbLibraryEntry => Boolean(entry?.id),
+          );
+          const primaryEntry = entries.find((entry) => entry.id === primaryEntryId);
+          if (!primaryEntry?.id) throw new Error("Entrada principal não encontrada.");
+
+          const duplicateEntries = entries.filter((entry) => entry.id !== primaryEntryId);
+          if (duplicateEntries.length === 0) return;
+
+          const gamesById = new Map(
+            (await db.games.bulkGet(
+              Array.from(new Set(entries.map((entry) => entry.gameId))),
+            ))
+              .filter((game): game is DbGameMetadata => Boolean(game?.id))
+              .map((game) => [game.id, game] as const),
+          );
+          const primaryGame = gamesById.get(primaryEntry.gameId);
+          if (!primaryGame?.id) throw new Error("Metadado principal do jogo não encontrado.");
+
+          const primarySessions = await db.playSessions.where("libraryEntryId").equals(primaryEntryId).toArray();
+          const duplicateSessions = await db.playSessions.where("libraryEntryId").anyOf(uniqueMergedIds).toArray();
+          const mergedSessions = [
+            ...primarySessions,
+            ...duplicateSessions.map((session) => ({
+              ...session,
+              libraryEntryId: primaryEntryId,
+              platform: primaryEntry.platform,
+            })),
+          ];
+
+          let mergedGame = { ...primaryGame };
+          for (const duplicateEntry of duplicateEntries) {
+            const duplicateGame = gamesById.get(duplicateEntry.gameId);
+            if (duplicateGame) mergedGame = mergeGameMetadata(mergedGame, duplicateGame);
+          }
+          await db.games.put({ ...mergedGame, id: primaryGame.id, updatedAt: new Date().toISOString() });
+
+          for (const session of duplicateSessions) {
+            if (session.id == null) continue;
+            await db.playSessions.update(session.id, {
+              libraryEntryId: primaryEntryId,
+              platform: primaryEntry.platform,
+            });
+          }
+
+          const reviews = await db.reviews.where("libraryEntryId").anyOf(allEntryIds).toArray();
+          const primaryReview = reviews.find((review) => review.libraryEntryId === primaryEntryId);
+          let mergedReview = primaryReview;
+          for (const duplicateEntryId of uniqueMergedIds) {
+            mergedReview = mergeReviewRecords(
+              mergedReview,
+              reviews.find((review) => review.libraryEntryId === duplicateEntryId),
+            );
+          }
+
+          if (mergedReview) {
+            if (primaryReview?.id != null) {
+              await db.reviews.put({ ...mergedReview, id: primaryReview.id, libraryEntryId: primaryEntryId });
+            } else {
+              await db.reviews.add({ ...mergedReview, id: undefined, libraryEntryId: primaryEntryId });
+            }
+          }
+          for (const review of reviews) {
+            if (review.libraryEntryId === primaryEntryId || review.id == null) continue;
+            await db.reviews.delete(review.id);
+          }
+
+          const primaryTagRelations = await db.gameTags.where("libraryEntryId").equals(primaryEntryId).toArray();
+          const duplicateTagRelations = await db.gameTags.where("libraryEntryId").anyOf(uniqueMergedIds).toArray();
+          const primaryTagSet = new Set(primaryTagRelations.map((relation) => relation.tagId));
+          for (const relation of duplicateTagRelations) {
+            if (primaryTagSet.has(relation.tagId)) {
+              if (relation.id != null) await db.gameTags.delete(relation.id);
+              continue;
+            }
+            primaryTagSet.add(relation.tagId);
+            if (relation.id != null) await db.gameTags.update(relation.id, { libraryEntryId: primaryEntryId });
+          }
+
+          const primaryListRelations = await db.libraryEntryLists.where("libraryEntryId").equals(primaryEntryId).toArray();
+          const duplicateListRelations = await db.libraryEntryLists.where("libraryEntryId").anyOf(uniqueMergedIds).toArray();
+          const primaryListSet = new Set(primaryListRelations.map((relation) => relation.listId));
+          for (const relation of duplicateListRelations) {
+            if (primaryListSet.has(relation.listId)) {
+              if (relation.id != null) await db.libraryEntryLists.delete(relation.id);
+              continue;
+            }
+            primaryListSet.add(relation.listId);
+            if (relation.id != null) await db.libraryEntryLists.update(relation.id, { libraryEntryId: primaryEntryId });
+          }
+
+          const mergedEntry = mergeLibraryEntries(primaryEntry, duplicateEntries, mergedSessions);
+          await db.libraryEntries.put({
+            ...mergedEntry,
+            id: primaryEntryId,
+            gameId: primaryGame.id,
+            updatedAt: new Date().toISOString(),
+          });
+
+          for (const duplicateEntry of duplicateEntries) {
+            if (duplicateEntry.id != null) await db.libraryEntries.delete(duplicateEntry.id);
+          }
+
+          const duplicateGameIds = Array.from(
+            new Set(duplicateEntries.map((entry) => entry.gameId).filter((gameId) => gameId !== primaryGame.id)),
+          );
+          for (const duplicateGameId of duplicateGameIds) {
+            const remainingEntries = await db.libraryEntries.where("gameId").equals(duplicateGameId).count();
+            if (remainingEntries === 0) await db.games.delete(duplicateGameId);
+          }
+        },
+      );
+
+      await refreshData();
+      setSelectedGameId(primaryEntryId);
+      setScreen("maintenance");
+      setNotice(`Mesclagem concluída no item #${primaryEntryId}. Histórico e relações foram preservados.`);
+    } catch (error) {
+      setNotice(`Falha ao mesclar duplicados: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCatalogMetadataEnrich = async (gameId: number) => {
+    if (!preferences.rawgApiKey.trim()) {
+      setNotice("Adicione uma chave RAWG nas preferências para enriquecer metadados.");
+      return;
+    }
+
+    const currentGame = await db.games.get(gameId);
+    if (!currentGame?.id) {
+      setNotice("Jogo não encontrado para enriquecimento.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const bestCandidate = await resolveBestRawgCandidate(currentGame.title, preferences.rawgApiKey.trim());
+      if (!bestCandidate) {
+        setNotice(`Nenhum match RAWG confiável foi encontrado para ${currentGame.title}.`);
+        return;
+      }
+
+      const metadata = await fetchRawgMetadata(bestCandidate.rawgId, preferences.rawgApiKey.trim());
+      if (!metadata) {
+        setNotice(`A RAWG não retornou metadado útil para ${currentGame.title}.`);
+        return;
+      }
+
+      await db.games.put(mergeRawgMetadataIntoGame(currentGame, metadata));
+      await refreshData();
+      setNotice(`Metadado de ${currentGame.title} enriquecido via RAWG.`);
+    } catch (error) {
+      setNotice(`Falha ao enriquecer metadado: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCatalogMetadataEnrichQueue = async () => {
+    if (!preferences.rawgApiKey.trim()) {
+      setNotice("Adicione uma chave RAWG nas preferências para enriquecer a fila de metadado.");
+      return;
+    }
+    if (catalogMaintenanceReport.metadataQueue.length === 0) {
+      setNotice("Nenhum jogo pendente na fila de metadado.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      let updated = 0;
+      let skipped = 0;
+
+      for (const item of catalogMaintenanceReport.metadataQueue) {
+        const game = await db.games.get(item.gameId);
+        if (!game?.id) {
+          skipped += 1;
+          continue;
+        }
+
+        const bestCandidate = await resolveBestRawgCandidate(game.title, preferences.rawgApiKey.trim());
+        if (!bestCandidate) {
+          skipped += 1;
+          continue;
+        }
+
+        const metadata = await fetchRawgMetadata(bestCandidate.rawgId, preferences.rawgApiKey.trim());
+        if (!metadata) {
+          skipped += 1;
+          continue;
+        }
+
+        await db.games.put(mergeRawgMetadataIntoGame(game, metadata));
+        updated += 1;
+      }
+
+      await refreshData();
+      setNotice(`Fila processada: ${updated} jogo(s) enriquecido(s) e ${skipped} sem match confiável.`);
+    } catch (error) {
+      setNotice(`Falha ao enriquecer a fila de metadado: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return {
     persistSession,
     handleGameSubmit,
@@ -1039,5 +1279,8 @@ export function useBacklogActions({
     handleOnboardingSubmit,
     handleSessionDelete,
     handleCatalogRepair,
+    handleCatalogDuplicateMerge,
+    handleCatalogMetadataEnrich,
+    handleCatalogMetadataEnrichQueue,
   };
 }

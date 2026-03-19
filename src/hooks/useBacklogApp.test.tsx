@@ -10,7 +10,7 @@ const useBuildSessionInsightsMock = vi.fn();
 const usePlannerInsightsMock = vi.fn();
 const useDashboardInsightsMock = vi.fn();
 const useSelectedGamePageMock = vi.fn();
-const useCatalogAuditStateMock = vi.fn();
+const useCatalogMaintenanceStateMock = vi.fn();
 const useBacklogActionsMock = vi.fn();
 
 vi.mock("./useBacklogDataState", () => ({
@@ -40,8 +40,8 @@ vi.mock("../modules/dashboard/hooks/useDashboardInsights", () => ({
 vi.mock("../modules/game-page/hooks/useSelectedGamePage", () => ({
   useSelectedGamePage: () => useSelectedGamePageMock(),
 }));
-vi.mock("../modules/settings/hooks/useCatalogAuditState", () => ({
-  useCatalogAuditState: () => useCatalogAuditStateMock(),
+vi.mock("../modules/catalog-maintenance/hooks/useCatalogMaintenanceState", () => ({
+  useCatalogMaintenanceState: () => useCatalogMaintenanceStateMock(),
 }));
 vi.mock("./useBacklogActions", () => ({
   useBacklogActions: () => useBacklogActionsMock(),
@@ -157,6 +157,7 @@ describe("useBacklogApp", () => {
       handleRestoreTextChange: vi.fn(),
       handleImportPreviewActionChange: vi.fn(),
       handleImportPreviewMatchChange: vi.fn(),
+      handleImportPreviewGameChange: vi.fn(),
       handleImportPreviewRawgChange: vi.fn(),
       handleImportFileChange: vi.fn(),
       handleRestoreFileChange: vi.fn(),
@@ -200,20 +201,36 @@ describe("useBacklogApp", () => {
       continuePlayingGames: [],
     });
     useSelectedGamePageMock.mockReturnValue(undefined);
-    useCatalogAuditStateMock.mockReturnValue({
+    useCatalogMaintenanceStateMock.mockReturnValue({
       summary: {
-        totalIssues: 1,
-        repairableIssues: 1,
-        metadataIssues: 0,
+        totalIssues: 3,
+        structuralIssues: 1,
+        repairableStructuralIssues: 1,
+        duplicateGroups: 1,
+        duplicateEntries: 2,
+        metadataQueue: 1,
         orphanSessions: 0,
-        playtimeIssues: 0,
-        progressIssues: 1,
       },
-      issues: [],
-      repairPlan: { entryUpdates: [], orphanSessionIds: [] },
+      duplicateGroups: [],
+      metadataQueue: [],
+      audit: {
+        summary: {
+          totalIssues: 1,
+          repairableIssues: 1,
+          metadataIssues: 0,
+          orphanSessions: 0,
+          playtimeIssues: 0,
+          progressIssues: 1,
+        },
+        issues: [],
+        repairPlan: { entryUpdates: [], orphanSessionIds: [] },
+      },
     });
     useBacklogActionsMock.mockReturnValue({
       handleCatalogRepair: vi.fn(),
+      handleCatalogDuplicateMerge: vi.fn(),
+      handleCatalogMetadataEnrich: vi.fn(),
+      handleCatalogMetadataEnrichQueue: vi.fn(),
     });
   });
 
@@ -243,5 +260,6 @@ describe("useBacklogApp", () => {
     const { result } = renderHook(() => useBacklogApp());
 
     expect(result.current.catalogAuditReport.summary.totalIssues).toBe(1);
+    expect(result.current.catalogMaintenanceReport.summary.duplicateGroups).toBe(1);
   });
 });

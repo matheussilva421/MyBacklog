@@ -23,7 +23,7 @@ import { useLibraryState } from "../modules/library/hooks/useLibraryState";
 import { usePlannerInsights } from "../modules/planner/hooks/usePlannerInsights";
 import { useBuildSessionInsights } from "../modules/sessions/hooks/useBuildSessionInsights";
 import { useAppPreferences } from "../modules/settings/hooks/useAppPreferences";
-import { useCatalogAuditState } from "../modules/settings/hooks/useCatalogAuditState";
+import { useCatalogMaintenanceState } from "../modules/catalog-maintenance/hooks/useCatalogMaintenanceState";
 
 export function useBacklogApp() {
   const data = useBacklogDataState();
@@ -163,6 +163,14 @@ export function useBacklogApp() {
     ui.setGameModalMode("edit");
   };
 
+  const openEditGameModalFor = (gameId: number) => {
+    const targetGame = findGame(gameId);
+    if (!targetGame) return;
+    ui.setSelectedGameId(gameId);
+    ui.setGameForm(createGameFormState(targetGame));
+    ui.setGameModalMode("edit");
+  };
+
   const openGamePage = (gameId?: number) => {
     const nextGameId = typeof gameId === "number" ? gameId : selectedGame?.id;
     if (typeof nextGameId === "number" && nextGameId > 0) {
@@ -193,11 +201,17 @@ export function useBacklogApp() {
   });
   const heroCopy = screenMeta[ui.screen];
 
-  const catalogAuditReport = useCatalogAuditState({
+  const catalogMaintenanceReport = useCatalogMaintenanceState({
     gameRows: data.gameRows,
     libraryEntryRows: data.libraryEntryRows,
     sessionRows: data.sessionRows,
+    reviewRows: data.reviewRows,
+    listRows: data.listRows,
+    libraryEntryListRows: data.libraryEntryListRows,
+    tagRows: data.tagRows,
+    gameTagRows: data.gameTagRows,
   });
+  const catalogAuditReport = catalogMaintenanceReport.audit;
 
   const readBackupTables = async (): Promise<BackupTables> => {
     const [gamesRows, libraryEntries, playSessions, reviews, lists, libraryEntryLists, tags, gameTags, goals, settings] = await Promise.all([
@@ -230,6 +244,7 @@ export function useBacklogApp() {
     editingGoalId: ui.editingGoalId,
     preferences,
     catalogAuditReport,
+    catalogMaintenanceReport,
     importState,
     refreshData: data.refreshData,
     readBackupTables,
@@ -309,9 +324,11 @@ export function useBacklogApp() {
     restorePreview: importState.restorePreview,
     restorePreviewTotals: importState.restorePreviewTotals,
     restoreFileInputRef: importState.restoreFileInputRef,
+    catalogMaintenanceReport,
     catalogAuditReport,
     openCreateGameModal: ui.openCreateGameModal,
     openEditGameModal,
+    openEditGameModalFor,
     closeGameModal: ui.closeGameModal,
     openSessionModal: ui.openSessionModal,
     closeSessionModal: ui.closeSessionModal,
@@ -331,6 +348,7 @@ export function useBacklogApp() {
     handleRestoreTextChange: importState.handleRestoreTextChange,
     handleImportPreviewActionChange: importState.handleImportPreviewActionChange,
     handleImportPreviewMatchChange: importState.handleImportPreviewMatchChange,
+    handleImportPreviewGameChange: importState.handleImportPreviewGameChange,
     handleImportPreviewRawgChange: importState.handleImportPreviewRawgChange,
     handleImportFileChange: importState.handleImportFileChange,
     handleRestoreFileChange: importState.handleRestoreFileChange,

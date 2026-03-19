@@ -100,23 +100,11 @@ export function GameModal({
           </label>
           <label className="field">
             <span>Progresso %</span>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={form.progress}
-              onChange={(event) => onChange("progress", event.target.value)}
-            />
+            <input type="number" min="0" max="100" value={form.progress} onChange={(event) => onChange("progress", event.target.value)} />
           </label>
           <label className="field">
             <span>Horas</span>
-            <input
-              type="number"
-              min="0"
-              step="0.5"
-              value={form.hours}
-              onChange={(event) => onChange("hours", event.target.value)}
-            />
+            <input type="number" min="0" step="0.5" value={form.hours} onChange={(event) => onChange("hours", event.target.value)} />
           </label>
           <label className="field">
             <span>ETA</span>
@@ -124,24 +112,11 @@ export function GameModal({
           </label>
           <label className="field">
             <span>Nota</span>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              step="0.1"
-              value={form.score}
-              onChange={(event) => onChange("score", event.target.value)}
-            />
+            <input type="number" min="0" max="10" step="0.1" value={form.score} onChange={(event) => onChange("score", event.target.value)} />
           </label>
           <label className="field">
             <span>Ano</span>
-            <input
-              type="number"
-              min="1980"
-              max="2100"
-              value={form.year}
-              onChange={(event) => onChange("year", event.target.value)}
-            />
+            <input type="number" min="1980" max="2100" value={form.year} onChange={(event) => onChange("year", event.target.value)} />
           </label>
           <label className="field">
             <span>Mood</span>
@@ -183,6 +158,7 @@ export function ImportModal({
   onFileChange,
   onActionChange,
   onMatchChange,
+  onGameChange,
   onRawgChange,
   onSubmit,
   onClose,
@@ -200,6 +176,7 @@ export function ImportModal({
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   onActionChange: (entryId: string, action: ImportPreviewAction) => void;
   onMatchChange: (entryId: string, matchId: number | null) => void;
+  onGameChange: (entryId: string, gameId: number | null) => void;
   onRawgChange: (entryId: string, rawgId: number | null) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onClose: () => void;
@@ -304,23 +281,54 @@ export function ImportModal({
                     {entry.status === "existing"
                       ? `Match encontrado no catálogo: ${entry.existingTitle}`
                       : entry.status === "review"
-                        ? "Há possíveis matches locais ou enriquecimento externo. Revise antes de aplicar."
+                        ? "Há conflitos locais ou oportunidades de vínculo/enriquecimento. Revise antes de aplicar."
                         : "Novo item pronto para entrar na biblioteca."}
                   </p>
 
+                  {entry.reviewReasons.length > 0 ? (
+                    <div className="detail-note__tags">
+                      {entry.reviewReasons.map((reason) => (
+                        <Pill key={`${entry.id}-${reason}`} tone="neutral">
+                          {reason}
+                        </Pill>
+                      ))}
+                    </div>
+                  ) : null}
+
                   {entry.matchCandidates.length > 0 ? (
                     <label className="field preview-card__field preview-card__field--wide">
-                      <span>Match local</span>
+                      <span>Atualizar LibraryEntry existente</span>
                       <select
                         value={entry.selectedMatchId ?? ""}
                         onChange={(event) =>
                           onMatchChange(entry.id, event.target.value ? Number(event.target.value) : null)
                         }
                       >
-                        <option value="">Criar novo item</option>
+                        <option value="">Criar nova LibraryEntry</option>
                         {entry.matchCandidates.map((candidate) => (
                           <option key={`${candidate.entryId}-${candidate.platform}`} value={candidate.entryId}>
                             {candidate.title} • {candidate.platform} • {candidate.sourceStore}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+
+                  {entry.gameCandidates.length > 0 ? (
+                    <label className="field preview-card__field preview-card__field--wide">
+                      <span>Vincular ao Game existente</span>
+                      <select
+                        value={entry.selectedGameId ?? ""}
+                        onChange={(event) =>
+                          onGameChange(entry.id, event.target.value ? Number(event.target.value) : null)
+                        }
+                      >
+                        <option value="">Criar Game novo</option>
+                        {entry.gameCandidates.map((candidate) => (
+                          <option key={`${entry.id}-game-${candidate.gameId}`} value={candidate.gameId}>
+                            {candidate.title}
+                            {candidate.releaseYear ? ` (${candidate.releaseYear})` : ""}
+                            {candidate.platforms.length > 0 ? ` • ${candidate.platforms.join(", ")}` : ""}
                           </option>
                         ))}
                       </select>
@@ -352,11 +360,10 @@ export function ImportModal({
 
                   <div className="preview-card__meta">
                     <Pill tone={entry.status === "new" ? "yellow" : entry.status === "review" ? "cyan" : "magenta"}>
-                      {entry.status === "new" ? "Novo" : entry.status === "review" ? "Revisar" : "Duplicado"}
+                      {entry.status === "new" ? "Novo" : entry.status === "review" ? "Conflito" : "Duplicado"}
                     </Pill>
-                    {entry.duplicateCount > 0 ? (
-                      <Pill tone="neutral">+{entry.duplicateCount} repetições</Pill>
-                    ) : null}
+                    {entry.duplicateCount > 0 ? <Pill tone="neutral">+{entry.duplicateCount} repetições</Pill> : null}
+                    {entry.selectedGameId ? <Pill tone="yellow">Game vinculado</Pill> : null}
                     {entry.selectedRawgId ? <Pill tone="cyan">RAWG ativo</Pill> : null}
                     <Pill tone={entry.action === "ignore" ? "neutral" : entry.action === "update" ? "magenta" : "cyan"}>
                       {entry.action === "create" ? "Criar" : entry.action === "update" ? "Atualizar" : "Ignorar"}
@@ -547,7 +554,11 @@ export function SessionModal({
   return (
     <Modal
       title={mode === "edit" ? "Editar sessão" : "Registrar sessão"}
-      description={mode === "edit" ? "Altere os dados desta sessão de jogo." : "Atualize o diário de jogo e alimente as estatísticas do sistema."}
+      description={
+        mode === "edit"
+          ? "Altere os dados desta sessão de jogo."
+          : "Atualize o diário de jogo e alimente as estatísticas do sistema."
+      }
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={onSubmit}>

@@ -13,6 +13,9 @@ vi.mock("./modules/dashboard/components/DashboardScreen", () => ({
 vi.mock("./modules/library/components/LibraryScreen", () => ({
   LibraryScreen: () => <div>library-screen</div>,
 }));
+vi.mock("./modules/catalog-maintenance/components/CatalogMaintenanceScreen", () => ({
+  CatalogMaintenanceScreen: () => <div>maintenance-screen</div>,
+}));
 vi.mock("./modules/planner/components/PlannerScreen", () => ({
   PlannerScreen: () => <div>planner-screen</div>,
 }));
@@ -106,6 +109,31 @@ function createAppState(overrides: Record<string, unknown> = {}) {
       onboardingCompleted: true,
     },
     listRows: [],
+    catalogMaintenanceReport: {
+      summary: {
+        totalIssues: 0,
+        structuralIssues: 0,
+        repairableStructuralIssues: 0,
+        duplicateGroups: 0,
+        duplicateEntries: 0,
+        metadataQueue: 0,
+        orphanSessions: 0,
+      },
+      duplicateGroups: [],
+      metadataQueue: [],
+      audit: {
+        summary: {
+          totalIssues: 0,
+          repairableIssues: 0,
+          metadataIssues: 0,
+          orphanSessions: 0,
+          playtimeIssues: 0,
+          progressIssues: 0,
+        },
+        issues: [],
+        repairPlan: { entryUpdates: [], orphanSessionIds: [] },
+      },
+    },
     catalogAuditReport: {
       summary: {
         totalIssues: 0,
@@ -122,6 +150,9 @@ function createAppState(overrides: Record<string, unknown> = {}) {
     handleListCreate: vi.fn(),
     handleListDelete: vi.fn(),
     handleCatalogRepair: vi.fn(),
+    handleCatalogDuplicateMerge: vi.fn(),
+    handleCatalogMetadataEnrich: vi.fn(),
+    handleCatalogMetadataEnrichQueue: vi.fn(),
     selectedGamePage: undefined,
     gameModalMode: null,
     gameForm: {},
@@ -152,6 +183,7 @@ function createAppState(overrides: Record<string, unknown> = {}) {
     handleImportFileChange: vi.fn(),
     handleImportPreviewActionChange: vi.fn(),
     handleImportPreviewMatchChange: vi.fn(),
+    handleImportPreviewGameChange: vi.fn(),
     handleImportPreviewRawgChange: vi.fn(),
     handleImportSubmit: vi.fn(),
     restoreModalOpen: false,

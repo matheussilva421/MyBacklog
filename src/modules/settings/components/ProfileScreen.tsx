@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, List, Plus, Save, Settings, ShieldAlert, User } from "lucide-react";
+import { AlertTriangle, CheckCircle2, List, Plus, Save, Settings, ShieldAlert, User, Wrench } from "lucide-react";
 import type { DbList, UserBadge } from "../../../backlog/shared";
 import {
   createPreferencesDraft,
@@ -29,6 +29,7 @@ type ProfileScreenProps = {
   onListCreate: (name: string) => Promise<void>;
   onListDelete: (listId: number) => Promise<void>;
   onRepairCatalog: () => Promise<void>;
+  onOpenMaintenance: () => void;
 };
 
 export function ProfileScreen({
@@ -42,6 +43,7 @@ export function ProfileScreen({
   onListCreate,
   onListDelete,
   onRepairCatalog,
+  onOpenMaintenance,
 }: ProfileScreenProps) {
   const [draft, setDraft] = useState<PreferencesDraft>(() => createPreferencesDraft(preferences));
   const [newListName, setNewListName] = useState("");
@@ -121,13 +123,19 @@ export function ProfileScreen({
           title="Auditoria do catálogo"
           description="Integridade da base local entre progresso, status, sessões e metadado"
           action={
-            <NotchButton
-              variant={catalogAuditReport.summary.repairableIssues > 0 ? "primary" : "secondary"}
-              onClick={onRepairCatalog}
-              disabled={catalogAuditReport.summary.repairableIssues === 0}
-            >
-              Reparar catálogo
-            </NotchButton>
+            <div className="panel-toolbar">
+              <NotchButton
+                variant={catalogAuditReport.summary.repairableIssues > 0 ? "primary" : "secondary"}
+                onClick={onRepairCatalog}
+                disabled={catalogAuditReport.summary.repairableIssues === 0}
+              >
+                Reparar catálogo
+              </NotchButton>
+              <NotchButton variant="secondary" onClick={onOpenMaintenance}>
+                <Wrench size={14} />
+                Abrir manutenção
+              </NotchButton>
+            </div>
           }
         />
 

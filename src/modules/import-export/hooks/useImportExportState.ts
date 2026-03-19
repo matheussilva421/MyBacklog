@@ -106,7 +106,23 @@ export function useImportExportState(setNotice: (value: string | null) => void) 
           ? {
               ...entry,
               selectedMatchId: matchId,
+              selectedGameId: matchId != null ? null : entry.selectedGameId,
               action: matchId != null ? "update" : entry.action === "ignore" ? "ignore" : "create",
+            }
+          : entry,
+      ) ?? null,
+    );
+  };
+
+  const handleImportPreviewGameChange = (entryId: string, gameId: number | null) => {
+    setImportPreview((current) =>
+      current?.map((entry) =>
+        entry.id === entryId
+          ? {
+              ...entry,
+              selectedGameId: gameId,
+              selectedMatchId: gameId != null ? null : entry.selectedMatchId,
+              action: gameId != null && entry.action === "update" ? "create" : entry.action,
             }
           : entry,
       ) ?? null,
@@ -191,6 +207,7 @@ export function useImportExportState(setNotice: (value: string | null) => void) 
     handleRestoreTextChange,
     handleImportPreviewActionChange,
     handleImportPreviewMatchChange,
+    handleImportPreviewGameChange,
     handleImportPreviewRawgChange,
     handleImportFileChange,
     handleRestoreFileChange,

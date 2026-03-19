@@ -1,6 +1,6 @@
 import type { Game as DbGameMetadata } from "../../../core/types";
 import type { ImportPayload } from "../../../backlog/shared";
-import { normalizeGameTitle } from "../../../core/utils";
+import { mergePlatformList, normalizeGameTitle } from "../../../core/utils";
 
 const rawgApiBase = "https://api.rawg.io/api";
 
@@ -173,5 +173,23 @@ export function applyRawgMetadataToImportPayload(payload: ImportPayload, metadat
     releaseYear: payload.releaseYear ?? metadata.releaseYear,
     developer: payload.developer || metadata.developer,
     publisher: payload.publisher || metadata.publisher,
+  };
+}
+
+export function mergeRawgMetadataIntoGame(game: DbGameMetadata, metadata: RawgMetadata): DbGameMetadata {
+  return {
+    ...game,
+    slug: game.slug || metadata.slug,
+    coverUrl: game.coverUrl || metadata.coverUrl,
+    rawgId: game.rawgId ?? metadata.rawgId,
+    genres: game.genres || metadata.genres,
+    releaseYear: game.releaseYear ?? metadata.releaseYear,
+    platforms:
+      metadata.platforms && metadata.platforms.trim()
+        ? mergePlatformList(game.platforms, metadata.platforms)
+        : game.platforms,
+    developer: game.developer || metadata.developer,
+    publisher: game.publisher || metadata.publisher,
+    updatedAt: new Date().toISOString(),
   };
 }

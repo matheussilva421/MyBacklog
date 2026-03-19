@@ -16,6 +16,7 @@ import { mergePlatformList, normalizeGameTitle } from "../../../core/utils";
 import { composeLibraryRecords } from "../../library/utils";
 import type {
   BackupPayload,
+  ImportGameCandidate,
   ImportMatchCandidate,
   ImportPayload,
   ImportPreviewEntry,
@@ -370,6 +371,21 @@ function createMatchCandidate(record: { game: DbGameMetadata; libraryEntry: DbLi
   };
 }
 
+function createGameCandidate(record: { game: DbGameMetadata; libraryEntry: DbLibraryEntry }, confidence: "exact" | "metadata"): ImportGameCandidate {
+  return {
+    gameId: record.game.id ?? 0,
+    title: record.game.title,
+    releaseYear: record.game.releaseYear,
+    platforms: String(record.game.platforms || "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+    developer: record.game.developer,
+    publisher: record.game.publisher,
+    confidence,
+  };
+}
+
 export function buildImportPreview(
   parsed: ImportPayload[],
   existingRecords: Array<{ game: DbGameMetadata; libraryEntry: DbLibraryEntry }>,
@@ -378,11 +394,18 @@ export function buildImportPreview(
     existingRecords.map((record) => [createImportKey(record.game.title, record.libraryEntry.platform), record] as const),
   );
   const existingByTitle = new Map<string, Array<{ game: DbGameMetadata; libraryEntry: DbLibraryEntry }>>();
+  const uniqueGamesByTitle = new Map<string, Map<number, ImportGameCandidate>>();
   for (const record of existingRecords) {
     const normalizedTitle = normalizeGameTitle(record.game.title);
     const current = existingByTitle.get(normalizedTitle) ?? [];
     current.push(record);
     existingByTitle.set(normalizedTitle, current);
+
+    const currentGames = uniqueGamesByTitle.get(normalizedTitle) ?? new Map<number, ImportGameCandidate>();
+    if ((record.game.id ?? 0) > 0 && !currentGames.has(record.game.id!)) {
+      currentGames.set(record.game.id!, createGameCandidate(record, "metadata"));
+    }
+    uniqueGamesByTitle.set(normalizedTitle, currentGames);
   }
 
   const previewMap = new Map<string, ImportPreviewEntry>();
@@ -397,27 +420,50 @@ export function buildImportPreview(
     }
 
     const exactRecord = existingExactMap.get(key);
-    const titleCandidates = (existingByTitle.get(normalizeGameTitle(item.title)) ?? [])
+    const normalizedTitle = normalizeGameTitle(item.title);
+    const titleCandidates = (existingByTitle.get(normalizedTitle) ?? [])
       .map((record) =>
         exactRecord?.libraryEntry.id === record.libraryEntry.id ? createMatchCandidate(record, "exact") : createMatchCandidate(record, "title"),
       )
       .filter((candidate) => candidate.entryId > 0);
+    const gameCandidates = Array.from(uniqueGamesByTitle.get(normalizedTitle)?.values() ?? []).map((candidate) =>
+      exactRecord?.game.id === candidate.gameId ? { ...candidate, confidence: "exact" as const } : candidate,
+    );
 
     const hasExactMatch = exactRecord?.libraryEntry.id != null;
+    const reviewReasons: string[] = [];
+    if (hasExactMatch) reviewReasons.push("Já existe uma entrada com o mesmo título e plataforma.");
+    if (!hasExactMatch && titleCandidates.length > 0) {
+      reviewReasons.push("Há entradas parecidas na biblioteca que podem ser atualizadas.");
+    }
+    if (!hasExactMatch && gameCandidates.length > 0) {
+      reviewReasons.push("O catálogo já possui metadado deste jogo; você pode só vincular uma nova entrada.");
+    }
+    if (item.coverUrl || item.genres || item.developer || item.publisher || item.releaseYear) {
+      reviewReasons.push("A importação já traz metadado útil para enriquecer o catálogo.");
+    }
+
+    const selectedGameId =
+      !hasExactMatch && titleCandidates.length === 0 && gameCandidates.length === 1 ? gameCandidates[0]?.gameId ?? null : null;
+    const suggestedAction = hasExactMatch ? "update" : "create";
     previewMap.set(key, {
       id: `${key}-${previewMap.size + 1}`,
       key,
       payload: item,
       status: hasExactMatch ? "existing" : titleCandidates.length > 0 ? "review" : "new",
-      action: hasExactMatch ? "update" : "create",
+      action: suggestedAction,
+      suggestedAction,
       existingId: exactRecord?.libraryEntry.id,
       existingTitle: exactRecord?.game.title,
       duplicateCount: 0,
       matchCandidates: titleCandidates,
       selectedMatchId: exactRecord?.libraryEntry.id ?? null,
+      gameCandidates,
+      selectedGameId,
       rawgCandidates: [],
       selectedRawgId: null,
       enrichmentStatus: "idle",
+      reviewReasons,
     });
   }
 

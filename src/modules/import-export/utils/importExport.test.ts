@@ -97,6 +97,11 @@ describe("importExport", () => {
     expect(reviewMatch?.action).toBe("create");
     expect(reviewMatch?.matchCandidates).toHaveLength(1);
     expect(reviewMatch?.matchCandidates[0]?.entryId).toBe(12);
+    expect(reviewMatch?.gameCandidates).toHaveLength(1);
+    expect(reviewMatch?.gameCandidates[0]?.gameId).toBe(2);
+    expect(reviewMatch?.reviewReasons).toContain(
+      "O catálogo já possui metadado deste jogo; você pode só vincular uma nova entrada.",
+    );
   });
 
   it("counts settings and list relations in restore preview", () => {
