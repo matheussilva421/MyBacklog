@@ -153,7 +153,6 @@ export function useBacklogApp() {
 
   const {
     listOptions,
-    searchedGames,
     libraryGames,
     selectedGame,
     selectedRecord,
@@ -171,14 +170,7 @@ export function useBacklogApp() {
     selectedGameId,
   });
 
-  const resolvedSelectedGameId = useMemo(() => {
-    if (selectedGameId > 0 && libraryGames.some((game) => game.id === selectedGameId)) return selectedGameId;
-    if (libraryGames.length > 0) return libraryGames[0].id;
-    if (selectedGameId > 0 && searchedGames.some((game) => game.id === selectedGameId)) return selectedGameId;
-    if (searchedGames.length > 0) return searchedGames[0].id;
-    if (games.length > 0) return games[0].id;
-    return 0;
-  }, [games, libraryGames, searchedGames, selectedGameId]);
+  const resolvedSelectedGameId = selectedGame?.id ?? 0;
 
   const selectedGamePage = useSelectedGamePage({
     selectedGame,
