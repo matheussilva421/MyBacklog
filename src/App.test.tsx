@@ -1,247 +1,20 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { vi } from "vitest";
+import App from "./App";
 
-const useBacklogAppMock = vi.fn();
 const useAuthMock = vi.fn();
-const useCloudSyncMock = vi.fn();
 
-vi.mock("./hooks/useBacklogApp", () => ({
-  useBacklogApp: () => useBacklogAppMock(),
-}));
 vi.mock("./contexts/AuthContext", () => ({
   useAuth: () => useAuthMock(),
 }));
-vi.mock("./hooks/useCloudSync", () => ({
-  useCloudSync: () => useCloudSyncMock(),
+
+vi.mock("./components/LoginScreen", () => ({
+  LoginScreen: () => <div>login-screen</div>,
 }));
 
-vi.mock("./modules/dashboard/components/DashboardScreen", () => ({
-  DashboardScreen: () => <div>dashboard-screen</div>,
+vi.mock("./components/AppShell", () => ({
+  default: () => <div>app-shell-screen</div>,
 }));
-vi.mock("./modules/library/components/LibraryScreen", () => ({
-  LibraryScreen: () => <div>library-screen</div>,
-}));
-vi.mock("./modules/catalog-maintenance/components/CatalogMaintenanceScreen", () => ({
-  CatalogMaintenanceScreen: () => <div>maintenance-screen</div>,
-}));
-vi.mock("./modules/planner/components/PlannerScreen", () => ({
-  PlannerScreen: () => <div>planner-screen</div>,
-}));
-vi.mock("./modules/sessions/components/SessionsScreen", () => ({
-  SessionsScreen: () => <div>sessions-screen</div>,
-}));
-vi.mock("./modules/stats/components/StatsScreen", () => ({
-  StatsScreen: () => <div>stats-screen</div>,
-}));
-vi.mock("./modules/settings/components/ProfileScreen", () => ({
-  ProfileScreen: () => <div>profile-screen</div>,
-}));
-vi.mock("./modules/game-page/components/GamePageScreen", () => ({
-  GamePageScreen: () => <div>game-screen</div>,
-}));
-vi.mock("./modules/onboarding/components/GuidedTourModal", () => ({
-  GuidedTourModal: ({
-    open,
-    onNext,
-    onClose,
-  }: {
-    open: boolean;
-    onNext: () => void;
-    onClose: () => void;
-  }) =>
-    open ? (
-      <div>
-        <div>guided-tour</div>
-        <button onClick={onNext}>tour-next</button>
-        <button onClick={onClose}>tour-close</button>
-      </div>
-    ) : null,
-}));
-vi.mock("./modules/onboarding/components/OnboardingScreen", () => ({
-  OnboardingScreen: () => <div>onboarding-screen</div>,
-}));
-vi.mock("./components/backlog-modals", () => ({
-  GameModal: () => null,
-  GoalModal: () => null,
-  ImportModal: () => null,
-  RestoreModal: () => null,
-  SessionModal: () => null,
-}));
-
-import App from "./App";
-
-function createAppState(overrides: Record<string, unknown> = {}) {
-  return {
-    loading: false,
-    hasCompletedOnboarding: true,
-    onboardingInitialDraft: {},
-    onboardingInitialLists: [],
-    onboardingInitialGoalIds: [],
-    notice: null,
-    submitting: false,
-    handleOnboardingSubmit: vi.fn(),
-    screen: "dashboard",
-    setScreen: vi.fn(),
-    stats: { total: 12, hours: 120 },
-    monthlyProgress: [],
-    platformData: [],
-    continuePlayingGames: [],
-    visiblePlannerQueue: [],
-    personalBadges: [],
-    monthlyRecap: null,
-    findGame: vi.fn(),
-    openLibraryGame: vi.fn(),
-    openGamePage: vi.fn(),
-    libraryGames: [],
-    selectedGame: undefined,
-    selectedGameLists: [],
-    filter: "Todos",
-    selectedListFilter: "all",
-    listOptions: [],
-    setFilter: vi.fn(),
-    setSelectedListFilter: vi.fn(),
-    setSelectedGameId: vi.fn(),
-    handleExport: vi.fn(),
-    handleBackupExport: vi.fn(),
-    openRestoreFlow: vi.fn(),
-    openCreateGameModal: vi.fn(),
-    openEditGameModal: vi.fn(),
-    handleDeleteSelectedGame: vi.fn(),
-    handleResumeSelectedGame: vi.fn(),
-    handleFavoriteSelectedGame: vi.fn(),
-    openSessionModal: vi.fn(),
-    handleSendSelectedToPlanner: vi.fn(),
-    goalProgress: [],
-    goalRows: [],
-    systemRules: [],
-    openCreateGoalModal: vi.fn(),
-    openEditGoalModal: vi.fn(),
-    handleGoalDelete: vi.fn(),
-    games: [],
-    sessionRows: [],
-    deferredQuery: "",
-    handleQuickSessionCreate: vi.fn(),
-    openEditSessionModal: vi.fn(),
-    handleSessionDelete: vi.fn(),
-    durationBuckets: [],
-    monthlyHours: [],
-    visibleSessions: [],
-    preferences: {
-      operatorName: "Matheus",
-      primaryPlatforms: ["PC"],
-      defaultStores: ["Steam"],
-      rawgApiKey: "",
-      plannerPreference: "balanced",
-      onboardingCompleted: true,
-      guidedTourCompleted: true,
-    },
-    listRows: [],
-    catalogMaintenanceReport: {
-      summary: {
-        totalIssues: 0,
-        structuralIssues: 0,
-        repairableStructuralIssues: 0,
-        duplicateGroups: 0,
-        duplicateEntries: 0,
-        metadataQueue: 0,
-        orphanSessions: 0,
-      },
-      duplicateGroups: [],
-      metadataQueue: [],
-      audit: {
-        summary: {
-          totalIssues: 0,
-          repairableIssues: 0,
-          metadataIssues: 0,
-          orphanSessions: 0,
-          playtimeIssues: 0,
-          progressIssues: 0,
-        },
-        issues: [],
-        repairPlan: { entryUpdates: [], orphanSessionIds: [] },
-      },
-    },
-    catalogAuditReport: {
-      summary: {
-        totalIssues: 0,
-        repairableIssues: 0,
-        metadataIssues: 0,
-        orphanSessions: 0,
-        playtimeIssues: 0,
-        progressIssues: 0,
-      },
-      issues: [],
-      repairPlan: { entryUpdates: [], orphanSessionIds: [] },
-    },
-    handlePreferencesSave: vi.fn(),
-    handleListCreate: vi.fn(),
-    handleListDelete: vi.fn(),
-    handleCatalogRepair: vi.fn(),
-    handleCatalogDuplicateMerge: vi.fn(),
-    handleCatalogMetadataEnrich: vi.fn(),
-    handleCatalogMetadataEnrichQueue: vi.fn(),
-    selectedGamePage: undefined,
-    gameModalMode: null,
-    gameForm: {},
-    closeGameModal: vi.fn(),
-    handleGameFormChange: vi.fn(),
-    handleGameSubmit: vi.fn(),
-    sessionModalOpen: false,
-    sessionForm: {},
-    sessionEditId: null,
-    closeSessionModal: vi.fn(),
-    handleSessionFormChange: vi.fn(),
-    handleSessionSubmit: vi.fn(),
-    goalModalMode: null,
-    goalForm: {},
-    closeGoalModal: vi.fn(),
-    handleGoalFormChange: vi.fn(),
-    handleGoalSubmit: vi.fn(),
-    importModalOpen: false,
-    importSource: "csv",
-    importText: "",
-    importFileName: "",
-    importPreview: null,
-    importPreviewSummary: null,
-    importFileInputRef: { current: null },
-    closeImportFlow: vi.fn(),
-    handleImportSourceChange: vi.fn(),
-    handleImportTextChange: vi.fn(),
-    handleImportFileChange: vi.fn(),
-    handleImportPreviewActionChange: vi.fn(),
-    handleImportPreviewMatchChange: vi.fn(),
-    handleImportPreviewGameChange: vi.fn(),
-    handleImportPreviewRawgChange: vi.fn(),
-    handleImportSubmit: vi.fn(),
-    restoreModalOpen: false,
-    restoreMode: "merge",
-    restoreText: "",
-    restoreFileName: "",
-    restorePreview: null,
-    restorePreviewTotals: null,
-    restoreFileInputRef: { current: null },
-    closeRestoreFlow: vi.fn(),
-    handleRestoreModeChange: vi.fn(),
-    handleRestoreTextChange: vi.fn(),
-    handleRestoreFileChange: vi.fn(),
-    handleRestoreSubmit: vi.fn(),
-    query: "",
-    setQuery: vi.fn(),
-    heroCopy: { before: "Visão", accent: "Geral" },
-    openImportFlow: vi.fn(),
-    guidedTourOpen: false,
-    guidedTourStep: { screen: "dashboard", target: "dashboard", title: "tour", description: "tour", bullets: [] },
-    guidedTourStepIndex: 0,
-    guidedTourStepCount: 8,
-    guidedTourTarget: null,
-    openGuidedTour: vi.fn(),
-    closeGuidedTour: vi.fn(),
-    finishGuidedTour: vi.fn(),
-    nextGuidedTourStep: vi.fn(),
-    previousGuidedTourStep: vi.fn(),
-    ...overrides,
-  };
-}
 
 function createAuthState(overrides: Record<string, unknown> = {}) {
   return {
@@ -259,67 +32,29 @@ function createAuthState(overrides: Record<string, unknown> = {}) {
 describe("App", () => {
   beforeEach(() => {
     useAuthMock.mockReturnValue(createAuthState());
-    useCloudSyncMock.mockReturnValue({
-      isSyncing: false,
-      isSyncBlockedByConflict: false,
-      triggerSyncToCloud: vi.fn(),
-    });
   });
 
-  it("renders the matching screen", () => {
-    useBacklogAppMock.mockReturnValue(createAppState({ screen: "profile" }));
+  it("shows the auth loading fallback", () => {
+    useAuthMock.mockReturnValue(createAuthState({ loading: true }));
 
     render(<App />);
 
-    expect(screen.getByText("profile-screen")).toBeInTheDocument();
-  });
-
-  it("routes sidebar clicks through setScreen", () => {
-    const setScreen = vi.fn();
-    useBacklogAppMock.mockReturnValue(createAppState({ setScreen }));
-
-    render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /perfil/i }));
-
-    expect(setScreen).toHaveBeenCalledWith("profile");
-  });
-
-  it("forwards search changes to the app state", () => {
-    const setQuery = vi.fn();
-    useBacklogAppMock.mockReturnValue(createAppState({ setQuery }));
-
-    render(<App />);
-    fireEvent.change(screen.getByPlaceholderText("Busca global..."), { target: { value: "cyber" } });
-
-    expect(setQuery).toHaveBeenCalledWith("cyber");
-  });
-
-  it("renders and controls the guided tour overlay", () => {
-    const nextGuidedTourStep = vi.fn();
-    const closeGuidedTour = vi.fn();
-    useBacklogAppMock.mockReturnValue(
-      createAppState({
-        guidedTourOpen: true,
-        nextGuidedTourStep,
-        closeGuidedTour,
-      }),
-    );
-
-    render(<App />);
-    fireEvent.click(screen.getByText("tour-next"));
-    fireEvent.click(screen.getByText("tour-close"));
-
-    expect(screen.getByText("guided-tour")).toBeInTheDocument();
-    expect(nextGuidedTourStep).toHaveBeenCalled();
-    expect(closeGuidedTour).toHaveBeenCalled();
+    expect(screen.getByText("Autenticando na interface neural...")).toBeInTheDocument();
   });
 
   it("renders login when cloud auth is enabled and there is no user", () => {
     useAuthMock.mockReturnValue(createAuthState({ isAuthEnabled: true, user: null }));
-    useBacklogAppMock.mockReturnValue(createAppState());
 
     render(<App />);
 
-    expect(screen.getByText("Acesso ao Sistema")).toBeInTheDocument();
+    expect(screen.getByText("login-screen")).toBeInTheDocument();
+  });
+
+  it("renders the lazy shell when auth is not blocking the app", async () => {
+    useAuthMock.mockReturnValue(createAuthState({ user: { uid: "local-user" } }));
+
+    render(<App />);
+
+    expect(await screen.findByText("app-shell-screen")).toBeInTheDocument();
   });
 });

@@ -179,6 +179,7 @@ describe("useBacklogApp", () => {
       plannerPreference: "balanced",
       onboardingCompleted: true,
       guidedTourCompleted: true,
+      autoSyncEnabled: true,
     });
     useBacklogUiStateMock.mockReturnValue(createBaseUiState());
     useLibraryStateMock.mockReturnValue({
@@ -284,6 +285,7 @@ describe("useBacklogApp", () => {
       plannerPreference: "balanced",
       onboardingCompleted: true,
       guidedTourCompleted: false,
+      autoSyncEnabled: true,
     });
     useBacklogUiStateMock.mockReturnValue(createBaseUiState({ openGuidedTour }));
 

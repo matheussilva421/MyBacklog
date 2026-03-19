@@ -1,4 +1,5 @@
 import type { GoalType, Period, Setting as DbSetting } from "../../../core/types";
+import { syncSettingsKeys } from "../../sync-center/utils/syncStorage";
 
 export type PlannerPreference =
   | "balanced"
@@ -14,6 +15,7 @@ export type AppPreferences = {
   defaultStores: string[];
   rawgApiKey: string;
   plannerPreference: PlannerPreference;
+  autoSyncEnabled: boolean;
 };
 
 export type PreferencesDraft = {
@@ -22,6 +24,7 @@ export type PreferencesDraft = {
   defaultStores: string;
   rawgApiKey: string;
   plannerPreference: PlannerPreference;
+  autoSyncEnabled: boolean;
 };
 
 export type OnboardingGoalTemplate = {
@@ -41,6 +44,7 @@ export const settingsKeys = {
   defaultStores: "app.defaultStores",
   rawgApiKey: "app.rawgApiKey",
   plannerPreference: "app.plannerPreference",
+  autoSyncEnabled: syncSettingsKeys.autoSyncEnabled,
 } as const;
 
 export const suggestedPlatforms = [
@@ -142,6 +146,7 @@ const defaultPreferences: AppPreferences = {
   defaultStores: ["Manual"],
   rawgApiKey: "",
   plannerPreference: "balanced",
+  autoSyncEnabled: true,
 };
 
 function parseBoolean(value: string | undefined): boolean {
@@ -204,6 +209,10 @@ export function parseAppPreferences(settingRows: DbSetting[]): AppPreferences {
     ),
     rawgApiKey: readSetting(settingRows, settingsKeys.rawgApiKey)?.trim() || "",
     plannerPreference,
+    autoSyncEnabled:
+      readSetting(settingRows, settingsKeys.autoSyncEnabled) == null
+        ? defaultPreferences.autoSyncEnabled
+        : parseBoolean(readSetting(settingRows, settingsKeys.autoSyncEnabled)),
   };
 }
 
@@ -214,6 +223,7 @@ export function createPreferencesDraft(preferences: AppPreferences): Preferences
     defaultStores: preferences.defaultStores.join(", "),
     rawgApiKey: preferences.rawgApiKey,
     plannerPreference: preferences.plannerPreference,
+    autoSyncEnabled: preferences.autoSyncEnabled,
   };
 }
 
@@ -233,6 +243,7 @@ export function normalizePreferencesDraft(
     ),
     rawgApiKey: draft.rawgApiKey.trim(),
     plannerPreference: draft.plannerPreference,
+    autoSyncEnabled: draft.autoSyncEnabled,
   };
 }
 
@@ -259,6 +270,7 @@ export function preferencesToSettingPairs(
     },
     { key: settingsKeys.rawgApiKey, value: preferences.rawgApiKey },
     { key: settingsKeys.plannerPreference, value: preferences.plannerPreference },
+    { key: settingsKeys.autoSyncEnabled, value: String(preferences.autoSyncEnabled) },
   ];
 }
 

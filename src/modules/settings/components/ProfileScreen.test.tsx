@@ -17,6 +17,7 @@ describe("ProfileScreen", () => {
           plannerPreference: "balanced",
           onboardingCompleted: true,
           guidedTourCompleted: true,
+          autoSyncEnabled: true,
         }}
         listRows={[]}
         catalogAuditReport={{
@@ -69,6 +70,7 @@ describe("ProfileScreen", () => {
           plannerPreference: "balanced",
           onboardingCompleted: true,
           guidedTourCompleted: true,
+          autoSyncEnabled: true,
         }}
         listRows={[]}
         catalogAuditReport={{

@@ -1,5 +1,12 @@
 import type { ChangeEvent } from "react";
-import { DatabaseZap, KeyRound, Layers2, Store, User } from "lucide-react";
+import {
+  Cloud,
+  DatabaseZap,
+  KeyRound,
+  Layers2,
+  Store,
+  User,
+} from "lucide-react";
 import { cx } from "../../../backlog/shared";
 import { Pill } from "../../../components/cyberpunk-ui";
 import type { PreferencesDraft } from "../utils/preferences";
@@ -26,7 +33,7 @@ function createToggleHandler(
 
 export function PreferencesFields({ draft, onChange }: PreferencesFieldsProps) {
   const handleTextChange =
-    <K extends keyof PreferencesDraft>(field: K) =>
+    <K extends Exclude<keyof PreferencesDraft, "autoSyncEnabled">>(field: K) =>
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
       onChange(field, event.target.value as PreferencesDraft[K]);
     };
@@ -60,9 +67,16 @@ export function PreferencesFields({ draft, onChange }: PreferencesFieldsProps) {
             <button
               key={platform}
               type="button"
-              className={cx("filter-chip", isTokenSelected(draft.primaryPlatforms, platform) && "filter-chip--active")}
+              className={cx(
+                "filter-chip",
+                isTokenSelected(draft.primaryPlatforms, platform) && "filter-chip--active",
+              )}
               onClick={() =>
-                createToggleHandler(draft.primaryPlatforms, (value) => onChange("primaryPlatforms", value), platform)
+                createToggleHandler(
+                  draft.primaryPlatforms,
+                  (value) => onChange("primaryPlatforms", value),
+                  platform,
+                )
               }
             >
               {platform}
@@ -86,9 +100,16 @@ export function PreferencesFields({ draft, onChange }: PreferencesFieldsProps) {
             <button
               key={store}
               type="button"
-              className={cx("filter-chip", isTokenSelected(draft.defaultStores, store) && "filter-chip--active")}
+              className={cx(
+                "filter-chip",
+                isTokenSelected(draft.defaultStores, store) && "filter-chip--active",
+              )}
               onClick={() =>
-                createToggleHandler(draft.defaultStores, (value) => onChange("defaultStores", value), store)
+                createToggleHandler(
+                  draft.defaultStores,
+                  (value) => onChange("defaultStores", value),
+                  store,
+                )
               }
             >
               {store}
@@ -110,7 +131,8 @@ export function PreferencesFields({ draft, onChange }: PreferencesFieldsProps) {
         </select>
         <small>
           {
-            plannerPreferenceOptions.find((option) => option.value === draft.plannerPreference)?.description
+            plannerPreferenceOptions.find((option) => option.value === draft.plannerPreference)
+              ?.description
           }
         </small>
       </label>
@@ -134,9 +156,36 @@ export function PreferencesFields({ draft, onChange }: PreferencesFieldsProps) {
       </label>
 
       <div className="field field--wide field--summary">
+        <span>
+          <Cloud size={14} /> Sincronização
+        </span>
+        <div className="sync-toggle-card">
+          <div>
+            <strong>Auto-sync com a nuvem</strong>
+            <p>
+              Quando ativo, o app tenta enviar alterações automaticamente depois da autenticação e
+              quando não há conflito.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={cx("filter-chip", draft.autoSyncEnabled && "filter-chip--active")}
+            onClick={() => onChange("autoSyncEnabled", !draft.autoSyncEnabled)}
+          >
+            {draft.autoSyncEnabled ? "Ativo" : "Pausado"}
+          </button>
+        </div>
+      </div>
+
+      <div className="field field--wide field--summary">
         <span>Impacto prático</span>
         <div className="detail-note__tags">
           {draft.operatorName.trim() ? <Pill tone="cyan">{draft.operatorName.trim()}</Pill> : null}
+          {draft.autoSyncEnabled ? (
+            <Pill tone="emerald">Auto-sync ligado</Pill>
+          ) : (
+            <Pill tone="neutral">Auto-sync desligado</Pill>
+          )}
           {draft.primaryPlatforms
             .split(",")
             .map((value) => value.trim())

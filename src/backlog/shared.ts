@@ -1,6 +1,7 @@
-import {
+﻿import {
   BarChart3,
   CalendarDays,
+  Cloud,
   Wrench,
   FolderKanban,
   LayoutDashboard,
@@ -60,6 +61,7 @@ export type ScreenKey =
   | "dashboard"
   | "library"
   | "maintenance"
+  | "sync"
   | "sessions"
   | "planner"
   | "stats"
@@ -76,6 +78,7 @@ export const navigationItems: Array<{
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "library", label: "Biblioteca", icon: Library },
   { key: "maintenance", label: "Manutenção", icon: Wrench },
+  { key: "sync", label: "Sync", icon: Cloud },
   { key: "sessions", label: "Sessões", icon: CalendarDays },
   { key: "planner", label: "Planner", icon: FolderKanban },
   { key: "stats", label: "Estatísticas", icon: BarChart3 },
@@ -444,3 +447,5 @@ export {
   type PlannerPreference,
   type PreferencesDraft,
 } from "../modules/settings/utils/preferences";
+
+

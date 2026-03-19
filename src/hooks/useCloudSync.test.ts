@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { BackupPayload } from "../backlog/shared";
-import { buildSyncFingerprint, resolveInitialSyncDecision, stripBackupMeta } from "./useCloudSync";
+import {
+  buildSyncFingerprint,
+  resolveInitialSyncDecision,
+  stripBackupMeta,
+} from "../modules/sync-center/utils/syncEngine";
 
 const baseTables = {
   games: [
@@ -57,15 +61,34 @@ function createPayload(overrides: Partial<BackupPayload> = {}): BackupPayload {
   };
 }
 
-describe("useCloudSync helpers", () => {
+describe("syncEngine helpers", () => {
   it("ignora exportedAt ao montar fingerprint", () => {
     const first = createPayload({ exportedAt: "2026-03-19T12:00:00.000Z" });
     const second = createPayload({ exportedAt: "2026-03-19T13:00:00.000Z" });
 
-    expect(buildSyncFingerprint(stripBackupMeta(first))).toBe(buildSyncFingerprint(stripBackupMeta(second)));
+    expect(buildSyncFingerprint(stripBackupMeta(first))).toBe(
+      buildSyncFingerprint(stripBackupMeta(second)),
+    );
   });
 
-  it("puxa da nuvem quando a base local esta vazia", () => {
+  it("ignora settings operacionais locais no fingerprint", () => {
+    const withSyncMeta = createPayload({
+      settings: [
+        {
+          id: 1,
+          key: "app.lastSuccessfulSyncAt",
+          value: "2026-03-19T14:00:00.000Z",
+          updatedAt: "2026-03-19T14:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(buildSyncFingerprint(stripBackupMeta(withSyncMeta))).toBe(
+      buildSyncFingerprint(stripBackupMeta(createPayload())),
+    );
+  });
+
+  it("puxa da nuvem quando a base local está vazia", () => {
     const decision = resolveInitialSyncDecision(
       { ...baseTables, games: [], libraryEntries: [] },
       createPayload(),
@@ -74,7 +97,7 @@ describe("useCloudSync helpers", () => {
     expect(decision.decision).toBe("pull-cloud");
   });
 
-  it("envia para a nuvem quando nao existe backup remoto", () => {
+  it("envia para a nuvem quando não existe backup remoto", () => {
     const decision = resolveInitialSyncDecision(baseTables, null);
 
     expect(decision.decision).toBe("push-local");
@@ -87,7 +110,7 @@ describe("useCloudSync helpers", () => {
         libraryEntries: [
           {
             ...baseTables.libraryEntries[0],
-            progressPercent: 80,
+            completionPercent: 80,
           },
         ],
       }),
