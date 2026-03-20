@@ -438,89 +438,86 @@ export function SyncCenterScreen({
         </div>
       </Panel>
 
-      <div className="sync-detail-grid">
-        <Panel>
-          <SectionHeader
-            icon={CheckCheck}
-            title="Comparação de snapshots"
-            description={
-              isConflict
-                ? "Blocos que exigem decisão antes de retomar a sincronização."
-                : "Diferenças por bloco entre a base local e o snapshot remoto atual."
-            }
-          />
+      <Panel>
+        <SectionHeader
+          icon={CheckCheck}
+          title="Comparação de snapshots"
+          description={
+            isConflict
+              ? "Blocos que exigem decisão antes de retomar a sincronização."
+              : "Diferenças por bloco entre a base local e o snapshot remoto atual."
+          }
+        />
 
-          {!comparison ? (
-            <EmptyState message="Faça login ou configure a nuvem para comparar snapshots." />
-          ) : displayedBlocks.length === 0 ? (
-            <EmptyState message="Nenhum bloco divergente precisa de intervenção agora." />
-          ) : (
-            <div className="sync-block-grid">
-              {displayedBlocks.map((block) => {
-                const blockState = describeBlockState(block.state);
+        {!comparison ? (
+          <EmptyState message="Faça login ou configure a nuvem para comparar snapshots." />
+        ) : displayedBlocks.length === 0 ? (
+          <EmptyState message="Nenhum bloco divergente precisa de intervenção agora." />
+        ) : (
+          <div className="sync-comparison-table">
+            <table className="sync-table">
+              <thead>
+                <tr>
+                  <th>Bloco</th>
+                  <th>Estado</th>
+                  <th>Local</th>
+                  <th>Nuvem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedBlocks.map((block) => {
+                  const blockState = describeBlockState(block.state);
+                  return (
+                    <tr key={block.key}>
+                      <td><strong>{block.label}</strong></td>
+                      <td><Pill tone={blockState.tone}>{blockState.label}</Pill></td>
+                      <td>{block.localCount}</td>
+                      <td>{block.cloudCount}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
 
-                return (
-                  <article className={cx("audit-card", "audit-card--compact", "app-card", "app-card--compact")} key={block.key}>
-                    <div className="audit-card__head">
-                      <div className="audit-card__title">
-                        <h3>{block.label}</h3>
-                      </div>
-                      <Pill tone={blockState.tone}>{blockState.label}</Pill>
-                    </div>
-                    <div className="sync-block-stats">
-                      <div className="detail-stat">
-                        <span>Local</span>
-                        <strong>{block.localCount}</strong>
-                      </div>
-                      <div className="detail-stat">
-                        <span>Nuvem</span>
-                        <strong>{block.cloudCount}</strong>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </Panel>
+      <Panel>
+        <SectionHeader
+          icon={History}
+          title="Histórico de sincronização"
+          description="Operações recentes para rastrear push, pull, merge e conflitos."
+        />
 
-        <Panel>
-          <SectionHeader
-            icon={History}
-            title="Histórico curto"
-            description="Operações recentes da sincronização para rastrear push, pull, merge e conflitos."
-          />
-
-          {syncHistory.length === 0 ? (
-            <EmptyState message="Nenhuma operação de sync registrada ainda." />
-          ) : (
-            <div className="sync-history-list">
-              {syncHistory.map((entry) => (
-                <article className={cx("sync-history-card", "app-card")} key={entry.id}>
-                  <div className="sync-history-card__head">
-                    <strong>{describeHistoryAction(entry.action)}</strong>
-                    <Pill
-                      tone={
-                        entry.result === "success"
-                          ? "emerald"
-                          : entry.result === "conflict"
-                            ? "magenta"
-                            : entry.result === "error"
-                              ? "yellow"
-                              : "neutral"
-                      }
-                    >
-                      {entry.result}
-                    </Pill>
-                  </div>
-                  <p>{entry.message}</p>
-                  <span>{formatDateTime(entry.timestamp)}</span>
-                </article>
-              ))}
-            </div>
-          )}
-        </Panel>
-      </div>
+        {syncHistory.length === 0 ? (
+          <EmptyState message="Nenhuma operação de sync registrada ainda." />
+        ) : (
+          <div className="sync-history-list">
+            {syncHistory.slice(0, 10).map((entry) => (
+              <article className={cx("sync-history-item", "app-card", "app-card--compact")} key={entry.id}>
+                <div className="sync-history-item__head">
+                  <strong>{describeHistoryAction(entry.action)}</strong>
+                  <Pill
+                    tone={
+                      entry.result === "success"
+                        ? "emerald"
+                        : entry.result === "conflict"
+                          ? "magenta"
+                          : entry.result === "error"
+                            ? "yellow"
+                            : "neutral"
+                    }
+                  >
+                    {entry.result}
+                  </Pill>
+                </div>
+                <p>{entry.message}</p>
+                <span className="sync-history-item__time">{formatDateTime(entry.timestamp)}</span>
+              </article>
+            ))}
+          </div>
+        )}
+      </Panel>
 
       {pendingAction && pendingActionCopy ? (
         <Modal

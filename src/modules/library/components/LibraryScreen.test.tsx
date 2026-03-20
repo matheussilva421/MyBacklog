@@ -30,9 +30,7 @@ function createProps(overrides: Record<string, unknown> = {}) {
   return {
     libraryGames: [baseGame],
     groupedLibraryGames: [{ key: "all", label: "Todos", games: [baseGame] }],
-    selectedGame: baseGame,
     selectedLibraryIds: [],
-    selectedGameLists: [],
     filter: "Todos",
     selectedListFilter: "all",
     sortBy: "updatedAt",
@@ -49,7 +47,6 @@ function createProps(overrides: Record<string, unknown> = {}) {
     onSaveCurrentView: vi.fn(),
     onApplySavedView: vi.fn(),
     onDeleteSavedView: vi.fn(),
-    onSelectGame: vi.fn(),
     onToggleLibrarySelection: vi.fn(),
     onClearLibrarySelection: vi.fn(),
     onSelectVisibleLibraryGames: vi.fn(),
@@ -58,41 +55,18 @@ function createProps(overrides: Record<string, unknown> = {}) {
     onOpenRestore: vi.fn(),
     onOpenCreate: vi.fn(),
     onOpenBatchEdit: vi.fn(),
-    onOpenEdit: vi.fn(),
-    onDeleteSelected: vi.fn(),
-    onResumeSelected: vi.fn(),
-    onFavoriteSelected: vi.fn(),
-    onOpenSession: vi.fn(),
     onOpenGamePage: vi.fn(),
-    onSendSelectedToPlanner: vi.fn(),
     ...overrides,
   };
 }
 
 describe("LibraryScreen", () => {
   it("selects a game from the library grid", () => {
-    const onSelectGame = vi.fn();
-
-    render(<LibraryScreen {...createProps({ onSelectGame })} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /abrir ficha de cyberpunk 2077/i }));
-
-    expect(onSelectGame).toHaveBeenCalledWith(7);
-  });
-
-  it("opens the dedicated game page from the detail panel", () => {
     const onOpenGamePage = vi.fn();
 
-    render(
-      <LibraryScreen
-        {...createProps({
-          selectedGameLists: [{ id: 1, name: "Prioridade", createdAt: "2026-03-01T00:00:00.000Z" }],
-          onOpenGamePage,
-        })}
-      />,
-    );
+    render(<LibraryScreen {...createProps({ onOpenGamePage })} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /abrir página/i }));
+    fireEvent.click(screen.getByRole("button", { name: /abrir ficha de cyberpunk 2077/i }));
 
     expect(onOpenGamePage).toHaveBeenCalledWith(7);
   });

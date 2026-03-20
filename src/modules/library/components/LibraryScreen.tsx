@@ -1,22 +1,18 @@
-import { ArrowUpRight, Download, FolderKanban, Gamepad2, Heart, Library, ListChecks, Plus, Upload } from "lucide-react";
+import { Download, Library, Plus, Upload } from "lucide-react";
 import {
   cx,
   filterOptions,
-  priorityTone,
-  statusTone,
   type Game,
   type LibraryListFilter,
   type StatusFilter,
 } from "../../../backlog/shared";
-import type { DbList } from "../../../backlog/shared";
 import type {
   LibraryViewGroupBy,
   LibraryViewSortBy,
   LibraryViewSortDirection,
   SavedView,
 } from "../../../core/types";
-import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
-import { formatDatePtBr, formatCurrency } from "../../../core/utils";
+import { EmptyState, NotchButton, Panel, SectionHeader } from "../../../components/cyberpunk-ui";
 import type { GroupedLibraryGames } from "../utils/savedViews";
 import { LibraryCard } from "./LibraryCard";
 
@@ -29,9 +25,7 @@ type ListOption = {
 type LibraryScreenProps = {
   libraryGames: Game[];
   groupedLibraryGames: GroupedLibraryGames[];
-  selectedGame?: Game;
   selectedLibraryIds: number[];
-  selectedGameLists: DbList[];
   filter: StatusFilter;
   selectedListFilter: LibraryListFilter;
   sortBy: LibraryViewSortBy;
@@ -48,7 +42,6 @@ type LibraryScreenProps = {
   onSaveCurrentView: () => void;
   onApplySavedView: (view: SavedView) => void;
   onDeleteSavedView: (viewId: number) => void;
-  onSelectGame: (gameId: number) => void;
   onToggleLibrarySelection: (gameId: number) => void;
   onClearLibrarySelection: () => void;
   onSelectVisibleLibraryGames: (gameIds: number[]) => void;
@@ -57,21 +50,13 @@ type LibraryScreenProps = {
   onOpenRestore: () => void;
   onOpenCreate: () => void;
   onOpenBatchEdit: () => void;
-  onOpenEdit: () => void;
-  onDeleteSelected: () => void;
-  onResumeSelected: () => void;
-  onFavoriteSelected: () => void;
-  onOpenSession: (gameId?: number) => void;
   onOpenGamePage: (gameId?: number) => void;
-  onSendSelectedToPlanner: () => void;
 };
 
 export function LibraryScreen({
   libraryGames,
   groupedLibraryGames,
-  selectedGame,
   selectedLibraryIds,
-  selectedGameLists,
   filter,
   selectedListFilter,
   sortBy,
@@ -88,7 +73,6 @@ export function LibraryScreen({
   onSaveCurrentView,
   onApplySavedView,
   onDeleteSavedView,
-  onSelectGame,
   onToggleLibrarySelection,
   onClearLibrarySelection,
   onSelectVisibleLibraryGames,
@@ -97,13 +81,7 @@ export function LibraryScreen({
   onOpenRestore,
   onOpenCreate,
   onOpenBatchEdit,
-  onOpenEdit,
-  onDeleteSelected,
-  onResumeSelected,
-  onFavoriteSelected,
-  onOpenSession,
   onOpenGamePage,
-  onSendSelectedToPlanner,
 }: LibraryScreenProps) {
   const visibleLibraryIds = libraryGames.map((game) => game.id);
   const selectedCount = selectedLibraryIds.length;
@@ -292,8 +270,8 @@ export function LibraryScreen({
                       key={game.id}
                       game={game}
                       isSelected={selectedLibraryIds.includes(game.id)}
-                      isActive={selectedGame?.id === game.id}
-                      onSelectGame={onSelectGame}
+                      isActive={false}
+                      onSelectGame={onOpenGamePage}
                       onToggleSelection={onToggleLibrarySelection}
                     />
                   ))}
@@ -301,163 +279,6 @@ export function LibraryScreen({
               </section>
             ))}
           </div>
-        )}
-      </Panel>
-
-      <Panel className="detail-panel">
-        <SectionHeader
-          icon={Gamepad2}
-          title="Ficha do jogo"
-          description="Painel lateral com detalhes, listas e ações rápidas."
-          action={
-            <div className="panel-toolbar">
-              <NotchButton variant="secondary" onClick={onOpenEdit} disabled={!selectedGame}>
-                Editar
-              </NotchButton>
-              <NotchButton variant="ghost" onClick={onDeleteSelected} disabled={!selectedGame}>
-                Excluir
-              </NotchButton>
-            </div>
-          }
-        />
-
-        {selectedGame ? (
-          <div className="detail-panel__body">
-            {selectedGame.coverUrl ? (
-              <div className="game-page-cover">
-                <img src={selectedGame.coverUrl} alt={`Capa de ${selectedGame.title}`} />
-              </div>
-            ) : null}
-
-            <div className="detail-panel__headline">
-              <div>
-                <span className="detail-panel__eyebrow">Selecionado</span>
-                <h3>{selectedGame.title}</h3>
-                <p>
-                  {selectedGame.platform} • {selectedGame.year} • {selectedGame.genre}
-                </p>
-              </div>
-              <div className="detail-panel__badges">
-                <Pill tone={statusTone[selectedGame.status]}>{selectedGame.status}</Pill>
-                <Pill tone={priorityTone[selectedGame.priority]}>{selectedGame.priority}</Pill>
-              </div>
-            </div>
-
-            <div className="detail-stats">
-              <div className="detail-stat">
-                <span>Progresso</span>
-                <strong>{selectedGame.progress}%</strong>
-              </div>
-              <div className="detail-stat">
-                <span>Horas</span>
-                <strong>{selectedGame.hours}h</strong>
-              </div>
-              <div className="detail-stat">
-                <span>ETA</span>
-                <strong>{selectedGame.eta}</strong>
-              </div>
-              <div className="detail-stat">
-                <span>Nota</span>
-                <strong>{selectedGame.score.toFixed(1)}</strong>
-              </div>
-            </div>
-
-            <div className="detail-progress">
-              <div className="detail-progress__head">
-                <span>Barra de avanço</span>
-                <strong>{selectedGame.progress}%</strong>
-              </div>
-              <ProgressBar value={selectedGame.progress} tone="sunset" />
-            </div>
-
-            <div className="detail-note">
-              <span className="detail-note__eyebrow">Leitura do sistema</span>
-              <p>{selectedGame.description || selectedGame.notes}</p>
-              <div className="detail-note__tags">
-                <Pill tone="cyan">Mood: {selectedGame.mood}</Pill>
-                <Pill tone="magenta">Dificuldade: {selectedGame.difficulty}</Pill>
-              </div>
-            </div>
-
-            <div className="detail-note">
-              <span className="detail-note__eyebrow">Metadado enriquecido</span>
-              <div className="detail-note__tags">
-                {(selectedGame.platforms ?? [selectedGame.platform]).map((platform) => (
-                  <Pill key={`${selectedGame.id}-platform-${platform}`} tone="neutral">
-                    {platform}
-                  </Pill>
-                ))}
-                {(selectedGame.stores ?? [selectedGame.sourceStore]).map((store) => (
-                  <Pill key={`${selectedGame.id}-store-${store}`} tone="sunset">
-                    {store}
-                  </Pill>
-                ))}
-                {selectedGame.developer ? <Pill tone="cyan">{selectedGame.developer}</Pill> : null}
-                {selectedGame.publisher ? <Pill tone="magenta">{selectedGame.publisher}</Pill> : null}
-                {selectedGame.rawgId ? <Pill tone="yellow">RAWG #{selectedGame.rawgId}</Pill> : null}
-              </div>
-            </div>
-
-            {(selectedGame.purchaseDate || selectedGame.pricePaid != null || selectedGame.storeLink) && (
-              <div className="detail-note">
-                <span className="detail-note__eyebrow">Aquisição</span>
-                <div className="detail-note__tags">
-                  {selectedGame.purchaseDate && (
-                    <Pill tone="neutral">Comprado em: {formatDatePtBr(selectedGame.purchaseDate)}</Pill>
-                  )}
-                  {selectedGame.pricePaid != null && (
-                    <Pill tone="sunset">Pago: {formatCurrency(selectedGame.pricePaid, selectedGame.currency)}</Pill>
-                  )}
-                  {selectedGame.storeLink && (
-                    <a href={selectedGame.storeLink} target="_blank" rel="noopener noreferrer">
-                      <Pill tone="cyan">
-                        Link da Lo <ArrowUpRight size={12} />
-                      </Pill>
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="detail-note">
-              <span className="detail-note__eyebrow">Listas ativas</span>
-              <div className="detail-note__tags">
-                {selectedGameLists.length === 0 ? (
-                  <Pill tone="neutral">Sem listas vinculadas</Pill>
-                ) : (
-                  selectedGameLists.map((list) => (
-                    <Pill key={list.id ?? list.name} tone="cyan">
-                      <ListChecks size={12} />
-                      {list.name}
-                    </Pill>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="detail-actions">
-              <NotchButton variant="primary" onClick={() => onOpenGamePage(selectedGame.id)}>
-                Abrir página
-              </NotchButton>
-              <NotchButton variant="secondary" onClick={onResumeSelected}>
-                Retomar
-              </NotchButton>
-              <NotchButton variant="secondary" onClick={onFavoriteSelected}>
-                <Heart size={15} />
-                Favoritar
-              </NotchButton>
-              <NotchButton variant="ghost" onClick={() => onOpenSession(selectedGame.id)}>
-                <Plus size={15} />
-                Nova sessão
-              </NotchButton>
-              <NotchButton variant="ghost" onClick={onSendSelectedToPlanner}>
-                <FolderKanban size={15} />
-                Enviar ao planner
-              </NotchButton>
-            </div>
-          </div>
-        ) : (
-          <EmptyState message="Selecione um jogo na biblioteca para abrir a ficha lateral." />
         )}
       </Panel>
     </div>

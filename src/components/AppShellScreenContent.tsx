@@ -262,9 +262,7 @@ function LibraryScreenWithHooks({ app }: { app: BacklogAppState }) {
     <LibraryScreen
       libraryGames={libraryState.libraryGames}
       groupedLibraryGames={libraryState.groupedLibraryGames}
-      selectedGame={libraryState.selectedGame}
       selectedLibraryIds={app.selectedLibraryIds}
-      selectedGameLists={libraryState.selectedGameLists}
       filter={app.filter}
       selectedListFilter={app.selectedListFilter}
       sortBy={app.librarySortBy}
@@ -283,7 +281,6 @@ function LibraryScreenWithHooks({ app }: { app: BacklogAppState }) {
       onSaveCurrentView={() => void app.handleSaveLibraryView()}
       onApplySavedView={app.handleApplySavedView}
       onDeleteSavedView={(viewId: number) => void app.handleDeleteSavedView(viewId)}
-      onSelectGame={(gameId: number) => app.setSelectedGameId(gameId)}
       onToggleLibrarySelection={app.toggleLibrarySelection}
       onClearLibrarySelection={app.clearLibrarySelection}
       onSelectVisibleLibraryGames={app.selectVisibleLibraryGames}
@@ -292,13 +289,7 @@ function LibraryScreenWithHooks({ app }: { app: BacklogAppState }) {
       onOpenRestore={app.openRestoreFlow}
       onOpenCreate={app.openCreateGameModal}
       onOpenBatchEdit={app.openBatchEditModal}
-      onOpenEdit={app.openEditGameModal}
-      onDeleteSelected={app.handleDeleteSelectedGame}
-      onResumeSelected={app.handleResumeSelectedGame}
-      onFavoriteSelected={app.handleFavoriteSelectedGame}
-      onOpenSession={app.openSessionModal}
       onOpenGamePage={app.openGamePage}
-      onSendSelectedToPlanner={app.handleSendSelectedToPlanner}
     />
   );
 }
