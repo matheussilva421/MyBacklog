@@ -130,6 +130,20 @@ export function formatMonthLabel(date: Date): string {
     .replace(/^\w/, (value) => value.toUpperCase());
 }
 
+export function formatCurrency(value: number | string | undefined, currency = "BRL"): string {
+  const numeric = typeof value === "string" ? Number(value) : value;
+  if (numeric == null || Number.isNaN(numeric)) return "--";
+
+  try {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: currency.toUpperCase().trim() || "BRL",
+    }).format(numeric);
+  } catch {
+    return `${currency.toUpperCase()} ${numeric.toFixed(2)}`;
+  }
+}
+
 export function downloadText(filename: string, content: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);

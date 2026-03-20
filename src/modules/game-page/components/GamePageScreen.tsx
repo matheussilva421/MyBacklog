@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import {
   ArrowLeft,
+  ArrowUpRight,
   BarChart3,
   Clock3,
   FolderKanban,
@@ -15,7 +16,7 @@ import {
 } from "lucide-react";
 import { VerticalBarChart } from "../../../charts";
 import { formatDuration, priorityTone, statusTone } from "../../../backlog/shared";
-import { formatDatePtBr } from "../../../core/utils";
+import { formatDatePtBr, formatCurrency } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
 import {
   ChartFrame,
@@ -207,6 +208,7 @@ export function GamePageScreen({
             </div>
           ) : null}
 
+
           <div className="game-page-metadata-grid">
             <div className="detail-stat">
               <span>Fonte</span>
@@ -232,6 +234,24 @@ export function GamePageScreen({
               <span>RAWG</span>
               <strong>{data.record.game.rawgId ? `#${data.record.game.rawgId}` : "Manual"}</strong>
             </div>
+            {data.purchaseDate && (
+              <div className="detail-stat">
+                <span>Data de compra</span>
+                <strong>{formatDatePtBr(data.purchaseDate)}</strong>
+              </div>
+            )}
+            {data.pricePaid != null && (
+              <div className="detail-stat">
+                <span>Valor pago</span>
+                <strong>{formatCurrency(data.pricePaid, data.currency)}</strong>
+              </div>
+            )}
+            {data.targetPrice != null && (
+              <div className="detail-stat">
+                <span>Valor desejado</span>
+                <strong>{formatCurrency(data.targetPrice, data.currency)}</strong>
+              </div>
+            )}
           </div>
 
           <div className="game-page-action-grid">
@@ -243,6 +263,12 @@ export function GamePageScreen({
               <FolderKanban size={14} />
               Priorizar no planner
             </NotchButton>
+            {data.storeLink && (
+              <NotchButton variant="secondary" onClick={() => window.open(data.storeLink, "_blank")}>
+                <ArrowUpRight size={14} />
+                Ver na loja
+              </NotchButton>
+            )}
             <NotchButton variant="ghost" onClick={onToggleFavorite}>
               <Heart size={14} />
               {data.record.libraryEntry.favorite ? "Remover favorito" : "Favoritar"}

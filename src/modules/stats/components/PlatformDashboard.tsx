@@ -1,15 +1,18 @@
 import { ArrowLeft, BarChart3, Clock3, Coins, Database, Target, Trophy } from "lucide-react";
-import { formatDuration, type Game } from "../../../backlog/shared";
+import { formatDuration, type Game, type Platform } from "../../../backlog/shared";
 import { NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type PlatformDashboardProps = {
-  platform: string;
+  platform: Platform | string;
   games: Game[];
   onBack: () => void;
 };
 
 export function PlatformDashboard({ platform, games, onBack }: PlatformDashboardProps) {
-  const platformGames = games.filter(g => g.platform === platform);
+  const platformName = typeof platform === "string" ? platform : platform.name;
+  const platformMeta = typeof platform === "string" ? null : platform;
+  
+  const platformGames = games.filter(g => g.platform === platformName);
   
   const totalGames = platformGames.length;
   const finishedGames = platformGames.filter(g => g.status === "Terminado").length;
@@ -22,13 +25,22 @@ export function PlatformDashboard({ platform, games, onBack }: PlatformDashboard
   
   const currency = platformGames.find(g => g.currency)?.currency || "R$";
 
+  const accentColor = platformMeta?.hexColor || "var(--accent)";
+
   return (
     <div className="platform-dashboard anim-fade-in">
       <div style={{ marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "1rem" }}>
         <NotchButton variant="ghost" onClick={onBack}>
           <ArrowLeft size={18} />
         </NotchButton>
-        <h2 className="glitch-text" data-text={platform}>{platform}</h2>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <h2 className="glitch-text" data-text={platformName} style={{ marginBottom: 0 }}>{platformName}</h2>
+          {platformMeta?.brand && (
+            <span style={{ fontSize: "0.75rem", color: "var(--foreground-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>
+              {platformMeta.brand} {platformMeta.generation ? `• Geração ${platformMeta.generation}` : ""}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="dashboard-grid dashboard-grid--top">

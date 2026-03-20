@@ -1627,6 +1627,16 @@ export function useBacklogActions({
     }
   };
 
+  const handleClearImportHistory = async () => {
+    try {
+      await db.importJobs.clear();
+      await refreshData();
+      setNotice("Histórico de importação removido.");
+    } catch (error) {
+      setNotice(`Falha ao limpar histórico: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    }
+  };
+
   return {
     persistSession,
     handleGameSubmit,
@@ -1659,5 +1669,6 @@ export function useBacklogActions({
     handleCatalogMetadataEnrich,
     handleCatalogMetadataEnrichQueue,
     handleGuidedTourComplete,
+    handleClearImportHistory,
   };
 }

@@ -35,6 +35,11 @@ export type GamePageData = {
   hoursPerMonth: BarPoint[];
   notedSessions: PlaySession[];
   inferredStartedAt?: string;
+  purchaseDate?: string;
+  pricePaid?: number;
+  targetPrice?: number;
+  currency?: string;
+  storeLink?: string;
 };
 
 function clampPercent(value: number): number {
@@ -120,5 +125,10 @@ export function buildGamePageData(input: {
     hoursPerMonth,
     notedSessions,
     inferredStartedAt,
+    purchaseDate: input.record.libraryEntry.purchaseDate,
+    pricePaid: input.record.libraryEntry.pricePaid,
+    targetPrice: input.record.libraryEntry.targetPrice,
+    currency: input.record.libraryEntry.currency,
+    storeLink: input.record.libraryEntry.storeLink,
   };
 }

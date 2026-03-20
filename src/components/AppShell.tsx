@@ -332,11 +332,15 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
         durationBuckets={app.durationBuckets}
         monthlyHours={app.monthlyHours}
         platformData={app.platformData}
+        platforms={app.platforms}
+        importJobs={app.importJobRows}
         visibleSessions={app.visibleSessions}
         games={app.games}
         findGame={app.findGame}
         onEditSession={app.openEditSessionModal}
         onDeleteSession={app.handleSessionDelete}
+        onClearImportHistory={app.handleClearImportHistory}
+        onManagePlatforms={() => app.setScreen("profile")}
       />
     );
   } else if (app.screen === "profile") {

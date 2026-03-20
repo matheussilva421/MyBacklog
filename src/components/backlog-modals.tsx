@@ -257,6 +257,10 @@ export function GameModal(props: {
               ))}
             </select>
           </label>
+          <div className="field field--wide form-section-title">
+            <span>Datas e Aquisição</span>
+          </div>
+
           <label className="field">
             <span>Começou a jogar</span>
             <input type="date" value={form.startedAt?.split("T")[0] || ""} onChange={(event) => onChange("startedAt", event.target.value)} />
@@ -281,6 +285,11 @@ export function GameModal(props: {
             <span>Link da loja/promoção</span>
             <input value={form.storeLink} onChange={(event) => onChange("storeLink", event.target.value)} />
           </label>
+
+          <div className="field field--wide form-section-title">
+            <span>Progresso e Avaliação</span>
+          </div>
+
           <label className="field">
             <span>Progresso %</span>
             <input type="number" min="0" max="100" value={form.progress} onChange={(event) => onChange("progress", event.target.value)} />
@@ -461,7 +470,7 @@ export function ImportModal(props: {
             <select value={source} onChange={(event) => onSourceChange(event.target.value as ImportSource)}>
               {importSources.map((item) => (
                 <option key={item} value={item}>
-                  {item.toUpperCase()}
+                  {item === "notion" ? "NOTION (CSV)" : item.toUpperCase()}
                 </option>
               ))}
             </select>
@@ -573,6 +582,9 @@ export function ImportModal(props: {
                       {entry.status === "new" ? "Novo" : entry.status === "review" ? "Conflito" : "Duplicado"}
                     </Pill>
                     {entry.duplicateCount > 0 ? <Pill tone="neutral">+{entry.duplicateCount} repetições</Pill> : null}
+                    {(entry.payload.pricePaid || entry.payload.purchaseDate || entry.payload.storeLink || entry.payload.startedAt) ? (
+                      <Pill tone="emerald">Financeiro</Pill>
+                    ) : null}
                     {entry.selectedGameId ? <Pill tone="yellow">Game vinculado</Pill> : null}
                     {entry.selectedRawgId ? <Pill tone="cyan">RAWG ativo</Pill> : null}
                     <Pill tone={entry.action === "ignore" ? "neutral" : entry.action === "update" ? "magenta" : "cyan"}>

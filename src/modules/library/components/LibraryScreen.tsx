@@ -16,6 +16,7 @@ import type {
   SavedView,
 } from "../../../core/types";
 import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
+import { formatDatePtBr, formatCurrency } from "../../../core/utils";
 import type { GroupedLibraryGames } from "../utils/savedViews";
 
 type ListOption = {
@@ -385,6 +386,27 @@ export function LibraryScreen({
                 {selectedGame.rawgId ? <Pill tone="yellow">RAWG #{selectedGame.rawgId}</Pill> : null}
               </div>
             </div>
+
+            {(selectedGame.purchaseDate || selectedGame.pricePaid != null || selectedGame.storeLink) && (
+              <div className="detail-note">
+                <span className="detail-note__eyebrow">Aquisição</span>
+                <div className="detail-note__tags">
+                  {selectedGame.purchaseDate && (
+                    <Pill tone="neutral">Comprado em: {formatDatePtBr(selectedGame.purchaseDate)}</Pill>
+                  )}
+                  {selectedGame.pricePaid != null && (
+                    <Pill tone="sunset">Pago: {formatCurrency(selectedGame.pricePaid, selectedGame.currency)}</Pill>
+                  )}
+                  {selectedGame.storeLink && (
+                    <a href={selectedGame.storeLink} target="_blank" rel="noopener noreferrer">
+                      <Pill tone="cyan">
+                        Link da Lo <ArrowUpRight size={12} />
+                      </Pill>
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="detail-note">
               <span className="detail-note__eyebrow">Listas ativas</span>

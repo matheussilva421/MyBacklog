@@ -3,9 +3,11 @@ import type {
   Game as DbGameMetadata,
   GameTag as DbGameTag,
   Goal as DbGoal,
+  ImportJob as DbImportJob,
   LibraryEntry as DbLibraryEntry,
   LibraryEntryList as DbLibraryEntryList,
   List as DbList,
+  Platform as DbPlatform,
   PlaySession as DbPlaySession,
   Review as DbReview,
   SavedView as DbSavedView,
@@ -62,6 +64,8 @@ export function useBacklogDataState() {
   const [listRows, setListRows] = useState<DbList[]>([]);
   const [settingRows, setSettingRows] = useState<DbSetting[]>([]);
   const [savedViewRows, setSavedViewRows] = useState<DbSavedView[]>([]);
+  const [importJobRows, setImportJobRows] = useState<DbImportJob[]>([]);
+  const [platformRows, setPlatformRows] = useState<DbPlatform[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -84,6 +88,8 @@ export function useBacklogDataState() {
       storedLibraryEntryLists,
       storedSettings,
       storedSavedViews,
+      storedImportJobs,
+      storedPlatforms,
     ] = await Promise.all([
       db.games.toArray(),
       db.playSessions.orderBy("date").reverse().toArray(),
@@ -95,6 +101,8 @@ export function useBacklogDataState() {
       db.libraryEntryLists.toArray(),
       db.settings.toArray(),
       db.savedViews.toArray(),
+      db.importJobs.orderBy("createdAt").reverse().toArray(),
+      db.platforms.toArray(),
     ]);
 
     setGameRows(sortByUpdatedAtDesc(storedGames));
@@ -108,6 +116,8 @@ export function useBacklogDataState() {
     setLibraryEntryListRows(storedLibraryEntryLists);
     setSettingRows(storedSettings);
     setSavedViewRows(sortByUpdatedAtDesc(storedSavedViews));
+    setImportJobRows(storedImportJobs);
+    setPlatformRows(storedPlatforms);
   };
 
   useEffect(() => {
@@ -146,6 +156,8 @@ export function useBacklogDataState() {
     listRows,
     settingRows,
     savedViewRows,
+    importJobRows,
+    platformRows,
     loading,
     notice,
     submitting,

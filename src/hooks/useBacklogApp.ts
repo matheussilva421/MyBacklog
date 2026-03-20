@@ -457,6 +457,8 @@ export function useBacklogApp() {
     finishGuidedTour,
     nextGuidedTourStep: () => ui.nextGuidedTourStep(guidedTourSteps.length),
     previousGuidedTourStep: ui.previousGuidedTourStep,
+    importJobRows: data.importJobRows,
+    platforms: data.platformRows,
     ...actions,
   };
 }

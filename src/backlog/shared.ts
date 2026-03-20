@@ -196,6 +196,18 @@ export type PiePoint = {
   value: number;
 };
 
+export type Platform = {
+  id?: number;
+  name: string;
+  normalizedName: string;
+  iconUrl?: string;
+  brand?: string;
+  generation?: number;
+  hexColor?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type BarPoint = {
   name: string;
   total: number;

@@ -217,6 +217,44 @@ function fromCsvRows(rows: Array<Record<string, string>>, source: ImportSource, 
     .filter((value): value is ImportPayload => Boolean(value));
 }
 
+function parseNotionCsv(rows: Array<Record<string, string>>, defaults?: ImportDefaults): ImportPayload[] {
+  return rows
+    .map((row) => {
+      // Notion costuma exportar o título como "Name" ou "Título"
+      const title = row.name || row.title || row.nome || row.título || row.Name;
+      if (!title) return null;
+
+      const payload = defaultPayload(title, defaults);
+      
+      // Mapeamento de Plataforma (Notion permite Multi-select)
+      const platformRaw = row.platform || row.plataforma || row.Platform || "";
+      payload.platform = getPrimaryCsvToken(platformRaw, payload.platform);
+      payload.platforms = splitCsvTokens(platformRaw || payload.platform);
+
+      // Mapeamento de Status
+      const statusRaw = row.status || row.state || row.estado || row.progresso || row.Status || "";
+      payload.progressStatus = mapProgress(statusRaw);
+      
+      // Mapeamento de Loja/Fonte
+      const sourceRaw = row.source || row.store || row.loja || row.origem || row.Source || "";
+      payload.sourceStore = getPrimaryCsvToken(sourceRaw, payload.sourceStore);
+      payload.stores = splitCsvTokens(sourceRaw || payload.sourceStore);
+
+      // Novos campos ricos (se existirem na tabela do Notion do usuário)
+      payload.pricePaid = Number(row.price || row.cost || row.preço || row.custo || row['Price Paid'] || 0) || undefined;
+      payload.purchaseDate = parseOptionalDate(row['Purchase Date'] || row['Data de Compra'] || row.aquisicao || "");
+      payload.startedAt = parseOptionalDate(row['Started At'] || row['Comecei em'] || row.inicio || "");
+      payload.completionDate = parseOptionalDate(row['Finished At'] || row['Data de Conclusão'] || row.termino || "");
+      
+      // Notas e outros
+      payload.notes = row.notes || row.comments || row.notas || row.comentários || row.Note || "";
+      payload.personalRating = Number(row.rating || row.score || row.nota || 0) || undefined;
+      
+      return applyImportDefaults(payload, defaults);
+    })
+    .filter((value): value is ImportPayload => Boolean(value));
+}
+
 export function parseImportText(source: ImportSource, text: string, defaults?: ImportDefaults): ImportPayload[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
@@ -287,6 +325,9 @@ export function parseImportText(source: ImportSource, text: string, defaults?: I
   }
 
   const rows = parseCsvRows(trimmed);
+  if (source === "notion") {
+    return parseNotionCsv(rows, defaults);
+  }
   return fromCsvRows(rows, source, defaults);
 }
 

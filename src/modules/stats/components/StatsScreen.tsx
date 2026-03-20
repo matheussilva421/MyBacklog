@@ -1,8 +1,30 @@
-import { useState } from "react";
+```
+import { useState, useMemo } from "react";
 import { PlatformDashboard } from "./PlatformDashboard";
-import { Activity, BarChart3, CalendarDays, Clock3, Monitor, Pencil, Trash2, Trophy } from "lucide-react";
+import { PlatformList } from "./PlatformList";
+import {
+  Activity,
+  BarChart3,
+  Calendar,
+  Clock,
+  Clock3,
+  FileText,
+  Monitor,
+  Pencil,
+  Trash2,
+  Trophy,
+  Wrench,
+} from "lucide-react";
 import { DonutChart, VerticalBarChart } from "../../../charts";
-import { formatDuration, pieColors, type BarPoint, type Game, type PiePoint } from "../../../backlog/shared";
+import {
+  formatDuration,
+  pieColors,
+  type BarPoint,
+  type Game,
+  type ImportJob,
+  type PiePoint,
+  type Platform,
+} from "../../../backlog/shared";
 import type { PlaySession } from "../../../core/types";
 import {
   ChartFrame,
@@ -11,6 +33,7 @@ import {
   Panel,
   Pill,
   SectionHeader,
+  Tag,
 } from "../../../components/cyberpunk-ui";
 
 const SESSION_PAGE_SIZE = 30;
@@ -19,24 +42,32 @@ type StatsScreenProps = {
   durationBuckets: BarPoint[];
   monthlyHours: BarPoint[];
   platformData: PiePoint[];
-  visibleSessions: PlaySession[];
+  platforms: Platform[];
+  visibleSessions: any[];
   games: Game[];
+  importJobs: ImportJob[];
   findGame: (id: number) => Game | undefined;
-  onEditSession: (session: PlaySession) => void;
-  onDeleteSession: (sessionId: number) => Promise<void>;
+  onEditSession: (id: number) => void;
+  onDeleteSession: (id: number) => void;
+  onManagePlatforms?: () => void;
+  onClearImportHistory?: () => void;
 };
 
 export function StatsScreen({
   durationBuckets,
   monthlyHours,
   platformData,
+  platforms,
   visibleSessions,
   games,
+  importJobs,
   findGame,
   onEditSession,
   onDeleteSession,
+  onManagePlatforms,
+  onClearImportHistory,
 }: StatsScreenProps) {
-  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform | string | null>(null);
   const [visibleCount, setVisibleCount] = useState(SESSION_PAGE_SIZE);
   const displayedSessions = visibleSessions.slice(0, visibleCount);
   const hasMore = visibleCount < visibleSessions.length;
@@ -68,35 +99,29 @@ export function StatsScreen({
         </Panel>
 
         <Panel>
-          <SectionHeader
-            icon={Monitor}
-            title="Plataformas"
-            description="Distribuição da sua coleção"
-          />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "1rem" }}>
+            <SectionHeader
+              icon={Monitor}
+              title="Distribuição"
+              description="Sua biblioteca por hardware"
+            />
+            <NotchButton variant="ghost" onClick={onManagePlatforms} title="Configurar hardware">
+              <Wrench size={16} />
+            </NotchButton>
+          </div>
           <ChartFrame className="chart-area--pie">
             {({ width, height }) => (
               <DonutChart width={width} height={height} data={platformData} colors={pieColors} />
             )}
           </ChartFrame>
-          <div className="legend-grid">
-            {platformData.map((entry, index) => (
-              <div className="legend-item" key={entry.name}>
-                <span
-                  className="legend-item__dot"
-                  style={{ backgroundColor: pieColors[index % pieColors.length] }}
-                />
-                <span 
-                  style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted" }}
-                  onClick={() => setSelectedPlatform(entry.name)}
-                >
-                  {entry.name}
-                </span>
-                <strong>{entry.value}%</strong>
-              </div>
-            ))}
-          </div>
         </Panel>
       </div>
+
+      <PlatformList 
+        platforms={platforms} 
+        games={games} 
+        onSelect={setSelectedPlatform} 
+      />
 
       <Panel>
         <SectionHeader
@@ -112,8 +137,54 @@ export function StatsScreen({
       </Panel>
 
       <Panel>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "1rem" }}>
+          <SectionHeader
+            icon={FileText}
+            title="Histórico de Importação"
+            description="Registros de sincronização e carga externa"
+          />
+          {importJobs.length > 0 && (
+            <NotchButton variant="ghost" onClick={onClearImportHistory} title="Limpar logs">
+              <Trash2 size={16} />
+            </NotchButton>
+          )}
+        </div>
+        
+        {importJobs.length === 0 ? (
+          <div style={{ padding: "2rem", textAlign: "center", opacity: 0.5, border: "1px dashed rgba(255,255,255,0.1)" }}>
+            <p>Nenhum registro de importação encontrado.</p>
+          </div>
+        ) : (
+          <div className="log-list" style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {importJobs.slice(0, 5).map((job) => (
+              <div key={job.id} style={{ padding: "1rem", backgroundColor: "rgba(255,255,255,0.03)", borderLeft: "2px solid" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    <Tag tone={job.status === "completed" ? "emerald" : job.status === "failed" ? "magenta" : "cyan"}>
+                      {job.source.toUpperCase()}
+                    </Tag>
+                    <span style={{ fontSize: "0.8rem", opacity: 0.6 }}>
+                      {new Date(job.createdAt).toLocaleDateString()} {new Date(job.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "0.9rem", fontWeight: "bold" }}>
+                    {job.totalItems != null ? (
+                      <span>{job.processedItems ?? 0}/{job.totalItems} itens</span>
+                    ) : (
+                      <span>{job.status === "completed" ? "Sucesso" : "Falha"}</span>
+                    )}
+                  </div>
+                </div>
+                {job.summary && <div style={{ fontSize: "0.85rem", opacity: 0.8 }}>{job.summary}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      <Panel>
         <SectionHeader
-          icon={CalendarDays}
+          icon={Calendar}
           title="Sessões recentes"
           description="Diário rápido de jogo"
         />
@@ -133,7 +204,7 @@ export function StatsScreen({
                         <h3>{game.title}</h3>
                         <Pill tone="neutral">{game.platform}</Pill>
                         <div className="session-card__actions">
-                          <NotchButton variant="ghost" onClick={() => onEditSession(entry)}>
+                          <NotchButton variant="ghost" onClick={() => entry.id != null && onEditSession(entry.id)}>
                             <Pencil size={12} />
                           </NotchButton>
                           <NotchButton
@@ -172,3 +243,4 @@ export function StatsScreen({
     </div>
   );
 }
+```
