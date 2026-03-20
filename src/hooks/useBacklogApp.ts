@@ -20,6 +20,15 @@ export function useBacklogApp() {
   const context = useBacklogContext();
   const { data, importState, preferences, ui } = context;
   const selectors = useBacklogSelectors(context);
+  const {
+    guidedTourOpen,
+    openGuidedTour,
+    closeGuidedTour: closeGuidedTourState,
+    selectedGameId,
+    setSelectedGameId,
+    selectedLibraryIds,
+    setSelectedLibraryIds,
+  } = ui;
   const hasAutoOpenedGuidedTour = useRef(false);
   const {
     effectiveSelectedListFilter,
@@ -108,8 +117,12 @@ export function useBacklogApp() {
     query: ui.deferredQuery,
   });
 
-  const matchesQuery = (values: Array<string | number>) =>
-    !ui.deferredQuery || values.some((value) => String(value).toLowerCase().includes(ui.deferredQuery));
+  const matchesQuery = useCallback(
+    (values: Array<string | number>) =>
+      !ui.deferredQuery ||
+      values.some((value) => String(value).toLowerCase().includes(ui.deferredQuery)),
+    [ui.deferredQuery],
+  );
 
   const resolvedSelectedGameId = selectedGame?.id ?? 0;
 
@@ -158,19 +171,27 @@ export function useBacklogApp() {
     ui.setScreen("library");
   };
 
-  const visiblePlannerQueue = computedPlannerQueue.filter((entry) => {
-    const game = findGame(entry.gameId);
-    return matchesQuery([game?.title ?? "", entry.reason, entry.fit, entry.eta]);
-  });
-  const visibleSessions = data.sessionRows.filter((entry) => {
-    const game = findGame(entry.libraryEntryId);
-    return matchesQuery([
-      game?.title ?? "",
-      game?.platform ?? "",
-      entry.note ?? "",
-      entry.durationMinutes,
-    ]);
-  });
+  const visiblePlannerQueue = useMemo(
+    () =>
+      computedPlannerQueue.filter((entry) => {
+        const game = findGame(entry.gameId);
+        return matchesQuery([game?.title ?? "", entry.reason, entry.fit, entry.eta]);
+      }),
+    [computedPlannerQueue, findGame, matchesQuery],
+  );
+  const visibleSessions = useMemo(
+    () =>
+      data.sessionRows.filter((entry) => {
+        const game = findGame(entry.libraryEntryId);
+        return matchesQuery([
+          game?.title ?? "",
+          game?.platform ?? "",
+          entry.note ?? "",
+          entry.durationMinutes,
+        ]);
+      }),
+    [data.sessionRows, findGame, matchesQuery],
+  );
 
   const catalogMaintenanceReport = useCatalogMaintenanceState({
     gameRows: data.gameRows,
@@ -235,23 +256,41 @@ export function useBacklogApp() {
   const guidedTourTarget = ui.guidedTourOpen ? guidedTourStep.target : null;
 
   useEffect(() => {
-    if (!hasCompletedOnboarding || preferences.guidedTourCompleted || ui.guidedTourOpen || hasAutoOpenedGuidedTour.current) {
+    if (
+      !hasCompletedOnboarding ||
+      preferences.guidedTourCompleted ||
+      guidedTourOpen ||
+      hasAutoOpenedGuidedTour.current
+    ) {
       return;
     }
 
     hasAutoOpenedGuidedTour.current = true;
-    ui.openGuidedTour("dashboard");
-  }, [hasCompletedOnboarding, preferences.guidedTourCompleted, ui]);
+    openGuidedTour("dashboard");
+  }, [guidedTourOpen, hasCompletedOnboarding, openGuidedTour, preferences.guidedTourCompleted]);
+
+  useEffect(() => {
+    if (selectedGameId <= 0) return;
+    if (games.some((game) => game.id === selectedGameId)) return;
+    setSelectedGameId(games[0]?.id ?? 0);
+  }, [games, selectedGameId, setSelectedGameId]);
+
+  useEffect(() => {
+    const validIds = new Set(games.map((game) => game.id));
+    const nextSelectedIds = selectedLibraryIds.filter((entryId) => validIds.has(entryId));
+    if (nextSelectedIds.length === selectedLibraryIds.length) return;
+    setSelectedLibraryIds(nextSelectedIds);
+  }, [games, selectedLibraryIds, setSelectedLibraryIds]);
 
   const closeGuidedTour = async () => {
     const persisted = await actions.handleGuidedTourComplete();
-    ui.closeGuidedTour(true);
+    closeGuidedTourState(true);
     if (persisted) data.setNotice("Guia rápido encerrado. Você pode reabrir esse tutorial no Perfil.");
   };
 
   const finishGuidedTour = async () => {
     const persisted = await actions.handleGuidedTourComplete();
-    ui.closeGuidedTour(true);
+    closeGuidedTourState(true);
     if (persisted) data.setNotice("Tutorial guiado concluído. O Arsenal Gamer já está pronto para uso.");
   };
 

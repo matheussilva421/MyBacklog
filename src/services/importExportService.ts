@@ -95,6 +95,37 @@ function findStructuredLibraryRecordMatch(
   return matches.size === 1 ? Array.from(matches.values())[0] ?? null : null;
 }
 
+function registerStructuredLibraryRecordMatch(
+  lookup: Map<string, LibraryRecord[]>,
+  record: LibraryRecord,
+  args: {
+    storeNamesByEntryId: Map<number, string[]>;
+    platformNamesByGameId: Map<number, string[]>;
+  },
+) {
+  const identity = createStructuredEntryIdentity({
+    title: record.game.title,
+    primaryPlatform: record.libraryEntry.platform,
+    primaryStore: record.libraryEntry.sourceStore,
+    platforms: resolveStructuredPlatforms(
+      record.game,
+      record.libraryEntry.platform,
+      args.platformNamesByGameId,
+    ),
+    stores: resolveStructuredStores(record.libraryEntry, args.storeNamesByEntryId),
+  });
+
+  for (const alias of buildStructuredEntryLookupAliases(identity)) {
+    const current = lookup.get(alias) ?? [];
+    const hasRecord = current.some(
+      (currentRecord) => currentRecord.libraryEntry.id === record.libraryEntry.id,
+    );
+    if (hasRecord) continue;
+    current.push(record);
+    lookup.set(alias, current);
+  }
+}
+
 async function fetchRawgCandidateMap(
   preview: Array<{ key: string; payload: { title: string } }>,
   apiKey: string,
@@ -581,15 +612,18 @@ export async function applyRestorePreview(preview: RestorePreview) {
         const existing = existingGamesByTitle.get(normalized);
         if (existing?.id != null) {
           if (game.id != null) resolvedGameIdByPayloadId.set(game.id, existing.id);
-          await db.games.put({
+          const mergedGame = {
             ...existing,
             ...game,
             id: existing.id,
             normalizedTitle: normalized,
             platforms: mergePlatformList(existing.platforms, game.platforms || ""),
-          });
+          };
+          await db.games.put(mergedGame);
+          existingGamesByTitle.set(normalized, mergedGame);
         } else {
           const nextId = Number(await db.games.add({ ...game, normalizedTitle: normalized }));
+          existingGamesByTitle.set(normalized, { ...game, id: nextId, normalizedTitle: normalized });
           if (game.id != null) resolvedGameIdByPayloadId.set(game.id, nextId);
         }
       }
@@ -616,10 +650,39 @@ export async function applyRestorePreview(preview: RestorePreview) {
 
         if (existing?.id != null) {
           if (entry.id != null) resolvedEntryIdByPayloadId.set(entry.id, existing.id);
-          await db.libraryEntries.put({ ...existing, ...entry, id: existing.id, gameId });
+          const nextEntry = { ...existing, ...entry, id: existing.id, gameId };
+          await db.libraryEntries.put(nextEntry);
+          const game = existingGamesByTitle.get(payloadGame.normalizedTitle || normalizeGameTitle(payloadGame.title));
+          if (game?.id != null) {
+            registerStructuredLibraryRecordMatch(
+              existingEntryLookup,
+              {
+                game,
+                libraryEntry: nextEntry,
+              },
+              {
+                storeNamesByEntryId: payloadStoreNamesByEntryId,
+                platformNamesByGameId: payloadPlatformNamesByGameId,
+              },
+            );
+          }
         } else {
           const nextId = Number(await db.libraryEntries.add({ ...entry, id: undefined, gameId }));
           if (entry.id != null) resolvedEntryIdByPayloadId.set(entry.id, nextId);
+          const game =
+            existingGamesByTitle.get(payloadGame.normalizedTitle || normalizeGameTitle(payloadGame.title)) ??
+            ({ ...payloadGame, id: gameId } as typeof payloadGame);
+          registerStructuredLibraryRecordMatch(
+            existingEntryLookup,
+            {
+              game,
+              libraryEntry: { ...entry, id: nextId, gameId },
+            },
+            {
+              storeNamesByEntryId: payloadStoreNamesByEntryId,
+              platformNamesByGameId: payloadPlatformNamesByGameId,
+            },
+          );
         }
       }
 
@@ -727,6 +790,7 @@ export async function applyRestorePreview(preview: RestorePreview) {
           await db.lists.put({ ...existing, ...list, id: existing.id });
         } else {
           const nextId = Number(await db.lists.add({ ...list, id: undefined, name: list.name.trim() }));
+          existingListMap.set(key, { ...list, id: nextId, name: list.name.trim() });
           if (list.id != null) resolvedListIdByPayloadId.set(list.id, nextId);
         }
       }
@@ -753,6 +817,7 @@ export async function applyRestorePreview(preview: RestorePreview) {
           if (tag.id != null) resolvedTagIdByPayloadId.set(tag.id, existing.id);
         } else {
           const nextId = Number(await db.tags.add({ ...tag, id: undefined, name: tag.name.trim() }));
+          existingTagMap.set(key, { ...tag, id: nextId, name: tag.name.trim() });
           if (tag.id != null) resolvedTagIdByPayloadId.set(tag.id, nextId);
         }
       }
@@ -760,8 +825,14 @@ export async function applyRestorePreview(preview: RestorePreview) {
       for (const goal of payload.goals) {
         const key = `${goal.type}::${goal.period}`;
         const existing = existingGoalMap.get(key);
-        if (existing?.id != null) await db.goals.put({ ...existing, ...goal, id: existing.id });
-        else await db.goals.add({ ...goal, id: undefined });
+        if (existing?.id != null) {
+          const nextGoal = { ...existing, ...goal, id: existing.id };
+          await db.goals.put(nextGoal);
+          existingGoalMap.set(key, nextGoal);
+        } else {
+          const nextId = Number(await db.goals.add({ ...goal, id: undefined }));
+          existingGoalMap.set(key, { ...goal, id: nextId });
+        }
       }
 
       const reviewSeen = new Set<number>();
@@ -771,9 +842,12 @@ export async function applyRestorePreview(preview: RestorePreview) {
         reviewSeen.add(libraryEntryId);
         const existing = existingReviewMap.get(libraryEntryId);
         if (existing?.id != null) {
-          await db.reviews.put({ ...existing, ...review, id: existing.id, libraryEntryId });
+          const nextReview = { ...existing, ...review, id: existing.id, libraryEntryId };
+          await db.reviews.put(nextReview);
+          existingReviewMap.set(libraryEntryId, nextReview);
         } else {
-          await db.reviews.add({ ...review, id: undefined, libraryEntryId });
+          const nextId = Number(await db.reviews.add({ ...review, id: undefined, libraryEntryId }));
+          existingReviewMap.set(libraryEntryId, { ...review, id: nextId, libraryEntryId });
         }
       }
 
@@ -788,7 +862,7 @@ export async function applyRestorePreview(preview: RestorePreview) {
           ...session,
           id: undefined,
           libraryEntryId,
-          platform: libraryEntry?.platform || session.platform,
+          platform: session.platform || libraryEntry?.platform || "PC",
         });
       }
 
@@ -804,8 +878,14 @@ export async function applyRestorePreview(preview: RestorePreview) {
 
       for (const setting of payload.settings) {
         const existing = existingSettingMap.get(setting.key);
-        if (existing?.id != null) await db.settings.put({ ...existing, ...setting, id: existing.id });
-        else await db.settings.add({ ...setting, id: undefined });
+        if (existing?.id != null) {
+          const nextSetting = { ...existing, ...setting, id: existing.id };
+          await db.settings.put(nextSetting);
+          existingSettingMap.set(setting.key, nextSetting);
+        } else {
+          const nextId = Number(await db.settings.add({ ...setting, id: undefined }));
+          existingSettingMap.set(setting.key, { ...setting, id: nextId });
+        }
       }
 
       for (const view of payload.savedViews) {

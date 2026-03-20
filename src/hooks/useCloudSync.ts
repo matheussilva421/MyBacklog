@@ -69,6 +69,13 @@ function isCloudPermissionError(error: unknown) {
   return code === "permission-denied" || message.includes("Missing or insufficient permissions");
 }
 
+export function shouldBlockPushBecauseOfConflict(
+  action: "auto-push" | "manual-push",
+  decision: SyncComparison["decision"],
+) {
+  return decision === "conflict" && action !== "manual-push";
+}
+
 function logSyncError(message: string, error: unknown) {
   // eslint-disable-next-line no-console
   console.error(message, error);
@@ -426,7 +433,7 @@ export function useCloudSync({
         setComparison(nextComparison);
         cloudSnapshotRef.current = cloudData;
 
-        if (nextComparison.decision === "conflict") {
+        if (shouldBlockPushBecauseOfConflict(action, nextComparison.decision)) {
           setIsWorkingLocal(false);
           await pushHistory(
             "conflict",

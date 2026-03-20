@@ -62,10 +62,25 @@ function createBaseUiState(overrides: Record<string, unknown> = {}) {
     setSelectedListFilter: vi.fn(),
     selectedGameId: 1,
     setSelectedGameId: vi.fn(),
+    selectedLibraryIds: [],
+    setSelectedLibraryIds: vi.fn(),
     gameModalMode: null,
     setGameModalMode: vi.fn(),
     gameForm: {},
     setGameForm: vi.fn(),
+    batchEditModalOpen: false,
+    setBatchEditModalOpen: vi.fn(),
+    batchEditForm: {
+      applyMode: "merge",
+      status: "",
+      priority: "",
+      primaryPlatform: "",
+      platforms: [],
+      primaryStore: "",
+      stores: [],
+      tags: "",
+      listIds: [],
+    },
     sessionModalOpen: false,
     setSessionModalOpen: vi.fn(),
     sessionForm: {},
@@ -93,8 +108,12 @@ function createBaseUiState(overrides: Record<string, unknown> = {}) {
     nextGuidedTourStep: vi.fn(),
     previousGuidedTourStep: vi.fn(),
     handleGameFormChange: vi.fn(),
+    handleBatchEditFormChange: vi.fn(),
     handleSessionFormChange: vi.fn(),
     handleGoalFormChange: vi.fn(),
+    toggleLibrarySelection: vi.fn(),
+    clearLibrarySelection: vi.fn(),
+    selectVisibleLibraryGames: vi.fn(),
     ...overrides,
   };
 }
@@ -121,32 +140,37 @@ function createGame() {
   };
 }
 
+function createBaseDataState(overrides: Record<string, unknown> = {}) {
+  return {
+    gameRows: [],
+    libraryEntryRows: [],
+    libraryEntryListRows: [],
+    libraryEntryStoreRows: [],
+    sessionRows: [],
+    reviewRows: [],
+    tagRows: [],
+    gameTagRows: [],
+    goalRows: [],
+    listRows: [{ id: 2, name: "Prioridade", createdAt: "2026-03-01T00:00:00.000Z" }],
+    settingRows: [],
+    savedViewRows: [],
+    importJobRows: [],
+    storeRows: [],
+    platformRows: [],
+    gamePlatformRows: [],
+    loading: false,
+    notice: null,
+    submitting: false,
+    setNotice: vi.fn(),
+    setSubmitting: vi.fn(),
+    refreshData: vi.fn(),
+    ...overrides,
+  };
+}
+
 describe("useBacklogApp", () => {
   beforeEach(() => {
-    useBacklogDataStateMock.mockReturnValue({
-      gameRows: [],
-      libraryEntryRows: [],
-      libraryEntryListRows: [],
-      libraryEntryStoreRows: [],
-      sessionRows: [],
-      reviewRows: [],
-      tagRows: [],
-      gameTagRows: [],
-      goalRows: [],
-      listRows: [{ id: 2, name: "Prioridade", createdAt: "2026-03-01T00:00:00.000Z" }],
-      settingRows: [],
-      savedViewRows: [],
-      importJobRows: [],
-      storeRows: [],
-      platformRows: [],
-      gamePlatformRows: [],
-      loading: false,
-      notice: null,
-      submitting: false,
-      setNotice: vi.fn(),
-      setSubmitting: vi.fn(),
-      refreshData: vi.fn(),
-    });
+    useBacklogDataStateMock.mockReturnValue(createBaseDataState());
     useImportExportStateMock.mockReturnValue({
       importModalOpen: false,
       importSource: "csv",
@@ -303,5 +327,54 @@ describe("useBacklogApp", () => {
     renderHook(() => useBacklogApp());
 
     expect(openGuidedTour).toHaveBeenCalledWith("dashboard");
+  });
+
+  it("reconciles stale selected game ids and batch selection after catalog changes", () => {
+    const setSelectedGameId = vi.fn();
+    const setSelectedLibraryIds = vi.fn();
+    useBacklogDataStateMock.mockReturnValue(
+      createBaseDataState({
+      gameRows: [
+        {
+          id: 1,
+          title: "Cyberpunk 2077",
+          normalizedTitle: "cyberpunk 2077",
+          platforms: "PC",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        },
+      ],
+      libraryEntryRows: [
+        {
+          id: 7,
+          gameId: 1,
+          platform: "PC",
+          sourceStore: "Steam",
+          format: "digital",
+          ownershipStatus: "owned",
+          progressStatus: "playing",
+          priority: "high",
+          completionPercent: 62,
+          playtimeMinutes: 1440,
+          favorite: false,
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-10T00:00:00.000Z",
+        },
+      ],
+      }),
+    );
+    useBacklogUiStateMock.mockReturnValue(
+      createBaseUiState({
+        selectedGameId: 999,
+        selectedLibraryIds: [7, 999],
+        setSelectedGameId,
+        setSelectedLibraryIds,
+      }),
+    );
+
+    renderHook(() => useBacklogApp());
+
+    expect(setSelectedGameId).toHaveBeenCalledWith(7);
+    expect(setSelectedLibraryIds).toHaveBeenCalledWith([7]);
   });
 });

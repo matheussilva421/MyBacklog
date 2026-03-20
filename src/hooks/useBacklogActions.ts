@@ -622,6 +622,7 @@ export function useBacklogActions({
     if (!selectedRecord || !selectedGame) return;
     const confirmed = window.confirm(`Excluir ${selectedGame.title} da biblioteca?`);
     if (!confirmed) return;
+    const deletedEntryId = selectedRecord.libraryEntry.id!;
 
     await db.transaction(
       "rw",
@@ -638,22 +639,25 @@ export function useBacklogActions({
         db.libraryEntryLists,
       ],
       async () => {
-      const entryId = selectedRecord.libraryEntry.id!;
-      await db.playSessions.where("libraryEntryId").equals(entryId).delete();
-      await db.reviews.where("libraryEntryId").equals(entryId).delete();
-      await db.gameTags.where("libraryEntryId").equals(entryId).delete();
-      await db.libraryEntryLists.where("libraryEntryId").equals(entryId).delete();
-      await db.libraryEntryStores.where("libraryEntryId").equals(entryId).delete();
-      await db.libraryEntries.delete(entryId);
-      const siblingCount = await db.libraryEntries.where("gameId").equals(selectedRecord.game.id!).count();
-      if (siblingCount === 0) {
-        await db.gamePlatforms.where("gameId").equals(selectedRecord.game.id!).delete();
-        await db.games.delete(selectedRecord.game.id!);
-      }
-    },
+        await db.playSessions.where("libraryEntryId").equals(deletedEntryId).delete();
+        await db.reviews.where("libraryEntryId").equals(deletedEntryId).delete();
+        await db.gameTags.where("libraryEntryId").equals(deletedEntryId).delete();
+        await db.libraryEntryLists.where("libraryEntryId").equals(deletedEntryId).delete();
+        await db.libraryEntryStores.where("libraryEntryId").equals(deletedEntryId).delete();
+        await db.libraryEntries.delete(deletedEntryId);
+        const siblingCount = await db.libraryEntries
+          .where("gameId")
+          .equals(selectedRecord.game.id!)
+          .count();
+        if (siblingCount === 0) {
+          await db.gamePlatforms.where("gameId").equals(selectedRecord.game.id!).delete();
+          await db.games.delete(selectedRecord.game.id!);
+        }
+      },
     );
 
     await refreshData();
+    setSelectedLibraryIds(selectedLibraryIds.filter((entryId) => entryId !== deletedEntryId));
     setScreen("library");
     setNotice("Jogo removido da biblioteca.");
   };
@@ -975,7 +979,7 @@ export function useBacklogActions({
             ...duplicateSessions.map((session) => ({
               ...session,
               libraryEntryId: primaryEntryId,
-              platform: primaryEntry.platform,
+              platform: session.platform || primaryEntry.platform,
             })),
           ];
 
@@ -990,7 +994,7 @@ export function useBacklogActions({
             if (session.id == null) continue;
             await db.playSessions.update(session.id, {
               libraryEntryId: primaryEntryId,
-              platform: primaryEntry.platform,
+              platform: session.platform || primaryEntry.platform,
             });
           }
 
@@ -1195,6 +1199,10 @@ export function useBacklogActions({
             }
             if (relation.id != null) {
               await db.libraryEntryStores.update(relation.id, { storeId: canonical.id });
+              canonicalRelationByEntryId.set(relation.libraryEntryId, {
+                ...relation,
+                storeId: canonical.id,
+              });
             }
           }
 
@@ -1251,6 +1259,10 @@ export function useBacklogActions({
             }
             if (relation.id != null) {
               await db.gamePlatforms.update(relation.id, { platformId: canonical.id });
+              canonicalRelationByGameId.set(relation.gameId, {
+                ...relation,
+                platformId: canonical.id,
+              });
             }
           }
 

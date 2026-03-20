@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useBatchEditModalState } from "./modals/useBatchEditModalState";
 import { useGameModalState } from "./modals/useGameModalState";
 import { useGoalModalState } from "./modals/useGoalModalState";
@@ -19,14 +20,21 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
   const sessionModal = useSessionModalState();
   const goalModal = useGoalModalState();
   const guidedTour = useGuidedTourState();
+  const { openGuidedTour: openGuidedTourState, closeGuidedTour: closeGuidedTourState } = guidedTour;
 
-  const openGuidedTour = (originScreen: ScreenKey = navigation.screen) => {
-    guidedTour.openGuidedTour(originScreen);
-  };
+  const openGuidedTour = useCallback(
+    (originScreen: ScreenKey = navigation.screen) => {
+      openGuidedTourState(originScreen);
+    },
+    [navigation.screen, openGuidedTourState],
+  );
 
-  const closeGuidedTour = (restoreOrigin = false) => {
-    guidedTour.closeGuidedTour(navigation.screen, navigation.setScreen, restoreOrigin);
-  };
+  const closeGuidedTour = useCallback(
+    (restoreOrigin = false) => {
+      closeGuidedTourState(navigation.screen, navigation.setScreen, restoreOrigin);
+    },
+    [closeGuidedTourState, navigation.screen, navigation.setScreen],
+  );
 
   return {
     ...navigation,

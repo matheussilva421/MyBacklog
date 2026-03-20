@@ -18,9 +18,11 @@ import type { useBacklogContext } from "./useBacklogContext";
 
 type BacklogContext = ReturnType<typeof useBacklogContext>;
 
-function createAutoSyncWatchKey(context: BacklogContext) {
-  const { data, preferences } = context;
-
+function createAutoSyncWatchKey(args: {
+  data: BacklogContext["data"];
+  preferences: BacklogContext["preferences"];
+}) {
+  const { data, preferences } = args;
   return JSON.stringify({
     games: data.gameRows.map((row) => [row.id, row.updatedAt, row.platforms]),
     entries: data.libraryEntryRows.map((row) => [row.id, row.updatedAt, row.platform, row.sourceStore]),
@@ -132,7 +134,14 @@ export function useBacklogSelectors(context: BacklogContext) {
       : onboardingGoalTemplates.slice(0, 2).map((template) => template.id);
   }, [data.goalRows]);
   const heroCopy = screenMeta[ui.screen];
-  const autoSyncWatchKey = createAutoSyncWatchKey(context);
+  const autoSyncWatchKey = useMemo(
+    () =>
+      createAutoSyncWatchKey({
+        data,
+        preferences,
+      }),
+    [data, preferences],
+  );
 
   return {
     effectiveSelectedListFilter,

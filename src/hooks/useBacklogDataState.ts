@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   emptyBacklogDataSnapshot,
   readBacklogDataSnapshot,
@@ -53,14 +53,17 @@ export function useBacklogDataState() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  return {
-    ...snapshot,
-    loading,
-    notice,
-    submitting,
-    setLoading,
-    setNotice,
-    setSubmitting,
-    refreshData,
-  };
+  return useMemo(
+    () => ({
+      ...snapshot,
+      loading,
+      notice,
+      submitting,
+      setLoading,
+      setNotice,
+      setSubmitting,
+      refreshData,
+    }),
+    [loading, notice, refreshData, snapshot, submitting],
+  );
 }

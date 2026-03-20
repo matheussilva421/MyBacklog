@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BackupPayload } from "../backlog/shared";
+import { shouldBlockPushBecauseOfConflict } from "./useCloudSync";
 import {
   buildSyncFingerprint,
   mergeSyncTables,
@@ -92,6 +93,11 @@ function createPayload(overrides: Partial<BackupPayload> = {}): BackupPayload {
 }
 
 describe("syncEngine helpers", () => {
+  it("permite manual push mesmo quando a comparacao aponta conflito", () => {
+    expect(shouldBlockPushBecauseOfConflict("manual-push", "conflict")).toBe(false);
+    expect(shouldBlockPushBecauseOfConflict("auto-push", "conflict")).toBe(true);
+  });
+
   it("ignora exportedAt ao montar fingerprint", () => {
     const first = createPayload({ exportedAt: "2026-03-19T12:00:00.000Z" });
     const second = createPayload({ exportedAt: "2026-03-19T13:00:00.000Z" });
