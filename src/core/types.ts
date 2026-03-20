@@ -50,6 +50,7 @@ export interface Game {
   slug?: string;
   coverUrl?: string;
   rawgId?: number;
+  description?: string;
   genres?: string;
   estimatedTime?: string;
   difficulty?: string;
@@ -210,6 +211,7 @@ export interface LegacyGameRecord {
   id?: number;
   title: string;
   coverUrl?: string;
+  description?: string;
   platform: string;
   sourceStore: string;
   edition?: string;

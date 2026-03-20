@@ -2,6 +2,20 @@ export function normalizeGameTitle(title: string): string {
   return title.trim().toLowerCase();
 }
 
+export function repairLegacyText(value: string | undefined): string | undefined {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed || !/[ÃÂâ]/.test(trimmed)) return trimmed;
+
+  try {
+    const bytes = Uint8Array.from(Array.from(trimmed).map((character) => character.charCodeAt(0) & 0xff));
+    const repaired = new TextDecoder("utf-8").decode(bytes).trim();
+    return repaired || trimmed;
+  } catch {
+    return trimmed;
+  }
+}
+
 export function normalizeToken(value: string): string {
   return value.trim().toLowerCase();
 }

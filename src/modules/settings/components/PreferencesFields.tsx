@@ -142,11 +142,12 @@ export function PreferencesFields({ draft, onChange }: PreferencesFieldsProps) {
           <KeyRound size={14} /> Chave RAWG (opcional)
         </span>
         <input
-          type="password"
+          type="text"
           value={draft.rawgApiKey}
           onChange={handleTextChange("rawgApiKey")}
           placeholder="Cole sua chave para enriquecer metadados"
-          autoComplete="new-password"
+          autoComplete="off"
+          spellCheck={false}
         />
         <small>
           {draft.rawgApiKey

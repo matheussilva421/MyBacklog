@@ -1,4 +1,5 @@
 import { dbPriorityToPriority, dbStatusToStatus } from "../../backlog/shared";
+import { getPrimaryCsvToken, repairLegacyText } from "../../core/utils";
 import type { Game, LibraryRecord } from "../../backlog/shared";
 import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../../core/types";
 
@@ -18,25 +19,42 @@ export function composeLibraryRecords(
 
 export function dbGameToUiGame(record: LibraryRecord): Game {
   const { game, libraryEntry } = record;
-  const genre = game.genres?.split(",")[0]?.trim() || game.genres || "CatÃ¡logo tÃ¡tico";
+  const title = repairLegacyText(game.title) || game.title;
+  const platform = repairLegacyText(libraryEntry.platform) || repairLegacyText(getPrimaryCsvToken(game.platforms, "PC")) || "PC";
+  const genre = repairLegacyText(getPrimaryCsvToken(game.genres, "Catálogo tático")) || "Catálogo tático";
+  const catalogPlatforms = repairLegacyText(game.platforms) || undefined;
+  const sourceStore = repairLegacyText(libraryEntry.sourceStore) || "Manual";
+  const eta = repairLegacyText(game.estimatedTime) || "Sem dado";
+  const mood = repairLegacyText(libraryEntry.mood) || "Tático";
+  const notes = repairLegacyText(libraryEntry.notes) || "Sem leitura registrada no sistema.";
+  const difficulty = repairLegacyText(game.difficulty) || "Média";
+  const developer = repairLegacyText(game.developer) || undefined;
+  const publisher = repairLegacyText(game.publisher) || undefined;
+  const description = repairLegacyText(game.description) || undefined;
 
   return {
     id: libraryEntry.id ?? Date.now(),
-    title: game.title,
-    platform: libraryEntry.platform || game.platforms?.split(",")[0]?.trim() || "PC",
-    sourceStore: libraryEntry.sourceStore || "Manual",
+    title,
+    platform,
+    catalogPlatforms,
+    sourceStore,
     genre,
     status: dbStatusToStatus(libraryEntry),
     progress: Math.max(0, Math.min(100, Math.round(libraryEntry.completionPercent || 0))),
     hours: Math.max(0, Math.round((libraryEntry.playtimeMinutes || 0) / 60)),
-    eta: game.estimatedTime || "Sem dado",
+    eta,
     priority: dbPriorityToPriority(libraryEntry.priority),
-    mood: libraryEntry.mood || "TÃ¡tico",
+    mood,
     score:
       typeof libraryEntry.personalRating === "number" ? Number(libraryEntry.personalRating) : 0,
     year: game.releaseYear || new Date(game.createdAt || Date.now()).getFullYear(),
-    notes: libraryEntry.notes || "Sem leitura registrada no sistema.",
-    difficulty: game.difficulty || "MÃ©dia",
+    notes,
+    description,
+    difficulty,
     completionDate: libraryEntry.completionDate,
+    coverUrl: game.coverUrl,
+    rawgId: game.rawgId,
+    developer,
+    publisher,
   };
 }

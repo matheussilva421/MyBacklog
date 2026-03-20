@@ -12,6 +12,7 @@ export function createGameFormState(game?: Game, defaults?: GameFormDefaults): G
   return {
     title: game?.title ?? "",
     platform: game?.platform ?? defaults?.platform ?? "PC",
+    catalogPlatforms: game?.catalogPlatforms ?? game?.platform ?? defaults?.platform ?? "PC",
     sourceStore: game?.sourceStore ?? defaults?.sourceStore ?? "Manual",
     genre: game?.genre ?? "",
     status: game?.status ?? "Backlog",
@@ -23,11 +24,19 @@ export function createGameFormState(game?: Game, defaults?: GameFormDefaults): G
     year: game ? String(game.year) : String(new Date().getFullYear()),
     mood: game?.mood ?? "",
     difficulty: game?.difficulty ?? "Média",
+    coverUrl: game?.coverUrl ?? "",
+    rawgId: game?.rawgId != null ? String(game.rawgId) : "",
+    developer: game?.developer ?? "",
+    publisher: game?.publisher ?? "",
+    description: game?.description ?? "",
     notes: game?.notes ?? "",
   };
 }
 
-export function createDbGameFromForm(form: GameFormState, current?: { game: DbGameMetadata; libraryEntry: DbLibraryEntry }): { game: DbGameMetadata; libraryEntry: DbLibraryEntry } {
+export function createDbGameFromForm(
+  form: GameFormState,
+  current?: { game: DbGameMetadata; libraryEntry: DbLibraryEntry },
+): { game: DbGameMetadata; libraryEntry: DbLibraryEntry } {
   const progress = Math.max(0, Math.min(100, Math.round(Number(form.progress) || 0)));
   const hours = Math.max(0, Number(form.hours) || 0);
   const title = form.title.trim();
@@ -35,6 +44,7 @@ export function createDbGameFromForm(form: GameFormState, current?: { game: DbGa
   const now = new Date().toISOString();
   const progressStatus = statusToDbStatus(form.status);
   const completionPercent = form.status === "Terminado" ? 100 : progress;
+  const catalogPlatforms = form.catalogPlatforms.trim() || platform;
 
   return {
     game: {
@@ -42,15 +52,16 @@ export function createDbGameFromForm(form: GameFormState, current?: { game: DbGa
       title,
       normalizedTitle: normalizeGameTitle(title),
       slug: current?.game.slug,
-      coverUrl: current?.game.coverUrl,
-      rawgId: current?.game.rawgId,
+      coverUrl: form.coverUrl.trim() || current?.game.coverUrl,
+      rawgId: form.rawgId ? Number(form.rawgId) : current?.game.rawgId,
+      description: form.description.trim() || current?.game.description,
       genres: form.genre.trim() || undefined,
       estimatedTime: form.eta.trim() || undefined,
       difficulty: form.difficulty.trim() || undefined,
       releaseYear: form.year ? Number(form.year) : undefined,
-      platforms: mergePlatformList(current?.game.platforms, platform),
-      developer: current?.game.developer,
-      publisher: current?.game.publisher,
+      platforms: mergePlatformList(current?.game.platforms, catalogPlatforms),
+      developer: form.developer.trim() || current?.game.developer,
+      publisher: form.publisher.trim() || current?.game.publisher,
       createdAt: current?.game.createdAt || now,
       updatedAt: now,
     },

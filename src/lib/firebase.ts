@@ -1,8 +1,9 @@
 import { initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import {
-  enableMultiTabIndexedDbPersistence,
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   type Firestore,
 } from "firebase/firestore";
 
@@ -22,14 +23,10 @@ export const isFirebaseConfigured = Object.values(firebaseConfig).every(
 const app: FirebaseApp | null = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
 
 export const auth: Auth | null = app ? getAuth(app) : null;
-export const cloudDb: Firestore | null = app ? getFirestore(app) : null;
-
-if (cloudDb) {
-  enableMultiTabIndexedDbPersistence(cloudDb).catch((err) => {
-    if (err.code === "failed-precondition") {
-      console.warn("Multiplas abas ativas; persistencia offline mantida apenas na primeira.");
-    } else if (err.code === "unimplemented") {
-      console.warn("O navegador nao suporta persistencia offline do Firestore.");
-    }
-  });
-}
+export const cloudDb: Firestore | null = app
+  ? initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    })
+  : null;

@@ -20,6 +20,8 @@ import type {
 } from "./types";
 import { buildStructuredTablesFromLegacy } from "./structuredTables";
 import { classifyAccessSource } from "./libraryEntryDerived";
+import { defaultGames } from "./defaults";
+import { repairLegacyText } from "./utils";
 
 // Local copies of normalizeGameTitle/mergePlatformList from utils.ts —
 // kept self-contained here so the v2 migration never breaks if utils change.
@@ -300,6 +302,80 @@ class MyBacklogDB extends Dexie {
               sourceKey: store.sourceKey ?? classifyAccessSource(store.name),
             })),
           );
+        }
+      });
+
+    this.version(6)
+      .stores({
+        games: "++id, normalizedTitle, title, rawgId, releaseYear",
+        libraryEntries:
+          "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
+        stores: "++id, normalizedName, name, sourceKey, updatedAt",
+        libraryEntryStores:
+          "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
+        platforms: "++id, normalizedName, name, updatedAt",
+        gamePlatforms:
+          "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
+        playSessions: "++id, libraryEntryId, date",
+        reviews: "++id, libraryEntryId",
+        lists: "++id, name",
+        libraryEntryLists:
+          "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
+        tags: "++id, name",
+        gameTags: "++id, libraryEntryId, tagId",
+        goals: "++id, type, period",
+        settings: "++id, key, updatedAt",
+        savedViews: "++id, scope, name, [scope+name], updatedAt",
+        importJobs: "++id, source, status, createdAt, updatedAt",
+      })
+      .upgrade(async (tx) => {
+        const curatedMetadataByTitle = new Map(
+          defaultGames
+            .filter((game) => Boolean(game.title))
+            .map((game) => [normalizeTitle(String(game.title)), game] as const),
+        );
+
+        const [games, libraryEntries] = await Promise.all([
+          tx.table("games").toArray() as Promise<Game[]>,
+          tx.table("libraryEntries").toArray() as Promise<LibraryEntry[]>,
+        ]);
+
+        const sanitizedGames = games.map((game) => {
+          const repairedTitle = repairLegacyText(game.title) || game.title;
+          const curated = curatedMetadataByTitle.get(normalizeTitle(repairedTitle));
+
+          return {
+            ...game,
+            title: repairedTitle,
+            normalizedTitle: normalizeTitle(repairedTitle),
+            coverUrl: game.coverUrl || curated?.coverUrl,
+            rawgId: game.rawgId ?? curated?.rawgId,
+            description: repairLegacyText(game.description) || game.description || curated?.description,
+            genres: repairLegacyText(game.genres) || game.genres || curated?.genres,
+            estimatedTime: repairLegacyText(game.estimatedTime) || game.estimatedTime || curated?.estimatedTime,
+            difficulty: repairLegacyText(game.difficulty) || game.difficulty || curated?.difficulty,
+            platforms: repairLegacyText(game.platforms) || game.platforms || curated?.platforms,
+            developer: repairLegacyText(game.developer) || game.developer || curated?.developer,
+            publisher: repairLegacyText(game.publisher) || game.publisher || curated?.publisher,
+            releaseYear: game.releaseYear ?? curated?.releaseYear,
+          } satisfies Game;
+        });
+
+        const sanitizedEntries = libraryEntries.map((entry) => ({
+          ...entry,
+          platform: repairLegacyText(entry.platform) || entry.platform,
+          sourceStore: repairLegacyText(entry.sourceStore) || entry.sourceStore,
+          edition: repairLegacyText(entry.edition) || entry.edition,
+          notes: repairLegacyText(entry.notes) || entry.notes,
+          checklist: repairLegacyText(entry.checklist) || entry.checklist,
+          mood: repairLegacyText(entry.mood) || entry.mood,
+        }));
+
+        if (sanitizedGames.length > 0) {
+          await tx.table("games").bulkPut(sanitizedGames);
+        }
+        if (sanitizedEntries.length > 0) {
+          await tx.table("libraryEntries").bulkPut(sanitizedEntries);
         }
       });
   }

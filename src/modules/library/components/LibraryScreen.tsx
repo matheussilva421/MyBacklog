@@ -1,4 +1,4 @@
-import { ArrowUpRight, Download, FolderKanban, Gamepad2, Heart, Library, ListChecks, Plus, Upload } from "lucide-react";
+import { ArrowUpRight, Download, FolderKanban, Gamepad2, Heart, ImageIcon, Library, ListChecks, Plus, Upload } from "lucide-react";
 import {
   cx,
   filterOptions,
@@ -100,35 +100,48 @@ export function LibraryScreen({
       className={cx("library-card", selectedGame?.id === game.id && "library-card--active")}
       onClick={() => onSelectGame(game.id)}
     >
-      <div className="library-card__platform">
-        <span>{game.platform}</span>
-        <ArrowUpRight size={15} />
+      <div className="library-card__cover">
+        {game.coverUrl ? (
+          <img src={game.coverUrl} alt={`Capa de ${game.title}`} />
+        ) : (
+          <div className="library-card__cover-placeholder">
+            <ImageIcon size={18} />
+            <span>Sem capa</span>
+          </div>
+        )}
       </div>
-      <h3>{game.title}</h3>
-      <p className="library-card__genre">{game.genre}</p>
-      <div className="library-card__chips">
-        <Pill tone={statusTone[game.status]}>{game.status}</Pill>
-        <Pill tone={priorityTone[game.priority]}>{game.priority}</Pill>
-      </div>
-      <div className="library-card__progress">
-        <div className="library-card__progress-head">
-          <span>Progresso</span>
-          <strong>{game.progress}%</strong>
+
+      <div className="library-card__content">
+        <div className="library-card__platform">
+          <span>{game.platform}</span>
+          <ArrowUpRight size={15} />
         </div>
-        <ProgressBar value={game.progress} tone="cyan" thin />
-      </div>
-      <div className="library-card__metrics">
-        <div>
-          <span>Nota</span>
-          <strong>{game.score.toFixed(1)}</strong>
+        <h3>{game.title}</h3>
+        <p className="library-card__genre">{game.genre}</p>
+        <div className="library-card__chips">
+          <Pill tone={statusTone[game.status]}>{game.status}</Pill>
+          <Pill tone={priorityTone[game.priority]}>{game.priority}</Pill>
         </div>
-        <div>
-          <span>Horas</span>
-          <strong>{game.hours}h</strong>
+        <div className="library-card__progress">
+          <div className="library-card__progress-head">
+            <span>Progresso</span>
+            <strong>{game.progress}%</strong>
+          </div>
+          <ProgressBar value={game.progress} tone="cyan" thin />
         </div>
-        <div>
-          <span>ETA</span>
-          <strong>{game.eta}</strong>
+        <div className="library-card__metrics">
+          <div>
+            <span>Nota</span>
+            <strong>{game.score.toFixed(1)}</strong>
+          </div>
+          <div>
+            <span>Horas</span>
+            <strong>{game.hours}h</strong>
+          </div>
+          <div>
+            <span>ETA</span>
+            <strong>{game.eta}</strong>
+          </div>
         </div>
       </div>
     </button>
@@ -220,10 +233,7 @@ export function LibraryScreen({
               </label>
               <label className="filter-select">
                 <span>Direção</span>
-                <select
-                  value={sortDirection}
-                  onChange={(event) => onSortDirectionChange(event.target.value as LibraryViewSortDirection)}
-                >
+                <select value={sortDirection} onChange={(event) => onSortDirectionChange(event.target.value as LibraryViewSortDirection)}>
                   <option value="desc">Descendente</option>
                   <option value="asc">Ascendente</option>
                 </select>
@@ -253,11 +263,10 @@ export function LibraryScreen({
               <p className="filter-empty-copy">Nenhuma view salva ainda. Use os filtros e salve a combinação atual.</p>
             ) : (
               <div className="saved-view-list">
-                {savedViews.map((view) => (
-                  <div
-                    key={view.id ?? `${view.scope}-${view.name}`}
-                    className={cx("saved-view-card", activeSavedView?.id === view.id && "saved-view-card--active")}
-                  >
+                {savedViews.map((view) => {
+                  const savedViewId = view.id;
+                  return (
+                  <div key={savedViewId ?? `${view.scope}-${view.name}`} className={cx("saved-view-card", activeSavedView?.id === savedViewId && "saved-view-card--active")}>
                     <button type="button" className="saved-view-card__main" onClick={() => onApplySavedView(view)}>
                       <strong>{view.name}</strong>
                       <span>
@@ -266,17 +275,13 @@ export function LibraryScreen({
                       </span>
                     </button>
                     {view.id != null ? (
-                      <button
-                        type="button"
-                        className="saved-view-card__delete"
-                        onClick={() => onDeleteSavedView(view.id!)}
-                        aria-label={`Excluir view ${view.name}`}
-                      >
+                      <button type="button" className="saved-view-card__delete" onClick={() => savedViewId != null && onDeleteSavedView(savedViewId)} aria-label={`Excluir view ${view.name}`}>
                         ×
                       </button>
                     ) : null}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -315,6 +320,12 @@ export function LibraryScreen({
 
         {selectedGame ? (
           <div className="detail-panel__body">
+            {selectedGame.coverUrl ? (
+              <div className="game-page-cover">
+                <img src={selectedGame.coverUrl} alt={`Capa de ${selectedGame.title}`} />
+              </div>
+            ) : null}
+
             <div className="detail-panel__headline">
               <div>
                 <span className="detail-panel__eyebrow">Selecionado</span>
@@ -358,10 +369,20 @@ export function LibraryScreen({
 
             <div className="detail-note">
               <span className="detail-note__eyebrow">Leitura do sistema</span>
-              <p>{selectedGame.notes}</p>
+              <p>{selectedGame.description || selectedGame.notes}</p>
               <div className="detail-note__tags">
                 <Pill tone="cyan">Mood: {selectedGame.mood}</Pill>
                 <Pill tone="magenta">Dificuldade: {selectedGame.difficulty}</Pill>
+              </div>
+            </div>
+
+            <div className="detail-note">
+              <span className="detail-note__eyebrow">Metadado enriquecido</span>
+              <div className="detail-note__tags">
+                <Pill tone="neutral">{selectedGame.catalogPlatforms || selectedGame.platform}</Pill>
+                {selectedGame.developer ? <Pill tone="cyan">{selectedGame.developer}</Pill> : null}
+                {selectedGame.publisher ? <Pill tone="magenta">{selectedGame.publisher}</Pill> : null}
+                {selectedGame.rawgId ? <Pill tone="yellow">RAWG #{selectedGame.rawgId}</Pill> : null}
               </div>
             </div>
 

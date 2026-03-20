@@ -57,6 +57,13 @@ function createHistoryEntry(
   };
 }
 
+function isCloudPermissionError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String(error.code) : "";
+  const message = "message" in error ? String(error.message) : "";
+  return code === "permission-denied" || message.includes("Missing or insufficient permissions");
+}
+
 async function replaceLocalTables(tables: SyncTables) {
   await db.transaction(
     "rw",
@@ -293,6 +300,17 @@ export function useCloudSync({
           "Conflito detectado entre a base local e a nuvem. Revise a Central de Sync para decidir como continuar.",
         );
       } catch (error) {
+        if (isCloudPermissionError(error)) {
+          if (!active) return;
+          setIsWorkingLocal(true);
+          await pushHistory(
+            "error",
+            "skipped",
+            "A nuvem está indisponível para esta conta. O app continuará operando em modo local.",
+          );
+          setNotice("Sincronização em nuvem indisponível para esta conta. O app continuará em modo local.");
+          return;
+        }
         console.error("Cloud sync bootstrap error:", error);
         if (!active) return;
         await pushHistory("error", "error", "Falha ao inicializar a sincronização com a nuvem.");
@@ -374,6 +392,12 @@ export function useCloudSync({
           successAt,
         );
       } catch (error) {
+        if (isCloudPermissionError(error)) {
+          await pushHistory(action, "skipped", "A conta não tem permissão para gravar na nuvem. Mantendo modo local.");
+          setNotice("Sua conta não tem permissão para gravar na nuvem. O app segue em modo local.");
+          setIsWorkingLocal(true);
+          return;
+        }
         console.error("Cloud sync push error:", error);
         await pushHistory(action, "error", "Falha ao enviar o snapshot local para a nuvem.");
         setNotice("Falha ao enviar backup para a nuvem.");
@@ -420,6 +444,12 @@ export function useCloudSync({
       );
       setNotice("Snapshot remoto aplicado na base local.");
     } catch (error) {
+      if (isCloudPermissionError(error)) {
+        await pushHistory("manual-pull", "skipped", "A conta não tem permissão para ler o snapshot remoto.");
+        setNotice("Sua conta não tem permissão para ler a nuvem.");
+        setIsWorkingLocal(true);
+        return;
+      }
       console.error("Cloud sync pull error:", error);
       await pushHistory("manual-pull", "error", "Falha ao puxar o snapshot remoto.");
       setNotice("Falha ao puxar a nuvem.");
@@ -467,6 +497,12 @@ export function useCloudSync({
       );
       setNotice("Merge concluído entre base local e nuvem.");
     } catch (error) {
+      if (isCloudPermissionError(error)) {
+        await pushHistory("manual-merge", "skipped", "A conta não tem permissão para mesclar com a nuvem.");
+        setNotice("Sua conta não tem permissão para mesclar com a nuvem.");
+        setIsWorkingLocal(true);
+        return;
+      }
       console.error("Cloud sync merge error:", error);
       await pushHistory("manual-merge", "error", "Falha ao mesclar snapshots local e remoto.");
       setNotice("Falha ao mesclar os dados de sync.");

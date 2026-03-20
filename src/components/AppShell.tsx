@@ -582,6 +582,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
           <GameModal
             mode={app.gameModalMode}
             form={app.gameForm}
+            rawgApiKey={app.preferences.rawgApiKey}
             submitting={app.submitting}
             onClose={app.closeGameModal}
             onChange={app.handleGameFormChange}

@@ -205,6 +205,7 @@ function fromCsvRows(rows: Array<Record<string, string>>, source: ImportSource, 
       payload.coverUrl = row.coverurl || row.cover || undefined;
       payload.developer = row.developer || row.studio || undefined;
       payload.publisher = row.publisher || row.publishers || undefined;
+      payload.description = row.description || row.descricao || undefined;
       return applyImportDefaults(payload, defaults);
     })
     .filter((value): value is ImportPayload => Boolean(value));
@@ -267,6 +268,7 @@ export function parseImportText(source: ImportSource, text: string, defaults?: I
         payload.coverUrl = String(item.coverUrl ?? item.background_image ?? "") || undefined;
         payload.developer = String(item.developer ?? item.Developer ?? "") || undefined;
         payload.publisher = String(item.publisher ?? item.Publisher ?? "") || undefined;
+        payload.description = String(item.description ?? item.description_raw ?? item.Description ?? "") || undefined;
         return applyImportDefaults(payload, defaults);
       })
       .filter((value): value is ImportPayload => Boolean(value));
@@ -303,6 +305,7 @@ export function gamesToCsv(records: ImportPayload[]): string {
     "releaseYear",
     "developer",
     "publisher",
+    "description",
     "notes",
   ];
 
@@ -342,6 +345,7 @@ export function recordToImportPayload(record: { game: DbGameMetadata; libraryEnt
     coverUrl: game.coverUrl,
     developer: game.developer,
     publisher: game.publisher,
+    description: game.description,
   };
 }
 
@@ -424,6 +428,7 @@ function mergeImportPayloads(current: ImportPayload, incoming: ImportPayload): I
     coverUrl: incoming.coverUrl || current.coverUrl,
     developer: incoming.developer || current.developer,
     publisher: incoming.publisher || current.publisher,
+    description: incoming.description || current.description,
   };
 }
 
@@ -505,7 +510,7 @@ export function buildImportPreview(
     if (!hasExactMatch && gameCandidates.length > 0) {
       reviewReasons.push("O catálogo já possui metadado deste jogo; você pode só vincular uma nova entrada.");
     }
-    if (item.coverUrl || item.genres || item.developer || item.publisher || item.releaseYear) {
+    if (item.coverUrl || item.genres || item.developer || item.publisher || item.releaseYear || item.description) {
       reviewReasons.push("A importação já traz metadado útil para enriquecer o catálogo.");
     }
 
@@ -581,6 +586,7 @@ export function createDbGameFromImport(
       slug: currentGame?.slug,
       coverUrl: item.coverUrl || currentGame?.coverUrl,
       rawgId: item.rawgId ?? currentGame?.rawgId,
+      description: item.description || currentGame?.description,
       genres: item.genres || currentGame?.genres,
       estimatedTime:
         item.estimatedTime ||

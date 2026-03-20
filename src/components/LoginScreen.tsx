@@ -83,6 +83,7 @@ export function LoginScreen() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   required
+                  autoComplete="username"
                   style={{
                     width: "100%",
                     padding: "0.75rem",
@@ -100,6 +101,7 @@ export function LoginScreen() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   required
+                  autoComplete={isRegistering ? "new-password" : "current-password"}
                   style={{
                     width: "100%",
                     padding: "0.75rem",

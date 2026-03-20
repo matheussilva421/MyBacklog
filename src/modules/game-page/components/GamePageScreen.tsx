@@ -158,7 +158,7 @@ export function GamePageScreen({
               <p className="game-page-hero__meta">
                 {data.game.platform} • {data.game.year} • {data.game.genre}
               </p>
-              <p className="game-page-hero__description">{data.game.notes}</p>
+              <p className="game-page-hero__description">{data.game.description || data.game.notes}</p>
             </div>
 
             <div className="game-page-stat-grid">

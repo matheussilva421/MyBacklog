@@ -90,6 +90,7 @@ export type ImportPayload = {
   coverUrl?: string;
   developer?: string;
   publisher?: string;
+  description?: string;
 };
 
 export type ScreenKey =
@@ -129,6 +130,7 @@ export type Game = {
   id: number;
   title: string;
   platform: string;
+  catalogPlatforms?: string;
   sourceStore: string;
   genre: string;
   status: Status;
@@ -140,8 +142,13 @@ export type Game = {
   score: number;
   year: number;
   notes: string;
+  description?: string;
   difficulty: string;
   completionDate?: string;
+  coverUrl?: string;
+  rawgId?: number;
+  developer?: string;
+  publisher?: string;
 };
 
 export type LibraryRecord = {
@@ -230,6 +237,7 @@ export type MonthlyRecap = {
 export type GameFormState = {
   title: string;
   platform: string;
+  catalogPlatforms: string;
   sourceStore: string;
   genre: string;
   status: Status;
@@ -241,6 +249,11 @@ export type GameFormState = {
   year: string;
   mood: string;
   difficulty: string;
+  coverUrl: string;
+  rawgId: string;
+  developer: string;
+  publisher: string;
+  description: string;
   notes: string;
 };
 

@@ -9,6 +9,7 @@ import {
   normalizeGameTitle,
   parseDateInput,
   parseEtaHours,
+  repairLegacyText,
   startOfLocalDay,
 } from "./utils";
 
@@ -159,6 +160,16 @@ describe("core/utils", () => {
 
     it("shows <1h for very small remaining time", () => {
       expect(formatRemainingEta("1h", 90, 0)).toBe("<1h restante");
+    });
+  });
+
+  describe("repairLegacyText", () => {
+    it("repairs common UTF-8 mojibake saved as latin1", () => {
+      expect(repairLegacyText("CatÃ¡logo tÃ¡tico")).toBe("Catálogo tático");
+    });
+
+    it("returns clean text unchanged", () => {
+      expect(repairLegacyText("Média")).toBe("Média");
     });
   });
 

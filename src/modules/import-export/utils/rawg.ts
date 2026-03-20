@@ -17,8 +17,17 @@ export type RawgCandidate = {
 
 export type RawgMetadata = Pick<
   DbGameMetadata,
-  "slug" | "coverUrl" | "rawgId" | "genres" | "releaseYear" | "platforms" | "developer" | "publisher"
+  "slug" | "coverUrl" | "rawgId" | "description" | "genres" | "releaseYear" | "platforms" | "developer" | "publisher"
 >;
+
+function stripHtml(value: string): string {
+  return value
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 function buildRawgUrl(path: string, apiKey: string, params: Record<string, string | number | undefined>) {
   const url = new URL(`${rawgApiBase}${path}`);
@@ -131,6 +140,10 @@ export async function fetchRawgMetadata(rawgId: number, apiKey: string): Promise
     genres: normalizeRawgGenres(item.genres).join(", ") || undefined,
     releaseYear: item.released ? Number(String(item.released).slice(0, 4)) || undefined : undefined,
     platforms: normalizeRawgPlatforms(item.platforms).join(", ") || undefined,
+    description:
+      String(item.description_raw ?? "").trim() ||
+      stripHtml(String(item.description ?? "")).trim() ||
+      undefined,
     developer:
       developers
         .map((developer) =>
@@ -173,6 +186,7 @@ export function applyRawgMetadataToImportPayload(payload: ImportPayload, metadat
     releaseYear: payload.releaseYear ?? metadata.releaseYear,
     developer: payload.developer || metadata.developer,
     publisher: payload.publisher || metadata.publisher,
+    description: payload.description || metadata.description,
   };
 }
 
@@ -182,6 +196,7 @@ export function mergeRawgMetadataIntoGame(game: DbGameMetadata, metadata: RawgMe
     slug: game.slug || metadata.slug,
     coverUrl: game.coverUrl || metadata.coverUrl,
     rawgId: game.rawgId ?? metadata.rawgId,
+    description: game.description || metadata.description,
     genres: game.genres || metadata.genres,
     releaseYear: game.releaseYear ?? metadata.releaseYear,
     platforms:

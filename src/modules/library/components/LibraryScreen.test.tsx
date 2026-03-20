@@ -6,6 +6,7 @@ const baseGame = {
   id: 7,
   title: "Cyberpunk 2077",
   platform: "PC",
+  catalogPlatforms: "PC, PS5, Xbox Series",
   sourceStore: "Steam",
   genre: "RPG",
   status: "Jogando" as const,
@@ -18,6 +19,9 @@ const baseGame = {
   year: 2020,
   notes: "Main story forte.",
   difficulty: "Média",
+  coverUrl: "https://example.com/cyberpunk.jpg",
+  developer: "CD Projekt RED",
+  publisher: "CD Projekt",
 };
 
 describe("LibraryScreen", () => {
@@ -109,5 +113,46 @@ describe("LibraryScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /abrir página/i }));
 
     expect(onOpenGamePage).toHaveBeenCalledWith(7);
+  });
+
+  it("renders the game cover in the library card", () => {
+    render(
+      <LibraryScreen
+        libraryGames={[baseGame]}
+        groupedLibraryGames={[{ key: "all", label: "Todos", games: [baseGame] }]}
+        selectedGame={baseGame}
+        selectedGameLists={[]}
+        filter="Todos"
+        selectedListFilter="all"
+        sortBy="updatedAt"
+        sortDirection="desc"
+        groupBy="none"
+        listOptions={[]}
+        savedViews={[]}
+        activeSavedView={undefined}
+        onFilterChange={vi.fn()}
+        onListFilterChange={vi.fn()}
+        onSortByChange={vi.fn()}
+        onSortDirectionChange={vi.fn()}
+        onGroupByChange={vi.fn()}
+        onSaveCurrentView={vi.fn()}
+        onApplySavedView={vi.fn()}
+        onDeleteSavedView={vi.fn()}
+        onSelectGame={vi.fn()}
+        onExport={vi.fn()}
+        onBackupExport={vi.fn()}
+        onOpenRestore={vi.fn()}
+        onOpenCreate={vi.fn()}
+        onOpenEdit={vi.fn()}
+        onDeleteSelected={vi.fn()}
+        onResumeSelected={vi.fn()}
+        onFavoriteSelected={vi.fn()}
+        onOpenSession={vi.fn()}
+        onOpenGamePage={vi.fn()}
+        onSendSelectedToPlanner={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByAltText(/capa de cyberpunk 2077/i)).not.toHaveLength(0);
   });
 });
