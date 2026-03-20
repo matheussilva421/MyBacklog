@@ -160,6 +160,10 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
     refreshData: app.refreshData,
     setNotice: app.setNotice,
   });
+  const guidedTourOpen = app.guidedTourOpen;
+  const guidedTourScreen = app.guidedTourStep.screen;
+  const currentScreen = app.screen;
+  const setScreen = app.setScreen;
 
   useEffect(() => {
     if (!isAuthEnabled || !user || app.loading || !app.preferences.autoSyncEnabled) {
@@ -169,10 +173,23 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
     void triggerSyncToCloud();
   }, [
     app.games,
+    app.reviewRows,
+    app.tagRows,
+    app.gameTagRows,
     app.goalRows,
     app.listRows,
+    app.libraryEntryListRows,
+    app.savedViewRows,
+    app.platforms,
     app.loading,
     app.preferences.autoSyncEnabled,
+    app.preferences.operatorName,
+    app.preferences.plannerPreference,
+    app.preferences.rawgApiKey,
+    app.preferences.onboardingCompleted,
+    app.preferences.guidedTourCompleted,
+    app.preferences.primaryPlatforms,
+    app.preferences.defaultStores,
     app.sessionRows,
     isAuthEnabled,
     triggerSyncToCloud,
@@ -180,10 +197,10 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
   ]);
 
   useEffect(() => {
-    if (!app.guidedTourOpen) return;
-    if (app.screen === app.guidedTourStep.screen) return;
-    app.setScreen(app.guidedTourStep.screen);
-  }, [app.guidedTourOpen, app.guidedTourStep.screen, app.screen, app.setScreen]);
+    if (!guidedTourOpen) return;
+    if (currentScreen === guidedTourScreen) return;
+    setScreen(guidedTourScreen);
+  }, [currentScreen, guidedTourOpen, guidedTourScreen, setScreen]);
 
   if (app.loading) {
     return (
@@ -587,6 +604,8 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
           <GameModal
             mode={app.gameModalMode}
             form={app.gameForm}
+            availableStores={app.storeRows.map((store) => store.name)}
+            availablePlatforms={app.platforms.map((platform) => platform.name)}
             rawgApiKey={app.preferences.rawgApiKey}
             submitting={app.submitting}
             onClose={app.closeGameModal}
@@ -643,6 +662,9 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
             onMatchChange={app.handleImportPreviewMatchChange}
             onGameChange={app.handleImportPreviewGameChange}
             onRawgChange={app.handleImportPreviewRawgChange}
+            onApplySuggested={app.handleImportPreviewApplySuggested}
+            onAutoMergeSafe={app.handleImportPreviewAutoMergeSafe}
+            onIgnoreUnsafe={app.handleImportPreviewIgnoreUnsafe}
             onSubmit={app.handleImportSubmit}
           />
         </Suspense>

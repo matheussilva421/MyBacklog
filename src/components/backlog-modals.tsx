@@ -25,6 +25,7 @@ import {
 } from "../modules/import-export/utils/rawg";
 import { db } from "../core/db";
 import type { ImportJob } from "../core/types";
+import { splitCsvTokens } from "../core/utils";
 
 type ImportPreviewSummary = {
   create: number;
@@ -32,7 +33,10 @@ type ImportPreviewSummary = {
   ignore: number;
   fresh: number;
   existing: number;
+  review: number;
   duplicates: number;
+  assisted: number;
+  maintenance: number;
 };
 
 type RestorePreviewTotals = {
@@ -40,6 +44,16 @@ type RestorePreviewTotals = {
   update: number;
   skip: number;
 };
+
+function formatImportJobChanges(changes?: string): string | null {
+  if (!changes || changes === "[]") return null;
+
+  try {
+    return JSON.stringify(JSON.parse(changes), null, 2);
+  } catch {
+    return changes;
+  }
+}
 
 function RawgCandidateCard({
   candidate,
@@ -90,21 +104,37 @@ function RawgCandidateCard({
 export function GameModal(props: {
   mode: "create" | "edit" | null;
   form: GameFormState;
+  availableStores: string[];
+  availablePlatforms: string[];
   rawgApiKey?: string;
   submitting?: boolean;
   onChange: <K extends keyof GameFormState>(field: K, value: GameFormState[K]) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onClose: () => void;
 }) {
-  const { mode, form, rawgApiKey = "", submitting = false, onChange, onSubmit, onClose } = props;
+  const {
+    mode,
+    form,
+    availableStores,
+    availablePlatforms,
+    rawgApiKey = "",
+    submitting = false,
+    onChange,
+    onSubmit,
+    onClose,
+  } = props;
   const [rawgCandidates, setRawgCandidates] = useState<RawgCandidate[]>([]);
   const [rawgLoading, setRawgLoading] = useState(false);
   const [rawgMessage, setRawgMessage] = useState<string | null>(null);
   const [rawgMessageTone, setRawgMessageTone] = useState<"error" | "success">("success");
+  const [platformDraft, setPlatformDraft] = useState("");
+  const [storeDraft, setStoreDraft] = useState("");
 
   useEffect(() => {
     setRawgCandidates([]);
     setRawgMessage(null);
+    setPlatformDraft("");
+    setStoreDraft("");
   }, [mode]);
 
   if (!mode) return null;
@@ -112,6 +142,54 @@ export function GameModal(props: {
   const setFeedback = (message: string | null, tone: "error" | "success" = "success") => {
     setRawgMessage(message);
     setRawgMessageTone(tone);
+  };
+
+  const platformOptions = Array.from(new Set([...availablePlatforms, ...form.platforms]))
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right, "pt-BR"));
+  const storeOptions = Array.from(new Set([...availableStores, ...form.stores]))
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right, "pt-BR"));
+
+  const updatePlatformSelections = (nextPlatforms: string[]) => {
+    const normalized = splitCsvTokens(nextPlatforms);
+    onChange("platforms", normalized);
+    onChange("catalogPlatforms", normalized.join(", "));
+    onChange("platform", normalized.includes(form.platform) ? form.platform : normalized[0] ?? "");
+  };
+
+  const updateStoreSelections = (nextStores: string[]) => {
+    const normalized = splitCsvTokens(nextStores);
+    onChange("stores", normalized);
+    onChange("sourceStore", normalized.includes(form.sourceStore) ? form.sourceStore : normalized[0] ?? "");
+  };
+
+  const togglePlatform = (platformName: string) => {
+    updatePlatformSelections(
+      form.platforms.includes(platformName)
+        ? form.platforms.filter((value) => value !== platformName)
+        : [...form.platforms, platformName],
+    );
+  };
+
+  const toggleStore = (storeName: string) => {
+    updateStoreSelections(
+      form.stores.includes(storeName)
+        ? form.stores.filter((value) => value !== storeName)
+        : [...form.stores, storeName],
+    );
+  };
+
+  const addPlatformsFromDraft = () => {
+    if (!platformDraft.trim()) return;
+    updatePlatformSelections([...form.platforms, ...splitCsvTokens(platformDraft)]);
+    setPlatformDraft("");
+  };
+
+  const addStoresFromDraft = () => {
+    if (!storeDraft.trim()) return;
+    updateStoreSelections([...form.stores, ...splitCsvTokens(storeDraft)]);
+    setStoreDraft("");
   };
 
   const handleRawgSearch = async () => {
@@ -157,12 +235,11 @@ export function GameModal(props: {
       onChange("rawgId", String(candidate.rawgId));
       onChange("coverUrl", metadata.coverUrl ?? candidate.coverUrl ?? "");
       onChange("genre", metadata.genres ?? candidate.genres.join(", "));
-      onChange("catalogPlatforms", metadata.platforms ?? candidate.platforms.join(", "));
+      updatePlatformSelections(splitCsvTokens(metadata.platforms ?? candidate.platforms.join(", ")));
       onChange("year", metadata.releaseYear != null ? String(metadata.releaseYear) : form.year);
       onChange("developer", metadata.developer ?? "");
       onChange("publisher", metadata.publisher ?? "");
       if (!form.description.trim() && metadata.description) onChange("description", metadata.description);
-      if (!form.platform.trim() && candidate.platforms[0]) onChange("platform", candidate.platforms[0]);
 
       setFeedback(`Metadados de ${candidate.title} aplicados ao formulário.`);
     } catch (error) {
@@ -217,21 +294,79 @@ export function GameModal(props: {
             </div>
           ) : null}
 
+          <div className="field field--wide">
+            <span>Plataformas estruturadas</span>
+            <div className="selection-chip-grid">
+              {platformOptions.map((platformName) => (
+                <button
+                  key={`platform-${platformName}`}
+                  type="button"
+                  className={cx("selection-chip", form.platforms.includes(platformName) && "selection-chip--active")}
+                  onClick={() => togglePlatform(platformName)}
+                >
+                  {platformName}
+                </button>
+              ))}
+            </div>
+            <div className="field__aux field__aux--inline">
+              <input
+                value={platformDraft}
+                onChange={(event) => setPlatformDraft(event.target.value)}
+                placeholder="Adicionar nova plataforma"
+              />
+              <NotchButton type="button" variant="secondary" onClick={addPlatformsFromDraft}>
+                Adicionar
+              </NotchButton>
+            </div>
+            <small>Selecione plataformas conhecidas ou adicione novas sem depender de CSV manual.</small>
+          </div>
           <label className="field">
-            <span>Plataforma</span>
-            <input value={form.platform} onChange={(event) => onChange("platform", event.target.value)} />
+            <span>Plataforma principal</span>
+            <select value={form.platform} onChange={(event) => onChange("platform", event.target.value)}>
+              {form.platforms.length === 0 ? <option value="">Selecione uma plataforma</option> : null}
+              {form.platforms.map((platformName) => (
+                <option key={`primary-platform-${platformName}`} value={platformName}>
+                  {platformName}
+                </option>
+              ))}
+            </select>
           </label>
+          <div className="field field--wide">
+            <span>Stores estruturadas</span>
+            <div className="selection-chip-grid">
+              {storeOptions.map((storeName) => (
+                <button
+                  key={`store-${storeName}`}
+                  type="button"
+                  className={cx("selection-chip", form.stores.includes(storeName) && "selection-chip--active")}
+                  onClick={() => toggleStore(storeName)}
+                >
+                  {storeName}
+                </button>
+              ))}
+            </div>
+            <div className="field__aux field__aux--inline">
+              <input
+                value={storeDraft}
+                onChange={(event) => setStoreDraft(event.target.value)}
+                placeholder="Adicionar nova store"
+              />
+              <NotchButton type="button" variant="secondary" onClick={addStoresFromDraft}>
+                Adicionar
+              </NotchButton>
+            </div>
+            <small>A primeira store selecionada vira fallback legado para compatibilidade.</small>
+          </div>
           <label className="field">
-            <span>Plataformas do catálogo</span>
-            <input
-              value={form.catalogPlatforms}
-              onChange={(event) => onChange("catalogPlatforms", event.target.value)}
-              placeholder="PC, PS5, Switch..."
-            />
-          </label>
-          <label className="field">
-            <span>Loja / fonte</span>
-            <input value={form.sourceStore} onChange={(event) => onChange("sourceStore", event.target.value)} />
+            <span>Store principal</span>
+            <select value={form.sourceStore} onChange={(event) => onChange("sourceStore", event.target.value)}>
+              {form.stores.length === 0 ? <option value="">Selecione uma store</option> : null}
+              {form.stores.map((storeName) => (
+                <option key={`primary-store-${storeName}`} value={storeName}>
+                  {storeName}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="field">
             <span>Gênero</span>
@@ -380,6 +515,9 @@ export function ImportModal(props: {
   onMatchChange: (entryId: string, matchId: number | null) => void;
   onGameChange: (entryId: string, gameId: number | null) => void;
   onRawgChange: (entryId: string, rawgId: number | null) => void;
+  onApplySuggested: () => void;
+  onAutoMergeSafe: () => void;
+  onIgnoreUnsafe: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onClose: () => void;
 }) {
@@ -399,6 +537,11 @@ export function ImportModal(props: {
     onMatchChange,
     onGameChange,
     onRawgChange,
+    onApplySuggested,
+    onAutoMergeSafe,
+    onIgnoreUnsafe,
+    onSubmit,
+    onClose,
   } = props;
   
   const [activeTab, setActiveTab] = useState<"import" | "history">("import");
@@ -438,28 +581,32 @@ export function ImportModal(props: {
           {history.length === 0 ? (
             <p className="preview-card__hint">Nenhum histórico de importação encontrado.</p>
           ) : (
-            history.map((job) => (
-              <article className="preview-card" key={job.id}>
-                <div className="preview-card__head">
-                  <div>
-                    <strong>Origem: {job.source.toUpperCase()}</strong>
-                    <span>{new Date(job.createdAt).toLocaleString("pt-BR")}</span>
+            history.map((job) => {
+              const formattedChanges = formatImportJobChanges(job.changes);
+
+              return (
+                <article className="preview-card" key={job.id}>
+                  <div className="preview-card__head">
+                    <div>
+                      <strong>Origem: {job.source.toUpperCase()}</strong>
+                      <span>{new Date(job.createdAt).toLocaleString("pt-BR")}</span>
+                    </div>
+                    <Pill tone={job.status === "completed" ? "emerald" : job.status === "failed" ? "magenta" : "cyan"}>
+                      {job.status === "completed" ? "Sucesso" : job.status === "failed" ? "Falha" : job.status}
+                    </Pill>
                   </div>
-                  <Pill tone={job.status === "completed" ? "emerald" : job.status === "failed" ? "magenta" : "cyan"}>
-                    {job.status === "completed" ? "Sucesso" : job.status === "failed" ? "Falha" : job.status}
-                  </Pill>
-                </div>
-                <p>{job.summary}</p>
-                {job.changes && job.changes !== "[]" ? (
-                  <details style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "var(--foreground-muted)" }}>
-                    <summary style={{ cursor: "pointer", outline: "none" }}>Ver alterações</summary>
-                    <pre style={{ whiteSpace: "pre-wrap", background: "rgba(0,0,0,0.2)", padding: "0.5rem", borderRadius: "4px", marginTop: "0.5rem" }}>
-                      {JSON.stringify(JSON.parse(job.changes), null, 2)}
-                    </pre>
-                  </details>
-                ) : null}
-              </article>
-            ))
+                  <p>{job.summary}</p>
+                  {formattedChanges ? (
+                    <details style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "var(--foreground-muted)" }}>
+                      <summary style={{ cursor: "pointer", outline: "none" }}>Ver alterações</summary>
+                      <pre style={{ whiteSpace: "pre-wrap", background: "rgba(0,0,0,0.2)", padding: "0.5rem", borderRadius: "4px", marginTop: "0.5rem" }}>
+                        {formattedChanges}
+                      </pre>
+                    </details>
+                  ) : null}
+                </article>
+              );
+            })
           )}
         </div>
       ) : (
@@ -495,10 +642,24 @@ export function ImportModal(props: {
         {preview ? (
           <>
             <div className="preview-summary-grid">
+              <article className="preview-summary-card"><span>Revisão manual</span><strong>{summary.review}</strong><small>Itens que exigem checagem</small></article>
+              <article className="preview-summary-card"><span>Matches diretos</span><strong>{summary.existing}</strong><small>Entradas já reconhecidas</small></article>
+              <article className="preview-summary-card"><span>Merge assistido</span><strong>{summary.assisted}</strong><small>Vínculos prontos para atualizar</small></article>
+              <article className="preview-summary-card"><span>Manutenção</span><strong>{summary.maintenance}</strong><small>Cards com sinais de deduplicação</small></article>
               <article className="preview-summary-card"><span>Novos itens</span><strong>{summary.fresh}</strong><small>Entradas sem match local</small></article>
-              <article className="preview-summary-card"><span>Matches diretos</span><strong>{summary.existing}</strong><small>Itens que podem atualizar</small></article>
               <article className="preview-summary-card"><span>Repetições no arquivo</span><strong>{summary.duplicates}</strong><small>Linhas consolidadas no preview</small></article>
-              <article className="preview-summary-card"><span>Aplicação atual</span><strong>{summary.create + summary.update}</strong><small>{summary.ignore} ignorados</small></article>
+            </div>
+
+            <div className="preview-batch-bar">
+              <NotchButton type="button" variant="secondary" onClick={onApplySuggested}>
+                Aplicar sugestões
+              </NotchButton>
+              <NotchButton type="button" variant="secondary" onClick={onAutoMergeSafe}>
+                Auto-mesclar seguros
+              </NotchButton>
+              <NotchButton type="button" variant="ghost" onClick={onIgnoreUnsafe}>
+                Ignorar ambíguos
+              </NotchButton>
             </div>
 
             <div className="preview-list">
@@ -518,11 +679,24 @@ export function ImportModal(props: {
                       </select>
                     </label>
                   </div>
+                  <div className="preview-card__stats">
+                    <span>
+                      Confiança <strong>{entry.confidenceScore}%</strong>
+                    </span>
+                    <span>
+                      Plano <strong>{entry.suggestedAction === "update" ? "Atualizar" : "Criar"}</strong>
+                    </span>
+                    {entry.duplicateCount > 0 ? (
+                      <span>
+                        Repetições <strong>{entry.duplicateCount}</strong>
+                      </span>
+                    ) : null}
+                  </div>
                   <p>
                     {entry.status === "existing"
                       ? `Match encontrado no catálogo: ${entry.existingTitle}`
                       : entry.status === "review"
-                        ? "Há conflitos locais ou oportunidades de vínculo/enriquecimento. Revise antes de aplicar."
+                        ? "Há conflitos locais ou oportunidade de merge assistido/manutenção. Revise antes de aplicar."
                         : "Novo item pronto para entrar na biblioteca."}
                   </p>
                   {entry.reviewReasons.length > 0 ? (
@@ -532,6 +706,34 @@ export function ImportModal(props: {
                       ))}
                     </div>
                   ) : null}
+                  {entry.overlapPlatforms.length > 0 || entry.overlapStores.length > 0 ? (
+                    <div className="preview-overlap-grid">
+                      {entry.overlapPlatforms.length > 0 ? (
+                        <div className="preview-overlap-card">
+                          <span>Plataformas em comum</span>
+                          <strong>{entry.overlapPlatforms.join(", ")}</strong>
+                        </div>
+                      ) : null}
+                      {entry.overlapStores.length > 0 ? (
+                        <div className="preview-overlap-card">
+                          <span>Stores em comum</span>
+                          <strong>{entry.overlapStores.join(", ")}</strong>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {entry.maintenanceSignals.length > 0 ? (
+                    <div className="preview-maintenance-card">
+                      <span>Fila de manutenção</span>
+                      <div className="detail-note__tags">
+                        {entry.maintenanceSignals.map((signal) => (
+                          <Pill key={`${entry.id}-${signal}`} tone="yellow">
+                            {signal}
+                          </Pill>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {entry.matchCandidates.length > 0 ? (
                     <label className="field preview-card__field preview-card__field--wide">
                       <span>Atualizar LibraryEntry existente</span>
@@ -539,7 +741,7 @@ export function ImportModal(props: {
                         <option value="">Criar nova LibraryEntry</option>
                         {entry.matchCandidates.map((candidate) => (
                           <option key={`${candidate.entryId}-${candidate.platform}`} value={candidate.entryId}>
-                            {candidate.title} • {candidate.platform} • {candidate.sourceStore}
+                            {candidate.title} • {candidate.platform} • {candidate.sourceStore} • {candidate.score}%
                           </option>
                         ))}
                       </select>
@@ -555,6 +757,7 @@ export function ImportModal(props: {
                             {candidate.title}
                             {candidate.releaseYear ? ` (${candidate.releaseYear})` : ""}
                             {candidate.platforms.length > 0 ? ` • ${candidate.platforms.join(", ")}` : ""}
+                            {` • ${candidate.score}%`}
                           </option>
                         ))}
                       </select>
@@ -585,6 +788,8 @@ export function ImportModal(props: {
                     {(entry.payload.pricePaid || entry.payload.purchaseDate || entry.payload.storeLink || entry.payload.startedAt) ? (
                       <Pill tone="emerald">Financeiro</Pill>
                     ) : null}
+                    {entry.confidenceScore >= 78 ? <Pill tone="emerald">Confiança alta</Pill> : null}
+                    {entry.maintenanceSignals.length > 0 ? <Pill tone="yellow">Manutenção</Pill> : null}
                     {entry.selectedGameId ? <Pill tone="yellow">Game vinculado</Pill> : null}
                     {entry.selectedRawgId ? <Pill tone="cyan">RAWG ativo</Pill> : null}
                     <Pill tone={entry.action === "ignore" ? "neutral" : entry.action === "update" ? "magenta" : "cyan"}>

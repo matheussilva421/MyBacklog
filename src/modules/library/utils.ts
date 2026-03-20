@@ -17,13 +17,27 @@ export function composeLibraryRecords(
     .filter((record): record is LibraryRecord => Boolean(record));
 }
 
-export function dbGameToUiGame(record: LibraryRecord): Game {
+export function dbGameToUiGame(
+  record: LibraryRecord,
+  structured?: {
+    stores?: string[];
+    platforms?: string[];
+  },
+): Game {
   const { game, libraryEntry } = record;
   const title = repairLegacyText(game.title) || game.title;
-  const platform = repairLegacyText(libraryEntry.platform) || repairLegacyText(getPrimaryCsvToken(game.platforms, "PC")) || "PC";
+  const structuredPlatforms = structured?.platforms?.map((value) => repairLegacyText(value) || value).filter(Boolean) ?? [];
+  const structuredStores = structured?.stores?.map((value) => repairLegacyText(value) || value).filter(Boolean) ?? [];
+  const platform =
+    repairLegacyText(libraryEntry.platform) ||
+    repairLegacyText(getPrimaryCsvToken(structuredPlatforms, getPrimaryCsvToken(game.platforms, "PC"))) ||
+    "PC";
   const genre = repairLegacyText(getPrimaryCsvToken(game.genres, "Catálogo tático")) || "Catálogo tático";
-  const catalogPlatforms = repairLegacyText(game.platforms) || undefined;
-  const sourceStore = repairLegacyText(libraryEntry.sourceStore) || "Manual";
+  const catalogPlatforms = structuredPlatforms.length > 0 ? structuredPlatforms.join(", ") : repairLegacyText(game.platforms) || undefined;
+  const sourceStore =
+    repairLegacyText(getPrimaryCsvToken(structuredStores, libraryEntry.sourceStore)) ||
+    repairLegacyText(libraryEntry.sourceStore) ||
+    "Manual";
   const eta = repairLegacyText(game.estimatedTime) || "Sem dado";
   const mood = repairLegacyText(libraryEntry.mood) || "Tático";
   const notes = repairLegacyText(libraryEntry.notes) || "Sem leitura registrada no sistema.";
@@ -36,8 +50,10 @@ export function dbGameToUiGame(record: LibraryRecord): Game {
     id: libraryEntry.id ?? Date.now(),
     title,
     platform,
+    platforms: structuredPlatforms.length > 0 ? structuredPlatforms : [platform],
     catalogPlatforms,
     sourceStore,
+    stores: structuredStores.length > 0 ? structuredStores : [sourceStore],
     genre,
     status: dbStatusToStatus(libraryEntry),
     progress: Math.max(0, Math.min(100, Math.round(libraryEntry.completionPercent || 0))),

@@ -29,8 +29,10 @@ vi.mock("../modules/import-export/utils/rawg", () => ({
 const baseForm = {
   title: "Cyberpunk",
   platform: "PC",
+  platforms: ["PC"],
   catalogPlatforms: "PC",
   sourceStore: "Manual",
+  stores: ["Manual"],
   genre: "",
   status: "Backlog" as const,
   priority: "Média" as const,
@@ -47,6 +49,12 @@ const baseForm = {
   publisher: "",
   description: "",
   notes: "",
+  startedAt: "",
+  purchaseDate: "",
+  pricePaid: "",
+  targetPrice: "",
+  currency: "BRL",
+  storeLink: "",
 };
 
 describe("GameModal", () => {
@@ -57,6 +65,8 @@ describe("GameModal", () => {
       <GameModal
         mode="create"
         form={baseForm}
+        availableStores={["Steam", "GOG", "Manual"]}
+        availablePlatforms={["PC", "PS5"]}
         rawgApiKey="rawg-key"
         onChange={onChange}
         onSubmit={vi.fn(async () => undefined)}
@@ -76,6 +86,7 @@ describe("GameModal", () => {
       expect(onChange).toHaveBeenCalledWith("title", "Cyberpunk 2077");
       expect(onChange).toHaveBeenCalledWith("coverUrl", "https://example.com/cyberpunk.jpg");
       expect(onChange).toHaveBeenCalledWith("genre", "RPG, Open World");
+      expect(onChange).toHaveBeenCalledWith("platforms", ["PC", "PS5"]);
       expect(onChange).toHaveBeenCalledWith("developer", "CD Projekt RED");
       expect(onChange).toHaveBeenCalledWith("publisher", "CD Projekt");
       expect(onChange).toHaveBeenCalledWith("description", "Mercenário em Night City.");

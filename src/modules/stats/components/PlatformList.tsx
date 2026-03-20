@@ -1,6 +1,7 @@
-import { Monitor, ChevronRight } from "lucide-react";
+import { useMemo } from "react";
+import { ChevronRight, Monitor } from "lucide-react";
 import type { Game, Platform } from "../../../backlog/shared";
-import { Panel, SectionHeader, Pill } from "../../../components/cyberpunk-ui";
+import { Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type PlatformListProps = {
   platforms: Platform[];
@@ -8,80 +9,80 @@ type PlatformListProps = {
   onSelect: (platform: Platform) => void;
 };
 
+type PlatformSummary = {
+  totalGames: number;
+  finishedCount: number;
+  playingCount: number;
+};
+
 export function PlatformList({ platforms, games, onSelect }: PlatformListProps) {
+  const summaryByPlatform = useMemo(() => {
+    const map = new Map<string, PlatformSummary>();
+
+    for (const game of games) {
+      const current = map.get(game.platform) ?? {
+        totalGames: 0,
+        finishedCount: 0,
+        playingCount: 0,
+      };
+
+      current.totalGames += 1;
+      if (game.status === "Terminado") current.finishedCount += 1;
+      if (game.status === "Jogando") current.playingCount += 1;
+      map.set(game.platform, current);
+    }
+
+    return map;
+  }, [games]);
+
   return (
     <Panel className="platform-list-panel anim-fade-in">
-      <SectionHeader 
-        icon={Monitor} 
-        title="Minhas Plataformas" 
-        description="Gerencie e visualize dados por hardware" 
+      <SectionHeader
+        icon={Monitor}
+        title="Minhas Plataformas"
+        description="Gerencie e visualize dados por hardware"
       />
-      
-      <div className="platform-grid-legacy" style={{ 
-        display: "grid", 
-        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", 
-        gap: "1rem",
-        marginTop: "1rem" 
-      }}>
-        {platforms.map(platform => {
-          const platformGames = games.filter(g => g.platform === platform.name);
-          const finishedCount = platformGames.filter(g => g.status === "Terminado").length;
-          const playingCount = platformGames.filter(g => g.status === "Jogando").length;
-          
+
+      <div className="platform-grid-legacy">
+        {platforms.map((platform) => {
+          const summary = summaryByPlatform.get(platform.name) ?? {
+            totalGames: 0,
+            finishedCount: 0,
+            playingCount: 0,
+          };
+
           return (
-            <div 
-              key={platform.id || platform.name} 
+            <button
+              type="button"
+              key={platform.id || platform.name}
               className="platform-card-interactive"
               onClick={() => onSelect(platform)}
-              style={{
-                border: "1px solid var(--border-color)",
-                padding: "1rem",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                position: "relative",
-                overflow: "hidden",
-                background: "rgba(255,255,255,0.02)"
-              }}
             >
-              {platform.hexColor && (
-                <div style={{ 
-                  position: "absolute", 
-                  top: 0, 
-                  left: 0, 
-                  width: "4px", 
-                  bottom: 0, 
-                  background: platform.hexColor 
-                }} />
-              )}
-              
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "0.5rem" }}>
+              {platform.hexColor ? (
+                <span
+                  className="platform-card-interactive__accent"
+                  style={{ background: platform.hexColor }}
+                  aria-hidden="true"
+                />
+              ) : null}
+
+              <div className="platform-card-interactive__head">
                 <div>
-                  <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{platform.name}</h3>
-                  <span style={{ fontSize: "0.7rem", color: "var(--foreground-muted)", textTransform: "uppercase" }}>
-                    {platform.brand || "Desconhecido"} {platform.generation ? `• G${platform.generation}` : ""}
+                  <h3>{platform.name}</h3>
+                  <span className="platform-card-interactive__meta">
+                    {platform.brand || "Desconhecido"}
+                    {platform.generation ? ` • G${platform.generation}` : ""}
                   </span>
                 </div>
-                <ChevronRight size={18} className="arrow-icon" />
+                <ChevronRight size={18} className="platform-card-interactive__arrow" />
               </div>
 
-              <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
-                <Pill tone="neutral">{platformGames.length} jogos</Pill>
-                {playingCount > 0 && <Pill tone="cyan">{playingCount} jogando</Pill>}
-                {finishedCount > 0 && <Pill tone="emerald">{finishedCount} zerados</Pill>}
+              <div className="platform-card-interactive__pills">
+                <Pill tone="neutral">{summary.totalGames} jogos</Pill>
+                {summary.playingCount > 0 ? <Pill tone="cyan">{summary.playingCount} jogando</Pill> : null}
+                {summary.finishedCount > 0 ? <Pill tone="emerald">{summary.finishedCount} zerados</Pill> : null}
               </div>
-
-              <style>{`
-                .platform-card-interactive:hover {
-                  background: rgba(255,255,255,0.05) !important;
-                  border-color: var(--accent) !important;
-                  transform: translateY(-2px);
-                }
-                .platform-card-interactive:hover .arrow-icon {
-                  color: var(--accent);
-                  transform: translateX(4px);
-                }
-              `}</style>
-            </div>
+            </button>
           );
         })}
       </div>

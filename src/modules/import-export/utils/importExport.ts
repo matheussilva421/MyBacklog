@@ -18,7 +18,20 @@ import type {
   ProgressStatus,
 } from "../../../core/types";
 import { deriveCompletionDate } from "../../../core/catalogIntegrity";
-import { getPrimaryCsvToken, mergePlatformList, normalizeGameTitle, splitCsvTokens, toDateInputValue } from "../../../core/utils";
+import {
+  getPrimaryCsvToken,
+  mergePlatformList,
+  normalizeGameTitle,
+  normalizeToken,
+  splitCsvTokens,
+  toDateInputValue,
+} from "../../../core/utils";
+import {
+  buildPlatformNamesByGameId,
+  buildStoreNamesByEntryId,
+  resolveStructuredPlatforms,
+  resolveStructuredStores,
+} from "../../../core/structuredRelations";
 import { composeLibraryRecords } from "../../library/utils";
 import { buildStructuredTablesFromLegacy } from "../../../core/structuredTables";
 import type {
@@ -370,14 +383,40 @@ export function gamesToCsv(records: ImportPayload[]): string {
   return [headers.join(","), ...rows].join("\n");
 }
 
-export function recordToImportPayload(record: { game: DbGameMetadata; libraryEntry: DbLibraryEntry }): ImportPayload {
+export function recordToImportPayload(
+  record: { game: DbGameMetadata; libraryEntry: DbLibraryEntry },
+  structured?: {
+    storeRows?: DbStore[];
+    libraryEntryStoreRows?: DbLibraryEntryStore[];
+    platformRows?: DbPlatform[];
+    gamePlatformRows?: DbGamePlatform[];
+    storeNamesByEntryId?: Map<number, string[]>;
+    platformNamesByGameId?: Map<number, string[]>;
+  },
+): ImportPayload {
   const { game, libraryEntry } = record;
+  const storeNamesByEntryId = structured?.storeNamesByEntryId
+    ? structured.storeNamesByEntryId
+    : structured?.storeRows && structured.libraryEntryStoreRows
+      ? buildStoreNamesByEntryId(structured.storeRows, structured.libraryEntryStoreRows)
+      : new Map<number, string[]>();
+  const platformNamesByGameId = structured?.platformNamesByGameId
+    ? structured.platformNamesByGameId
+    : structured?.platformRows && structured.gamePlatformRows
+      ? buildPlatformNamesByGameId(structured.platformRows, structured.gamePlatformRows)
+    : new Map<number, string[]>();
+  const platforms = structured
+    ? resolveStructuredPlatforms(game, libraryEntry.platform, platformNamesByGameId)
+    : splitCsvTokens(game.platforms);
+  const stores = structured
+    ? resolveStructuredStores(libraryEntry, storeNamesByEntryId)
+    : splitCsvTokens(libraryEntry.sourceStore);
   return {
     title: game.title,
     platform: libraryEntry.platform,
-    platforms: splitCsvTokens(game.platforms),
-    sourceStore: libraryEntry.sourceStore,
-    stores: splitCsvTokens(libraryEntry.sourceStore),
+    platforms,
+    sourceStore: getPrimaryCsvToken(stores, libraryEntry.sourceStore),
+    stores,
     format: libraryEntry.format,
     ownershipStatus: libraryEntry.ownershipStatus,
     progressStatus: libraryEntry.progressStatus,
@@ -485,17 +524,156 @@ function mergeImportPayloads(current: ImportPayload, incoming: ImportPayload): I
   };
 }
 
-function createMatchCandidate(record: { game: DbGameMetadata; libraryEntry: DbLibraryEntry }, confidence: "exact" | "title"): ImportMatchCandidate {
+function buildTokenIntersection(left: string[], right: string[]): string[] {
+  const rightTokens = new Map(right.map((value) => [normalizeToken(value), value] as const));
+  const unique = new Set<string>();
+
+  for (const value of left) {
+    const match = rightTokens.get(normalizeToken(value));
+    if (match) unique.add(match);
+  }
+
+  return Array.from(unique);
+}
+
+function countSharedMetadataSignals(payload: ImportPayload, record: { game: DbGameMetadata }): number {
+  let matches = 0;
+  if (payload.releaseYear && record.game.releaseYear && payload.releaseYear === record.game.releaseYear) matches += 1;
+  if (
+    payload.developer &&
+    record.game.developer &&
+    normalizeToken(payload.developer) === normalizeToken(record.game.developer)
+  ) {
+    matches += 1;
+  }
+  if (
+    payload.publisher &&
+    record.game.publisher &&
+    normalizeToken(payload.publisher) === normalizeToken(record.game.publisher)
+  ) {
+    matches += 1;
+  }
+  return matches;
+}
+
+function computeAssistedScore(args: {
+  exact: boolean;
+  overlapPlatforms: string[];
+  overlapStores: string[];
+  metadataMatches: number;
+}): number {
+  if (args.exact) return 100;
+
+  return Math.min(
+    96,
+    56 +
+      Math.min(args.overlapPlatforms.length, 2) * 14 +
+      Math.min(args.overlapStores.length, 2) * 10 +
+      Math.min(args.metadataMatches, 3) * 6,
+  );
+}
+
+function summarizeGameMetadataGaps(game: DbGameMetadata): string[] {
+  const labels = {
+    coverUrl: "capa",
+    genres: "gêneros",
+    estimatedTime: "ETA",
+    platforms: "plataformas",
+    developer: "estúdio",
+    publisher: "publisher",
+    releaseYear: "ano",
+  } as const;
+
+  return (Object.keys(labels) as Array<keyof typeof labels>).filter((field) => {
+    const value = game[field as keyof DbGameMetadata];
+    if (typeof value === "number") return !Number.isFinite(value);
+    return !String(value || "").trim();
+  }).map((field) => labels[field]);
+}
+
+function hasUsefulImportMetadata(payload: ImportPayload): boolean {
+  return Boolean(
+    payload.coverUrl ||
+      payload.genres ||
+      payload.developer ||
+      payload.publisher ||
+      payload.releaseYear ||
+      payload.description,
+  );
+}
+
+function createMatchCandidate(
+  record: { game: DbGameMetadata; libraryEntry: DbLibraryEntry },
+  payload: ImportPayload,
+  confidence: "exact" | "title",
+): ImportMatchCandidate {
+  const incomingPlatforms = splitCsvTokens([...(payload.platforms ?? []), payload.platform]);
+  const incomingStores = splitCsvTokens([...(payload.stores ?? []), payload.sourceStore]);
+  const overlapPlatforms = buildTokenIntersection(
+    incomingPlatforms,
+    splitCsvTokens([record.libraryEntry.platform, record.game.platforms]),
+  );
+  const overlapStores = buildTokenIntersection(incomingStores, splitCsvTokens(record.libraryEntry.sourceStore));
+  const metadataMatches = countSharedMetadataSignals(payload, record);
+  const score = computeAssistedScore({
+    exact: confidence === "exact",
+    overlapPlatforms,
+    overlapStores,
+    metadataMatches,
+  });
+  const maintenanceSignals: string[] = [];
+
+  if (confidence !== "exact" && overlapPlatforms.length === 0) {
+    maintenanceSignals.push("Título coincide, mas a plataforma local diverge.");
+  }
+  if (confidence !== "exact" && overlapStores.length === 0 && incomingStores.length > 0) {
+    maintenanceSignals.push("Título coincide, mas a store local diverge.");
+  }
+  if (confidence !== "exact" && score >= 78) {
+    maintenanceSignals.push("Merge assistido disponível com boa confiança.");
+  }
+
   return {
     entryId: record.libraryEntry.id ?? 0,
     title: record.game.title,
     platform: record.libraryEntry.platform,
     sourceStore: record.libraryEntry.sourceStore,
-    confidence,
+    overlapPlatforms,
+    overlapStores,
+    maintenanceSignals,
+    score,
+    confidence: confidence === "exact" ? "exact" : score >= 78 ? "assisted" : "title",
   };
 }
 
-function createGameCandidate(record: { game: DbGameMetadata; libraryEntry: DbLibraryEntry }, confidence: "exact" | "metadata"): ImportGameCandidate {
+function createGameCandidate(
+  record: { game: DbGameMetadata; libraryEntry: DbLibraryEntry },
+  payload: ImportPayload,
+  confidence: "exact" | "metadata",
+): ImportGameCandidate {
+  const incomingPlatforms = splitCsvTokens([...(payload.platforms ?? []), payload.platform]);
+  const overlapPlatforms = buildTokenIntersection(
+    incomingPlatforms,
+    splitCsvTokens([record.libraryEntry.platform, record.game.platforms]),
+  );
+  const metadataMatches = countSharedMetadataSignals(payload, record);
+  const score = computeAssistedScore({
+    exact: confidence === "exact",
+    overlapPlatforms,
+    overlapStores: [],
+    metadataMatches,
+  });
+  const fillableMetadata = summarizeGameMetadataGaps(record.game).filter((field) => {
+    if (field === "ano") return payload.releaseYear != null;
+    if (field === "plataformas") return splitCsvTokens([...(payload.platforms ?? []), payload.platform]).length > 0;
+    if (field === "capa") return Boolean(payload.coverUrl);
+    if (field === "gêneros") return Boolean(payload.genres);
+    if (field === "ETA") return Boolean(payload.estimatedTime);
+    if (field === "estúdio") return Boolean(payload.developer);
+    if (field === "publisher") return Boolean(payload.publisher);
+    return false;
+  });
+
   return {
     gameId: record.game.id ?? 0,
     title: record.game.title,
@@ -504,9 +682,17 @@ function createGameCandidate(record: { game: DbGameMetadata; libraryEntry: DbLib
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean),
+    overlapPlatforms,
+    maintenanceSignals:
+      fillableMetadata.length > 0
+        ? [`Importação pode preencher: ${fillableMetadata.join(", ")}.`]
+        : confidence !== "exact" && score >= 72
+          ? ["Game existente pode ser reutilizado com segurança."]
+          : [],
+    score,
     developer: record.game.developer,
     publisher: record.game.publisher,
-    confidence,
+    confidence: confidence === "exact" ? "exact" : score >= 72 ? "assisted" : "metadata",
   };
 }
 
@@ -518,16 +704,20 @@ export function buildImportPreview(
     existingRecords.map((record) => [createImportKey(record.game.title, record.libraryEntry.platform), record] as const),
   );
   const existingByTitle = new Map<string, Array<{ game: DbGameMetadata; libraryEntry: DbLibraryEntry }>>();
-  const uniqueGamesByTitle = new Map<string, Map<number, ImportGameCandidate>>();
+  const uniqueGamesByTitle = new Map<
+    string,
+    Map<number, { game: DbGameMetadata; libraryEntry: DbLibraryEntry }>
+  >();
   for (const record of existingRecords) {
     const normalizedTitle = normalizeGameTitle(record.game.title);
     const current = existingByTitle.get(normalizedTitle) ?? [];
     current.push(record);
     existingByTitle.set(normalizedTitle, current);
 
-    const currentGames = uniqueGamesByTitle.get(normalizedTitle) ?? new Map<number, ImportGameCandidate>();
+    const currentGames =
+      uniqueGamesByTitle.get(normalizedTitle) ?? new Map<number, { game: DbGameMetadata; libraryEntry: DbLibraryEntry }>();
     if ((record.game.id ?? 0) > 0 && !currentGames.has(record.game.id!)) {
-      currentGames.set(record.game.id!, createGameCandidate(record, "metadata"));
+      currentGames.set(record.game.id!, record);
     }
     uniqueGamesByTitle.set(normalizedTitle, currentGames);
   }
@@ -547,53 +737,108 @@ export function buildImportPreview(
     const normalizedTitle = normalizeGameTitle(item.title);
     const titleCandidates = (existingByTitle.get(normalizedTitle) ?? [])
       .map((record) =>
-        exactRecord?.libraryEntry.id === record.libraryEntry.id ? createMatchCandidate(record, "exact") : createMatchCandidate(record, "title"),
+        exactRecord?.libraryEntry.id === record.libraryEntry.id
+          ? createMatchCandidate(record, item, "exact")
+          : createMatchCandidate(record, item, "title"),
       )
-      .filter((candidate) => candidate.entryId > 0);
-    const gameCandidates = Array.from(uniqueGamesByTitle.get(normalizedTitle)?.values() ?? []).map((candidate) =>
-      exactRecord?.game.id === candidate.gameId ? { ...candidate, confidence: "exact" as const } : candidate,
-    );
+      .filter((candidate) => candidate.entryId > 0)
+      .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title, "pt-BR"));
+    const gameCandidates = Array.from(uniqueGamesByTitle.get(normalizedTitle)?.values() ?? [])
+      .map((record) =>
+        exactRecord?.game.id === record.game.id
+          ? createGameCandidate(record, item, "exact")
+          : createGameCandidate(record, item, "metadata"),
+      )
+      .filter((candidate) => candidate.gameId > 0)
+      .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title, "pt-BR"));
 
     const hasExactMatch = exactRecord?.libraryEntry.id != null;
+    const bestMatchCandidate = titleCandidates[0];
+    const bestGameCandidate = gameCandidates[0];
+    const confidentTitleMatch =
+      !hasExactMatch &&
+      titleCandidates.length === 1 &&
+      (bestMatchCandidate?.score ?? 0) >= 78;
+    const confidentGameLink =
+      !hasExactMatch &&
+      titleCandidates.length === 0 &&
+      gameCandidates.length === 1 &&
+      (bestGameCandidate?.score ?? 0) >= 72;
     const reviewReasons: string[] = [];
     if (hasExactMatch) reviewReasons.push("Já existe uma entrada com o mesmo título e plataforma.");
     if (!hasExactMatch && titleCandidates.length > 0) {
       reviewReasons.push("Há entradas parecidas na biblioteca que podem ser atualizadas.");
     }
+    if (confidentTitleMatch) {
+      reviewReasons.push("Um merge assistido foi pré-selecionado com alta confiança.");
+    }
     if (!hasExactMatch && gameCandidates.length > 0) {
       reviewReasons.push("O catálogo já possui metadado deste jogo; você pode só vincular uma nova entrada.");
     }
-    if (item.coverUrl || item.genres || item.developer || item.publisher || item.releaseYear || item.description) {
+    if (hasUsefulImportMetadata(item)) {
       reviewReasons.push("A importação já traz metadado útil para enriquecer o catálogo.");
     }
+    if (titleCandidates.length > 1) {
+      reviewReasons.push("Há múltiplas entradas locais com o mesmo título; revisar merge manualmente.");
+    }
+    const overlapPlatforms = Array.from(
+      new Set(titleCandidates.flatMap((candidate) => candidate.overlapPlatforms).filter(Boolean)),
+    );
+    const overlapStores = Array.from(
+      new Set(titleCandidates.flatMap((candidate) => candidate.overlapStores).filter(Boolean)),
+    );
+    const maintenanceSignals = Array.from(
+      new Set(
+        [
+          ...titleCandidates.flatMap((candidate) => candidate.maintenanceSignals),
+          ...gameCandidates.flatMap((candidate) => candidate.maintenanceSignals),
+          ...(hasUsefulImportMetadata(item) ? ["Importação traz metadados prontos para manutenção do catálogo."] : []),
+        ].filter(Boolean),
+      ),
+    );
 
-    const selectedGameId =
-      !hasExactMatch && titleCandidates.length === 0 && gameCandidates.length === 1 ? gameCandidates[0]?.gameId ?? null : null;
-    const suggestedAction = hasExactMatch ? "update" : "create";
+    const selectedGameId = confidentGameLink ? bestGameCandidate?.gameId ?? null : null;
+    const selectedMatchId =
+      hasExactMatch ? exactRecord?.libraryEntry.id ?? null : confidentTitleMatch ? bestMatchCandidate?.entryId ?? null : null;
+    const suggestedAction = hasExactMatch || confidentTitleMatch ? "update" : "create";
+    const confidenceScore = hasExactMatch
+      ? 100
+      : Math.max(bestMatchCandidate?.score ?? 0, Math.max(0, (bestGameCandidate?.score ?? 0) - 6));
+    const status =
+      hasExactMatch
+        ? "existing"
+        : titleCandidates.length > 0 || gameCandidates.length > 0 || maintenanceSignals.length > 0
+          ? "review"
+          : "new";
     previewMap.set(key, {
       id: `${key}-${previewMap.size + 1}`,
       key,
       payload: item,
-      status: hasExactMatch ? "existing" : titleCandidates.length > 0 ? "review" : "new",
+      status,
       action: suggestedAction,
       suggestedAction,
       existingId: exactRecord?.libraryEntry.id,
       existingTitle: exactRecord?.game.title,
       duplicateCount: 0,
       matchCandidates: titleCandidates,
-      selectedMatchId: exactRecord?.libraryEntry.id ?? null,
+      selectedMatchId,
       gameCandidates,
       selectedGameId,
       rawgCandidates: [],
       selectedRawgId: null,
       enrichmentStatus: "idle",
+      confidenceScore,
+      overlapPlatforms,
+      overlapStores,
+      maintenanceSignals,
       reviewReasons,
     });
   }
 
   return Array.from(previewMap.values()).sort((left, right) => {
-    const statusRank = { new: 0, review: 1, existing: 2 };
+    const statusRank = { review: 0, existing: 1, new: 2 };
     if (left.status !== right.status) return statusRank[left.status] - statusRank[right.status];
+    if (left.confidenceScore !== right.confidenceScore) return right.confidenceScore - left.confidenceScore;
     return left.payload.title.localeCompare(right.payload.title, "pt-BR");
   });
 }

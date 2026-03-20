@@ -64,6 +64,11 @@ function isCloudPermissionError(error: unknown) {
   return code === "permission-denied" || message.includes("Missing or insufficient permissions");
 }
 
+function logSyncError(message: string, error: unknown) {
+  // eslint-disable-next-line no-console
+  console.error(message, error);
+}
+
 async function replaceLocalTables(tables: SyncTables) {
   await db.transaction(
     "rw",
@@ -294,10 +299,10 @@ export function useCloudSync({
         await pushHistory(
           "conflict",
           "conflict",
-          "Conflito detectado entre a base local e a nuvem. A sincronização automática foi pausada.",
+          "Conflito detectado entre base local e nuvem. Revise as diferenças antes de manter local, puxar nuvem, mesclar ou seguir só local.",
         );
         setNotice(
-          "Conflito detectado entre a base local e a nuvem. Revise a Central de Sync para decidir como continuar.",
+          "Conflito detectado entre base local e nuvem. Abra a Central de Sync e escolha conscientemente como resolver.",
         );
       } catch (error) {
         if (isCloudPermissionError(error)) {
@@ -311,7 +316,7 @@ export function useCloudSync({
           setNotice("Sincronização em nuvem indisponível para esta conta. O app continuará em modo local.");
           return;
         }
-        console.error("Cloud sync bootstrap error:", error);
+        logSyncError("Cloud sync bootstrap error:", error);
         if (!active) return;
         await pushHistory("error", "error", "Falha ao inicializar a sincronização com a nuvem.");
         setNotice("Falha ao sincronizar com a nuvem.");
@@ -363,9 +368,9 @@ export function useCloudSync({
           await pushHistory(
             "conflict",
             "conflict",
-            "Conflito detectado antes do envio. Nenhum dado foi sobrescrito.",
+            "Conflito detectado antes do envio. Nenhum snapshot foi sobrescrito sem confirmação manual.",
           );
-          setNotice("Conflito detectado antes do envio. Abra a Central de Sync para decidir.");
+          setNotice("Conflito detectado antes do envio. Revise as diferenças na Central de Sync.");
           return;
         }
 
@@ -388,7 +393,7 @@ export function useCloudSync({
           "success",
           action === "auto-push"
             ? "Alterações locais enviadas automaticamente para a nuvem."
-            : "Snapshot local enviado manualmente para a nuvem.",
+            : "Base local confirmada como origem e enviada manualmente para a nuvem.",
           successAt,
         );
       } catch (error) {
@@ -398,7 +403,7 @@ export function useCloudSync({
           setIsWorkingLocal(true);
           return;
         }
-        console.error("Cloud sync push error:", error);
+        logSyncError("Cloud sync push error:", error);
         await pushHistory(action, "error", "Falha ao enviar o snapshot local para a nuvem.");
         setNotice("Falha ao enviar backup para a nuvem.");
       } finally {
@@ -439,10 +444,10 @@ export function useCloudSync({
       await pushHistory(
         "manual-pull",
         "success",
-        "Snapshot remoto aplicado manualmente na base local.",
+        "Snapshot remoto confirmado como origem e aplicado manualmente na base local.",
         cloudData.exportedAt,
       );
-      setNotice("Snapshot remoto aplicado na base local.");
+      setNotice("Snapshot remoto aplicado na base local como fonte de verdade.");
     } catch (error) {
       if (isCloudPermissionError(error)) {
         await pushHistory("manual-pull", "skipped", "A conta não tem permissão para ler o snapshot remoto.");
@@ -450,7 +455,7 @@ export function useCloudSync({
         setIsWorkingLocal(true);
         return;
       }
-      console.error("Cloud sync pull error:", error);
+      logSyncError("Cloud sync pull error:", error);
       await pushHistory("manual-pull", "error", "Falha ao puxar o snapshot remoto.");
       setNotice("Falha ao puxar a nuvem.");
     } finally {
@@ -492,7 +497,7 @@ export function useCloudSync({
       await pushHistory(
         "manual-merge",
         "success",
-        "Snapshots local e remoto foram mesclados com preservação de histórico.",
+        "Snapshots local e remoto foram reconciliados com merge seguro e preservação de histórico.",
         mergedPayload.exportedAt,
       );
       setNotice("Merge concluído entre base local e nuvem.");
@@ -503,7 +508,7 @@ export function useCloudSync({
         setIsWorkingLocal(true);
         return;
       }
-      console.error("Cloud sync merge error:", error);
+      logSyncError("Cloud sync merge error:", error);
       await pushHistory("manual-merge", "error", "Falha ao mesclar snapshots local e remoto.");
       setNotice("Falha ao mesclar os dados de sync.");
     } finally {
@@ -526,9 +531,9 @@ export function useCloudSync({
     await pushHistory(
       "manual-local",
       "skipped",
-      "Modo local ativado. A sincronização automática ficou pausada até nova ação manual.",
+      "Modo somente local ativado. A sincronização automática ficou pausada até nova decisão manual.",
     );
-    setNotice("Modo local ativado. A sincronização automática ficará pausada até nova decisão.");
+    setNotice("Modo somente local ativado. O auto-sync seguirá pausado até nova decisão manual.");
   }, [pushHistory, setNotice]);
 
   const triggerSyncToCloud = useCallback(async () => {

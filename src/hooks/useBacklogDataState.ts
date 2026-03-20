@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import type {
   Game as DbGameMetadata,
+  GamePlatform as DbGamePlatform,
   GameTag as DbGameTag,
   Goal as DbGoal,
   ImportJob as DbImportJob,
   LibraryEntry as DbLibraryEntry,
+  LibraryEntryStore as DbLibraryEntryStore,
   LibraryEntryList as DbLibraryEntryList,
   List as DbList,
   Platform as DbPlatform,
@@ -12,6 +14,7 @@ import type {
   Review as DbReview,
   SavedView as DbSavedView,
   Setting as DbSetting,
+  Store as DbStore,
   Tag as DbTag,
 } from "../core/types";
 import { db } from "../core/db";
@@ -56,6 +59,7 @@ export function useBacklogDataState() {
   const [gameRows, setGameRows] = useState<DbGameMetadata[]>([]);
   const [libraryEntryRows, setLibraryEntryRows] = useState<DbLibraryEntry[]>([]);
   const [libraryEntryListRows, setLibraryEntryListRows] = useState<DbLibraryEntryList[]>([]);
+  const [libraryEntryStoreRows, setLibraryEntryStoreRows] = useState<DbLibraryEntryStore[]>([]);
   const [sessionRows, setSessionRows] = useState<DbPlaySession[]>([]);
   const [reviewRows, setReviewRows] = useState<DbReview[]>([]);
   const [tagRows, setTagRows] = useState<DbTag[]>([]);
@@ -65,7 +69,9 @@ export function useBacklogDataState() {
   const [settingRows, setSettingRows] = useState<DbSetting[]>([]);
   const [savedViewRows, setSavedViewRows] = useState<DbSavedView[]>([]);
   const [importJobRows, setImportJobRows] = useState<DbImportJob[]>([]);
+  const [storeRows, setStoreRows] = useState<DbStore[]>([]);
   const [platformRows, setPlatformRows] = useState<DbPlatform[]>([]);
+  const [gamePlatformRows, setGamePlatformRows] = useState<DbGamePlatform[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -86,10 +92,13 @@ export function useBacklogDataState() {
       storedGoals,
       storedLists,
       storedLibraryEntryLists,
+      storedLibraryEntryStores,
       storedSettings,
       storedSavedViews,
       storedImportJobs,
+      storedStores,
       storedPlatforms,
+      storedGamePlatforms,
     ] = await Promise.all([
       db.games.toArray(),
       db.playSessions.orderBy("date").reverse().toArray(),
@@ -99,10 +108,13 @@ export function useBacklogDataState() {
       db.goals.toArray(),
       db.lists.toArray(),
       db.libraryEntryLists.toArray(),
+      db.libraryEntryStores.toArray(),
       db.settings.toArray(),
       db.savedViews.toArray(),
       db.importJobs.orderBy("createdAt").reverse().toArray(),
+      db.stores.toArray(),
       db.platforms.toArray(),
+      db.gamePlatforms.toArray(),
     ]);
 
     setGameRows(sortByUpdatedAtDesc(storedGames));
@@ -114,10 +126,13 @@ export function useBacklogDataState() {
     setGoalRows(storedGoals);
     setListRows(storedLists);
     setLibraryEntryListRows(storedLibraryEntryLists);
+    setLibraryEntryStoreRows(storedLibraryEntryStores);
     setSettingRows(storedSettings);
     setSavedViewRows(sortByUpdatedAtDesc(storedSavedViews));
     setImportJobRows(storedImportJobs);
+    setStoreRows(storedStores);
     setPlatformRows(storedPlatforms);
+    setGamePlatformRows(storedGamePlatforms);
   };
 
   useEffect(() => {
@@ -148,6 +163,7 @@ export function useBacklogDataState() {
     gameRows,
     libraryEntryRows,
     libraryEntryListRows,
+    libraryEntryStoreRows,
     sessionRows,
     reviewRows,
     tagRows,
@@ -157,7 +173,9 @@ export function useBacklogDataState() {
     settingRows,
     savedViewRows,
     importJobRows,
+    storeRows,
     platformRows,
+    gamePlatformRows,
     loading,
     notice,
     submitting,

@@ -3,6 +3,16 @@ import { Zap } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { Panel, NotchButton, SectionHeader } from "./cyberpunk-ui";
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
+function getErrorCode(error: unknown) {
+  if (!error || typeof error !== "object" || !("code" in error)) return "";
+  return String(error.code);
+}
+
 export function LoginScreen() {
   const { login, register, loginWithGoogle } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
@@ -22,8 +32,8 @@ export function LoginScreen() {
       } else {
         await login(email, password);
       }
-    } catch (err: any) {
-      setError(err.message || "Erro ao conectar.");
+    } catch (error) {
+      setError(getErrorMessage(error, "Erro ao conectar."));
     } finally {
       setIsLoading(false);
     }
@@ -34,9 +44,9 @@ export function LoginScreen() {
     setIsLoading(true);
     try {
       await loginWithGoogle();
-    } catch (err: any) {
-      if (err.code !== "auth/popup-closed-by-user") {
-        setError(err.message || "Erro ao conectar com Google.");
+    } catch (error) {
+      if (getErrorCode(error) !== "auth/popup-closed-by-user") {
+        setError(getErrorMessage(error, "Erro ao conectar com Google."));
       }
     } finally {
       setIsLoading(false);

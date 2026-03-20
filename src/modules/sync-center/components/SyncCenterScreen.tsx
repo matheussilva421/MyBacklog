@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCheck,
@@ -14,6 +15,7 @@ import {
 import { cx } from "../../../backlog/shared";
 import {
   EmptyState,
+  Modal,
   NotchButton,
   Panel,
   Pill,
@@ -38,6 +40,16 @@ type SyncCenterScreenProps = {
   onMerge: () => Promise<void> | void;
   onWorkLocal: () => Promise<void> | void;
   onOpenSettings: () => void;
+};
+
+type SyncConflictAction = "push-local" | "pull-cloud" | "merge";
+
+type SyncConflictActionCopy = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  impact: string;
+  tone: "cyan" | "magenta" | "yellow";
 };
 
 function formatDateTime(value: string | null): string {
@@ -128,13 +140,13 @@ function describeHistoryAction(action: SyncHistoryEntry["action"]) {
     case "auto-pull":
       return "Auto: puxar nuvem";
     case "manual-push":
-      return "Manual: enviar local";
+      return "Manual: manter local";
     case "manual-pull":
       return "Manual: puxar nuvem";
     case "manual-merge":
-      return "Manual: merge";
+      return "Manual: mesclar snapshots";
     case "manual-local":
-      return "Manual: trabalhar local";
+      return "Manual: só local";
     case "conflict":
       return "Conflito";
     case "match":
@@ -142,6 +154,38 @@ function describeHistoryAction(action: SyncHistoryEntry["action"]) {
     case "error":
     default:
       return "Erro";
+  }
+}
+
+function buildConflictActionCopy(action: SyncConflictAction, divergentBlocks: number): SyncConflictActionCopy {
+  const scope = divergentBlocks === 1 ? "1 bloco divergente" : `${divergentBlocks} blocos divergentes`;
+
+  switch (action) {
+    case "push-local":
+      return {
+        title: "Confirmar envio da base local",
+        description: "Você está escolhendo a base local como fonte de verdade para retomar a sync.",
+        confirmLabel: "Confirmar envio local",
+        impact: `O snapshot remoto será substituído pelo estado local atual. Use esta ação quando a sua máquina estiver mais atual que a nuvem em ${scope}.`,
+        tone: "cyan",
+      };
+    case "pull-cloud":
+      return {
+        title: "Confirmar aplicação da nuvem",
+        description: "Você está escolhendo o snapshot remoto como fonte de verdade para esta sessão.",
+        confirmLabel: "Confirmar puxar nuvem",
+        impact: `A base local será substituída pelo snapshot remoto atual. Use esta ação quando a nuvem estiver mais correta que o seu dispositivo em ${scope}.`,
+        tone: "magenta",
+      };
+    case "merge":
+    default:
+      return {
+        title: "Confirmar merge dos snapshots",
+        description: "O app vai reconciliar os dois lados com as regras estruturais já existentes no motor de sync.",
+        confirmLabel: "Confirmar merge",
+        impact: `O sistema vai combinar local e nuvem preservando histórico sempre que possível. Use esta ação quando ambos os lados tenham valor em ${scope}.`,
+        tone: "yellow",
+      };
   }
 }
 
@@ -161,8 +205,64 @@ export function SyncCenterScreen({
   onWorkLocal,
   onOpenSettings,
 }: SyncCenterScreenProps) {
+  const [pendingAction, setPendingAction] = useState<SyncConflictAction | null>(null);
+
   const modeCopy = describeMode(syncMode, isAuthEnabled);
   const ModeIcon = modeCopy.icon;
+  const isConflict = syncMode === "conflict" && comparison?.decision === "conflict";
+  const divergentBlocks = useMemo(
+    () => comparison?.blocks.filter((block) => block.state !== "same") ?? [],
+    [comparison],
+  );
+  const displayedBlocks =
+    isConflict && divergentBlocks.length > 0 ? divergentBlocks : comparison?.blocks ?? [];
+  const conflictStats = useMemo(
+    () =>
+      divergentBlocks.reduce(
+        (summary, block) => {
+          if (block.state === "different") summary.different += 1;
+          if (block.state === "local-only") summary.localOnly += 1;
+          if (block.state === "cloud-only") summary.cloudOnly += 1;
+          return summary;
+        },
+        { different: 0, localOnly: 0, cloudOnly: 0 },
+      ),
+    [divergentBlocks],
+  );
+  const pendingActionCopy = pendingAction
+    ? buildConflictActionCopy(pendingAction, Math.max(divergentBlocks.length, 1))
+    : null;
+
+  const handleProtectedAction = (action: SyncConflictAction, handler: () => Promise<void> | void) => {
+    if (isConflict) {
+      setPendingAction(action);
+      return;
+    }
+    void handler();
+  };
+
+  const handleConfirmPendingAction = async () => {
+    if (!pendingAction) return;
+
+    const action = pendingAction;
+    setPendingAction(null);
+
+    if (action === "push-local") {
+      await onPushLocal();
+      return;
+    }
+    if (action === "pull-cloud") {
+      await onPullCloud();
+      return;
+    }
+    await onMerge();
+  };
+
+  const pushLabel = isConflict ? "Manter local e enviar" : "Enviar local";
+  const pullLabel = isConflict ? "Descartar local e puxar nuvem" : "Puxar nuvem";
+  const mergeLabel = isConflict ? "Mesclar snapshots" : "Mesclar";
+  const workLocalLabel = isConflict ? "Continuar só local" : "Trabalhar local";
+  const autoSyncLabel = isConflict ? "Pausado por conflito" : autoSyncEnabled ? "Ativo" : "Pausado";
 
   return (
     <div className="sync-layout">
@@ -186,7 +286,7 @@ export function SyncCenterScreen({
           </div>
           <div className="detail-stat">
             <span>Auto-sync</span>
-            <strong>{autoSyncEnabled ? "Ativo" : "Pausado"}</strong>
+            <strong>{autoSyncLabel}</strong>
           </div>
           <div className="detail-stat">
             <span>Último sync</span>
@@ -198,34 +298,76 @@ export function SyncCenterScreen({
           </div>
         </div>
 
+        {isConflict && comparison ? (
+          <div className="sync-conflict-callout">
+            <div className="sync-conflict-callout__head">
+              <AlertTriangle size={18} />
+              <div>
+                <strong>Resolução manual obrigatória</strong>
+                <p>
+                  O auto-sync foi pausado porque local e nuvem divergem. Revise os blocos abaixo e
+                  escolha conscientemente qual lado deve prevalecer.
+                </p>
+              </div>
+            </div>
+
+            <div className="sync-conflict-callout__meta">
+              <Pill tone="magenta">Auto-sync pausado</Pill>
+              <Pill tone="yellow">
+                {divergentBlocks.length} bloco{divergentBlocks.length === 1 ? "" : "s"} em conflito
+              </Pill>
+              {conflictStats.localOnly > 0 ? (
+                <Pill tone="cyan">{conflictStats.localOnly} só local</Pill>
+              ) : null}
+              {conflictStats.cloudOnly > 0 ? (
+                <Pill tone="magenta">{conflictStats.cloudOnly} só nuvem</Pill>
+              ) : null}
+              {conflictStats.different > 0 ? (
+                <Pill tone="yellow">{conflictStats.different} divergentes</Pill>
+              ) : null}
+            </div>
+
+            <div className="sync-conflict-chip-list">
+              {divergentBlocks.map((block) => (
+                <article className="sync-conflict-chip" key={block.key}>
+                  <strong>{block.label}</strong>
+                  <span>
+                    Local {block.localCount} • Nuvem {block.cloudCount}
+                  </span>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="sync-action-grid">
           <NotchButton
             variant="primary"
-            onClick={onPushLocal}
+            onClick={() => handleProtectedAction("push-local", onPushLocal)}
             disabled={!isAuthEnabled || !isOnline || isSyncing}
           >
             <Upload size={15} />
-            Enviar local
+            {pushLabel}
           </NotchButton>
           <NotchButton
             variant="secondary"
-            onClick={onPullCloud}
+            onClick={() => handleProtectedAction("pull-cloud", onPullCloud)}
             disabled={!isAuthEnabled || !isOnline || isSyncing}
           >
             <Download size={15} />
-            Puxar nuvem
+            {pullLabel}
           </NotchButton>
           <NotchButton
             variant="secondary"
-            onClick={onMerge}
+            onClick={() => handleProtectedAction("merge", onMerge)}
             disabled={!isAuthEnabled || !isOnline || isSyncing}
           >
             <GitMerge size={15} />
-            Mesclar
+            {mergeLabel}
           </NotchButton>
-          <NotchButton variant="ghost" onClick={onWorkLocal} disabled={isSyncing}>
+          <NotchButton variant="ghost" onClick={() => void onWorkLocal()} disabled={isSyncing}>
             <HardDriveDownload size={15} />
-            Trabalhar local
+            {workLocalLabel}
           </NotchButton>
         </div>
 
@@ -245,14 +387,20 @@ export function SyncCenterScreen({
           <SectionHeader
             icon={CheckCheck}
             title="Comparação de snapshots"
-            description="Diferenças por bloco entre a base local e o snapshot remoto atual."
+            description={
+              isConflict
+                ? "Blocos que exigem decisão antes de retomar a sincronização."
+                : "Diferenças por bloco entre a base local e o snapshot remoto atual."
+            }
           />
 
           {!comparison ? (
             <EmptyState message="Faça login ou configure a nuvem para comparar snapshots." />
+          ) : displayedBlocks.length === 0 ? (
+            <EmptyState message="Nenhum bloco divergente precisa de intervenção agora." />
           ) : (
             <div className="sync-block-grid">
-              {comparison.blocks.map((block) => {
+              {displayedBlocks.map((block) => {
                 const blockState = describeBlockState(block.state);
 
                 return (
@@ -317,6 +465,50 @@ export function SyncCenterScreen({
           )}
         </Panel>
       </div>
+
+      {pendingAction && pendingActionCopy ? (
+        <Modal
+          title={pendingActionCopy.title}
+          description={pendingActionCopy.description}
+          onClose={() => {
+            if (!isSyncing) setPendingAction(null);
+          }}
+        >
+          <div className="sync-confirmation">
+            <div className="sync-confirmation__meta">
+              <Pill tone={pendingActionCopy.tone}>Ação manual</Pill>
+              <Pill tone="neutral">{formatDateTime(cloudExportedAt)}</Pill>
+            </div>
+
+            <div className="sync-confirmation__body">
+              <p>{pendingActionCopy.impact}</p>
+              <div className="sync-confirmation__blocks">
+                {divergentBlocks.map((block) => (
+                  <div className="sync-confirmation__block" key={block.key}>
+                    <strong>{block.label}</strong>
+                    <span>
+                      Local {block.localCount} • Nuvem {block.cloudCount}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <NotchButton variant="ghost" onClick={() => setPendingAction(null)} disabled={isSyncing}>
+                Cancelar
+              </NotchButton>
+              <NotchButton
+                variant={pendingAction === "pull-cloud" ? "secondary" : "primary"}
+                onClick={() => void handleConfirmPendingAction()}
+                disabled={isSyncing}
+              >
+                {pendingActionCopy.confirmLabel}
+              </NotchButton>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

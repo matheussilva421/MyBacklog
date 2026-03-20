@@ -13,6 +13,7 @@ import {
   buildRestorePreview,
   parseBackupText,
   parseImportText,
+  recordToImportPayload,
 } from "./importExport";
 
 function createGame(partial: Partial<Game>): Game {
@@ -109,16 +110,64 @@ describe("importExport", () => {
     expect(exactMatch?.status).toBe("existing");
     expect(exactMatch?.action).toBe("update");
     expect(exactMatch?.selectedMatchId).toBe(11);
+    expect(exactMatch?.confidenceScore).toBe(100);
 
     expect(reviewMatch?.status).toBe("review");
     expect(reviewMatch?.action).toBe("create");
     expect(reviewMatch?.matchCandidates).toHaveLength(1);
     expect(reviewMatch?.matchCandidates[0]?.entryId).toBe(12);
+    expect(reviewMatch?.matchCandidates[0]?.score).toBeLessThan(78);
     expect(reviewMatch?.gameCandidates).toHaveLength(1);
     expect(reviewMatch?.gameCandidates[0]?.gameId).toBe(2);
     expect(reviewMatch?.reviewReasons).toContain(
       "O catálogo já possui metadado deste jogo; você pode só vincular uma nova entrada.",
     );
+    expect(reviewMatch?.maintenanceSignals).toContain("Título coincide, mas a plataforma local diverge.");
+  });
+
+  it("preselects high-confidence assisted merges when title, platform overlap and store overlap agree", () => {
+    const preview = buildImportPreview(
+      [
+        {
+          title: "Hades",
+          platform: "Steam Deck",
+          platforms: ["Steam Deck", "PC"],
+          sourceStore: "Steam",
+          stores: ["Steam"],
+          format: "digital",
+          ownershipStatus: "owned",
+          progressStatus: "playing",
+          playtimeMinutes: 240,
+          completionPercent: 35,
+          priority: "medium",
+          releaseYear: 2020,
+          developer: "Supergiant Games",
+        },
+      ],
+      [
+        {
+          game: createGame({
+            id: 4,
+            title: "Hades",
+            normalizedTitle: "hades",
+            releaseYear: 2020,
+            developer: "Supergiant Games",
+            platforms: "PC, Switch",
+          }),
+          libraryEntry: createEntry({ id: 41, gameId: 4, platform: "PC", sourceStore: "Steam" }),
+        },
+      ],
+    );
+
+    expect(preview).toHaveLength(1);
+    expect(preview[0]?.status).toBe("review");
+    expect(preview[0]?.suggestedAction).toBe("update");
+    expect(preview[0]?.action).toBe("update");
+    expect(preview[0]?.selectedMatchId).toBe(41);
+    expect(preview[0]?.confidenceScore).toBeGreaterThanOrEqual(78);
+    expect(preview[0]?.overlapPlatforms).toContain("PC");
+    expect(preview[0]?.overlapStores).toContain("Steam");
+    expect(preview[0]?.reviewReasons).toContain("Um merge assistido foi pré-selecionado com alta confiança.");
   });
 
   it("counts settings, stores and list relations in restore preview", () => {
@@ -216,6 +265,61 @@ describe("importExport", () => {
     expect(settingsRow).toEqual({ label: "Configurações", create: 0, update: 1, skip: 0 });
     expect(listRelationRow).toEqual({ label: "Relações de lista", create: 1, update: 0, skip: 0 });
     expect(storeRow).toEqual({ label: "Stores", create: 0, update: 1, skip: 0 });
+  });
+
+  it("exports structured store and platform relations when available", () => {
+    const payload = recordToImportPayload(
+      {
+        game: createGame({ id: 10, title: "Hades", normalizedTitle: "hades", platforms: "PC" }),
+        libraryEntry: createEntry({ id: 20, gameId: 10, platform: "PC", sourceStore: "Steam" }),
+      },
+      {
+        storeRows: [
+          {
+            id: 1,
+            name: "Steam",
+            normalizedName: "steam",
+            createdAt: "2026-03-01T00:00:00.000Z",
+            updatedAt: "2026-03-01T00:00:00.000Z",
+          },
+          {
+            id: 2,
+            name: "Epic Games Store",
+            normalizedName: "epic games store",
+            createdAt: "2026-03-01T00:00:00.000Z",
+            updatedAt: "2026-03-01T00:00:00.000Z",
+          },
+        ],
+        libraryEntryStoreRows: [
+          { id: 31, libraryEntryId: 20, storeId: 1, isPrimary: true, createdAt: "2026-03-01T00:00:00.000Z" },
+          { id: 32, libraryEntryId: 20, storeId: 2, isPrimary: false, createdAt: "2026-03-01T00:00:00.000Z" },
+        ],
+        platformRows: [
+          {
+            id: 5,
+            name: "PC",
+            normalizedName: "pc",
+            createdAt: "2026-03-01T00:00:00.000Z",
+            updatedAt: "2026-03-01T00:00:00.000Z",
+          },
+          {
+            id: 6,
+            name: "Steam Deck",
+            normalizedName: "steam deck",
+            createdAt: "2026-03-01T00:00:00.000Z",
+            updatedAt: "2026-03-01T00:00:00.000Z",
+          },
+        ],
+        gamePlatformRows: [
+          { id: 41, gameId: 10, platformId: 5, createdAt: "2026-03-01T00:00:00.000Z" },
+          { id: 42, gameId: 10, platformId: 6, createdAt: "2026-03-01T00:00:00.000Z" },
+        ],
+      },
+    );
+
+    expect(payload.sourceStore).toBe("Steam");
+    expect(payload.stores).toEqual(["Steam", "Epic Games Store"]);
+    expect(payload.platforms).toEqual(["PC", "Steam Deck"]);
   });
 
   it("applies RAWG enrichment without overwriting manual metadata", () => {

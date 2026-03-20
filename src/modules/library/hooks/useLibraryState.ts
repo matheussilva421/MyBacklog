@@ -88,6 +88,14 @@ export function useLibraryState({
     return map;
   }, [listById, listIdsByEntryId]);
 
+  const listCountsById = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const relation of libraryEntryListRows) {
+      map.set(relation.listId, (map.get(relation.listId) ?? 0) + 1);
+    }
+    return map;
+  }, [libraryEntryListRows]);
+
   const listOptions = useMemo(
     () =>
       Array.from(listById.values())
@@ -95,10 +103,10 @@ export function useLibraryState({
         .map((list) => ({
           id: list.id,
           name: list.name,
-          count: libraryEntryListRows.filter((relation) => relation.listId === list.id).length,
+          count: listCountsById.get(list.id) ?? 0,
         }))
         .sort((left, right) => left.name.localeCompare(right.name, "pt-BR")),
-    [libraryEntryListRows, listById],
+    [listById, listCountsById],
   );
 
   const searchedGames = useMemo(
@@ -108,6 +116,8 @@ export function useLibraryState({
           [
             game.title,
             game.platform,
+            game.platforms?.join(", ") ?? "",
+            game.stores?.join(", ") ?? "",
             game.genre,
             game.mood,
             game.notes,

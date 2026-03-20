@@ -25,6 +25,12 @@ import { useBuildSessionInsights } from "../modules/sessions/hooks/useBuildSessi
 import { useAppPreferences } from "../modules/settings/hooks/useAppPreferences";
 import { useCatalogMaintenanceState } from "../modules/catalog-maintenance/hooks/useCatalogMaintenanceState";
 import { guidedTourSteps } from "../modules/onboarding/utils/guidedTour";
+import {
+  buildPlatformNamesByGameId,
+  buildStoreNamesByEntryId,
+  resolveStructuredPlatforms,
+  resolveStructuredStores,
+} from "../core/structuredRelations";
 
 export function useBacklogApp() {
   const data = useBacklogDataState();
@@ -58,7 +64,24 @@ export function useBacklogApp() {
     () => new Map(data.listRows.map((list) => [list.id, list] as const)),
     [data.listRows],
   );
-  const games = useMemo(() => records.map(dbGameToUiGame), [records]);
+  const storeNamesByEntryId = useMemo(
+    () => buildStoreNamesByEntryId(data.storeRows, data.libraryEntryStoreRows),
+    [data.libraryEntryStoreRows, data.storeRows],
+  );
+  const platformNamesByGameId = useMemo(
+    () => buildPlatformNamesByGameId(data.platformRows, data.gamePlatformRows),
+    [data.gamePlatformRows, data.platformRows],
+  );
+  const games = useMemo(
+    () =>
+      records.map((record) =>
+        dbGameToUiGame(record, {
+          stores: resolveStructuredStores(record.libraryEntry, storeNamesByEntryId),
+          platforms: resolveStructuredPlatforms(record.game, record.libraryEntry.platform, platformNamesByGameId),
+        }),
+      ),
+    [platformNamesByGameId, records, storeNamesByEntryId],
+  );
 
   const {
     listOptions,
@@ -157,6 +180,8 @@ export function useBacklogApp() {
     selectedGame,
     selectedRecord,
     sessionRows: data.sessionRows,
+    storeNamesByEntryId,
+    platformNamesByGameId,
     gameTagRows: data.gameTagRows,
     libraryEntryListRows: data.libraryEntryListRows,
     tagById,
@@ -374,6 +399,11 @@ export function useBacklogApp() {
     onboardingInitialLists,
     onboardingInitialGoalIds,
     games,
+    reviewRows: data.reviewRows,
+    tagRows: data.tagRows,
+    gameTagRows: data.gameTagRows,
+    libraryEntryListRows: data.libraryEntryListRows,
+    libraryEntryStoreRows: data.libraryEntryStoreRows,
     sessionRows: data.sessionRows,
     libraryGames,
     selectedGame,
@@ -405,6 +435,7 @@ export function useBacklogApp() {
     selectedGameLists,
     goalModalMode: ui.goalModalMode,
     goalForm: ui.goalForm,
+    storeRows: data.storeRows,
     importModalOpen: importState.importModalOpen,
     importSource: importState.importSource,
     importText: importState.importText,
@@ -446,6 +477,9 @@ export function useBacklogApp() {
     handleImportPreviewMatchChange: importState.handleImportPreviewMatchChange,
     handleImportPreviewGameChange: importState.handleImportPreviewGameChange,
     handleImportPreviewRawgChange: importState.handleImportPreviewRawgChange,
+    handleImportPreviewApplySuggested: importState.handleImportPreviewApplySuggested,
+    handleImportPreviewAutoMergeSafe: importState.handleImportPreviewAutoMergeSafe,
+    handleImportPreviewIgnoreUnsafe: importState.handleImportPreviewIgnoreUnsafe,
     handleImportFileChange: importState.handleImportFileChange,
     handleRestoreFileChange: importState.handleRestoreFileChange,
     openLibraryGame,
@@ -459,6 +493,7 @@ export function useBacklogApp() {
     previousGuidedTourStep: ui.previousGuidedTourStep,
     importJobRows: data.importJobRows,
     platforms: data.platformRows,
+    gamePlatformRows: data.gamePlatformRows,
     ...actions,
   };
 }

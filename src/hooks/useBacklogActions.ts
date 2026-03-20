@@ -3,6 +3,7 @@ import { db } from "../core/db";
 import {
   syncStructuredRelationsForRecord,
 } from "../core/structuredDataSync";
+import { buildPlatformNamesByGameId, buildStoreNamesByEntryId } from "../core/structuredRelations";
 import type {
   Game as DbGameMetadata,
   Goal as DbGoal,
@@ -120,7 +121,7 @@ async function fetchRawgCandidateMap(
     if (result.status === "fulfilled") {
       candidateMap.set(result.value.key, result.value.candidates);
     } else {
-      console.warn("[RAWG] Falha ao buscar candidatos:", result.reason);
+      logRawgWarning("[RAWG] Falha ao buscar candidatos:", result.reason);
     }
   }
 
@@ -150,11 +151,16 @@ async function fetchSelectedRawgMetadata(
     if (result.status === "fulfilled") {
       metadataMap.set(result.value.rawgId, result.value.metadata);
     } else {
-      console.warn("[RAWG] Falha ao buscar metadados:", result.reason);
+      logRawgWarning("[RAWG] Falha ao buscar metadados:", result.reason);
     }
   }
 
   return metadataMap;
+}
+
+function logRawgWarning(message: string, error: unknown) {
+  // eslint-disable-next-line no-console
+  console.warn(message, error);
 }
 
 export function useBacklogActions({
@@ -249,7 +255,7 @@ export function useBacklogActions({
             }
           }
         } catch (rawgError) {
-          console.warn("[RAWG] Enriquecimento de metadados falhou:", rawgError);
+          logRawgWarning("[RAWG] Enriquecimento de metadados falhou:", rawgError);
         }
       }
 
@@ -300,6 +306,8 @@ export function useBacklogActions({
           await syncStructuredRelationsForRecord({
             game: { ...persistedGame, id: gameId },
             libraryEntry: { ...payload.libraryEntry, id: entryId },
+            extraStoreNames: gameForm.stores,
+            extraPlatformNames: gameForm.platforms,
           });
         },
       );
@@ -492,9 +500,19 @@ export function useBacklogActions({
       return;
     }
 
+    const tables = await readBackupTables();
+    const storeNamesByEntryId = buildStoreNamesByEntryId(tables.stores, tables.libraryEntryStores);
+    const platformNamesByGameId = buildPlatformNamesByGameId(tables.platforms, tables.gamePlatforms);
     downloadText(
       `arsenal-gamer-${new Date().toISOString().slice(0, 10)}.csv`,
-      gamesToCsv(records.map(recordToImportPayload)),
+      gamesToCsv(
+        records.map((record) =>
+          recordToImportPayload(record, {
+            storeNamesByEntryId,
+            platformNamesByGameId,
+          }),
+        ),
+      ),
       "text/csv;charset=utf-8",
     );
     setNotice("Biblioteca exportada em CSV.");

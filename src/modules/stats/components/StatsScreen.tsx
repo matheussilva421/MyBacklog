@@ -1,12 +1,10 @@
-```
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { PlatformDashboard } from "./PlatformDashboard";
 import { PlatformList } from "./PlatformList";
 import {
   Activity,
   BarChart3,
   Calendar,
-  Clock,
   Clock3,
   FileText,
   Monitor,
@@ -21,11 +19,10 @@ import {
   pieColors,
   type BarPoint,
   type Game,
-  type ImportJob,
   type PiePoint,
   type Platform,
 } from "../../../backlog/shared";
-import type { PlaySession } from "../../../core/types";
+import type { ImportJob, PlaySession } from "../../../core/types";
 import {
   ChartFrame,
   EmptyState,
@@ -33,7 +30,6 @@ import {
   Panel,
   Pill,
   SectionHeader,
-  Tag,
 } from "../../../components/cyberpunk-ui";
 
 const SESSION_PAGE_SIZE = 30;
@@ -43,7 +39,7 @@ type StatsScreenProps = {
   monthlyHours: BarPoint[];
   platformData: PiePoint[];
   platforms: Platform[];
-  visibleSessions: any[];
+  visibleSessions: PlaySession[];
   games: Game[];
   importJobs: ImportJob[];
   findGame: (id: number) => Game | undefined;
@@ -67,7 +63,7 @@ export function StatsScreen({
   onManagePlatforms,
   onClearImportHistory,
 }: StatsScreenProps) {
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform | string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const [visibleCount, setVisibleCount] = useState(SESSION_PAGE_SIZE);
   const displayedSessions = visibleSessions.slice(0, visibleCount);
   const hasMore = visibleCount < visibleSessions.length;
@@ -117,11 +113,7 @@ export function StatsScreen({
         </Panel>
       </div>
 
-      <PlatformList 
-        platforms={platforms} 
-        games={games} 
-        onSelect={setSelectedPlatform} 
-      />
+      <PlatformList platforms={platforms} games={games} onSelect={setSelectedPlatform} />
 
       <Panel>
         <SectionHeader
@@ -160,9 +152,9 @@ export function StatsScreen({
               <div key={job.id} style={{ padding: "1rem", backgroundColor: "rgba(255,255,255,0.03)", borderLeft: "2px solid" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
                   <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                    <Tag tone={job.status === "completed" ? "emerald" : job.status === "failed" ? "magenta" : "cyan"}>
+                    <Pill tone={job.status === "completed" ? "emerald" : job.status === "failed" ? "magenta" : "cyan"}>
                       {job.source.toUpperCase()}
-                    </Tag>
+                    </Pill>
                     <span style={{ fontSize: "0.8rem", opacity: 0.6 }}>
                       {new Date(job.createdAt).toLocaleDateString()} {new Date(job.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
@@ -243,4 +235,3 @@ export function StatsScreen({
     </div>
   );
 }
-```

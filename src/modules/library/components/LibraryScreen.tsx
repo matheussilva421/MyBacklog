@@ -380,7 +380,16 @@ export function LibraryScreen({
             <div className="detail-note">
               <span className="detail-note__eyebrow">Metadado enriquecido</span>
               <div className="detail-note__tags">
-                <Pill tone="neutral">{selectedGame.catalogPlatforms || selectedGame.platform}</Pill>
+                {(selectedGame.platforms ?? [selectedGame.platform]).map((platform) => (
+                  <Pill key={`${selectedGame.id}-platform-${platform}`} tone="neutral">
+                    {platform}
+                  </Pill>
+                ))}
+                {(selectedGame.stores ?? [selectedGame.sourceStore]).map((store) => (
+                  <Pill key={`${selectedGame.id}-store-${store}`} tone="sunset">
+                    {store}
+                  </Pill>
+                ))}
                 {selectedGame.developer ? <Pill tone="cyan">{selectedGame.developer}</Pill> : null}
                 {selectedGame.publisher ? <Pill tone="magenta">{selectedGame.publisher}</Pill> : null}
                 {selectedGame.rawgId ? <Pill tone="yellow">RAWG #{selectedGame.rawgId}</Pill> : null}

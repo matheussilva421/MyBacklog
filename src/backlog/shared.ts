@@ -136,8 +136,10 @@ export type Game = {
   id: number;
   title: string;
   platform: string;
+  platforms?: string[];
   catalogPlatforms?: string;
   sourceStore: string;
+  stores?: string[];
   genre: string;
   status: Status;
   progress: number;
@@ -261,8 +263,10 @@ export type MonthlyRecap = {
 export type GameFormState = {
   title: string;
   platform: string;
+  platforms: string[];
   catalogPlatforms: string;
   sourceStore: string;
+  stores: string[];
   genre: string;
   status: Status;
   priority: Priority;
@@ -322,7 +326,11 @@ export type ImportMatchCandidate = {
   title: string;
   platform: string;
   sourceStore: string;
-  confidence: "exact" | "title";
+  overlapPlatforms: string[];
+  overlapStores: string[];
+  maintenanceSignals: string[];
+  score: number;
+  confidence: "exact" | "title" | "assisted";
 };
 
 export type ImportGameCandidate = {
@@ -330,9 +338,12 @@ export type ImportGameCandidate = {
   title: string;
   releaseYear?: number;
   platforms: string[];
+  overlapPlatforms: string[];
+  maintenanceSignals: string[];
+  score: number;
   developer?: string;
   publisher?: string;
-  confidence: "exact" | "metadata";
+  confidence: "exact" | "metadata" | "assisted";
 };
 
 export type ImportRawgCandidate = {
@@ -360,6 +371,10 @@ export type ImportPreviewEntry = {
   rawgCandidates: ImportRawgCandidate[];
   selectedRawgId: number | null;
   enrichmentStatus: "idle" | "matched" | "ambiguous" | "missing";
+  confidenceScore: number;
+  overlapPlatforms: string[];
+  overlapStores: string[];
+  maintenanceSignals: string[];
   reviewReasons: string[];
 };
 
@@ -524,5 +539,3 @@ export {
   type PlannerPreference,
   type PreferencesDraft,
 } from "../modules/settings/utils/preferences";
-
-

@@ -9,6 +9,8 @@ type UseSelectedGamePageArgs = {
   selectedGame?: Game;
   selectedRecord?: LibraryRecord;
   sessionRows: PlaySession[];
+  storeNamesByEntryId: Map<number, string[]>;
+  platformNamesByGameId: Map<number, string[]>;
   gameTagRows: Array<{ libraryEntryId: number; tagId: number }>;
   libraryEntryListRows: LibraryEntryList[];
   tagById: Map<number | undefined, Tag>;
@@ -23,6 +25,8 @@ export function useSelectedGamePage({
   selectedGame,
   selectedRecord,
   sessionRows,
+  storeNamesByEntryId,
+  platformNamesByGameId,
   gameTagRows,
   libraryEntryListRows,
   tagById,
@@ -49,6 +53,11 @@ export function useSelectedGamePage({
     return buildGamePageData({
       game: selectedGame,
       record: selectedRecord,
+      storeNames: storeNamesByEntryId.get(entryId) ?? selectedGame.stores ?? [selectedGame.sourceStore],
+      platformNames:
+        selectedRecord.game.id != null
+          ? platformNamesByGameId.get(selectedRecord.game.id) ?? selectedGame.platforms ?? [selectedGame.platform]
+          : selectedGame.platforms ?? [selectedGame.platform],
       sessions,
       review: reviewByEntryId.get(entryId),
       tags,
@@ -62,12 +71,14 @@ export function useSelectedGamePage({
     goalRows,
     libraryEntryListRows,
     listById,
+    platformNamesByGameId,
     plannerGoalSignals,
     preferences,
     reviewByEntryId,
     selectedGame,
     selectedRecord,
     sessionRows,
+    storeNamesByEntryId,
     tagById,
   ]);
 }

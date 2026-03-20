@@ -151,6 +151,87 @@ button {
   gap: 20px;
 }
 
+.platform-grid-legacy {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.platform-card-interactive {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.02);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.platform-card-interactive:hover,
+.platform-card-interactive:focus-visible {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.platform-card-interactive:focus-visible {
+  outline: 2px solid rgba(38, 216, 255, 0.45);
+  outline-offset: 2px;
+}
+
+.platform-card-interactive__accent {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+}
+
+.platform-card-interactive__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.platform-card-interactive__head h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.platform-card-interactive__meta {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+
+.platform-card-interactive__arrow {
+  transition:
+    transform 0.2s ease,
+    color 0.2s ease;
+}
+
+.platform-card-interactive:hover .platform-card-interactive__arrow,
+.platform-card-interactive:focus-visible .platform-card-interactive__arrow {
+  color: var(--accent);
+  transform: translateX(4px);
+}
+
+.platform-card-interactive__pills {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .sessions-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
@@ -1636,9 +1717,12 @@ button {
 .sync-trust-banner__copy,
 .sync-trust-banner__actions,
 .sync-layout,
+.sync-conflict-chip-list,
 .sync-status-grid,
 .sync-block-grid,
-.sync-history-list {
+.sync-history-list,
+.sync-confirmation,
+.sync-confirmation__blocks {
   display: grid;
   gap: 12px;
 }
@@ -1650,7 +1734,9 @@ button {
 .sync-trust-banner__copy p,
 .sync-helper-row p,
 .sync-history-card p,
-.sync-toggle-card p {
+.sync-toggle-card p,
+.sync-conflict-callout p,
+.sync-confirmation__body p {
   margin: 0;
   color: var(--text-soft);
   font-size: 14px;
@@ -1661,7 +1747,10 @@ button {
 .sync-trust-banner__actions,
 .sync-helper-row,
 .sync-history-card__head,
-.sync-toggle-card {
+.sync-toggle-card,
+.sync-conflict-callout__head,
+.sync-conflict-callout__meta,
+.sync-confirmation__meta {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1709,6 +1798,56 @@ button {
   grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
 }
 
+.sync-conflict-callout {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(255, 87, 201, 0.2);
+  background:
+    linear-gradient(135deg, rgba(255, 87, 201, 0.12), rgba(14, 17, 24, 0.88)),
+    rgba(7, 9, 13, 0.9);
+}
+
+.sync-conflict-callout__head {
+  align-items: flex-start;
+}
+
+.sync-conflict-callout__head svg {
+  margin-top: 2px;
+  color: var(--magenta);
+}
+
+.sync-conflict-callout__head strong,
+.sync-confirmation__block strong,
+.sync-conflict-chip strong {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.sync-conflict-chip-list,
+.sync-confirmation__blocks {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+}
+
+.sync-conflict-chip,
+.sync-confirmation__block {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 8, 13, 0.72);
+}
+
+.sync-conflict-chip span,
+.sync-confirmation__block span {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
 .sync-block-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
 }
@@ -1737,6 +1876,15 @@ button {
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(7, 9, 13, 0.82);
+}
+
+.sync-confirmation__meta {
+  justify-content: space-between;
+}
+
+.sync-confirmation__body {
+  display: grid;
+  gap: 14px;
 }
 
 .modal-backdrop {
@@ -2054,6 +2202,30 @@ button {
   color: #d8fbff;
 }
 
+.selection-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selection-chip {
+  padding: 8px 12px;
+  border: 1px solid rgba(244, 239, 27, 0.14);
+  background: rgba(13, 17, 26, 0.82);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.selection-chip--active {
+  border-color: rgba(38, 216, 255, 0.42);
+  background: rgba(38, 216, 255, 0.12);
+  color: var(--text);
+}
+
 .rawg-candidate-list {
   display: grid;
   gap: 14px;
@@ -2144,6 +2316,13 @@ button {
   padding-right: 4px;
 }
 
+.preview-batch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 14px;
+}
+
 .preview-list--compact {
   max-height: none;
 }
@@ -2181,6 +2360,35 @@ button {
   color: var(--text);
   font-size: 15px;
   margin-left: 6px;
+}
+
+.preview-overlap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.preview-overlap-card,
+.preview-maintenance-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(244, 239, 27, 0.14);
+  background: rgba(13, 17, 26, 0.82);
+}
+
+.preview-overlap-card strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.preview-overlap-card span,
+.preview-maintenance-card span {
+  color: var(--text-faint);
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .preview-card p,
@@ -2319,7 +2527,8 @@ button {
   .guided-tour__actions .cp-button,
   .guided-tour__modal-head .cp-button,
   .sync-trust-banner__actions .cp-button,
-  .sync-action-grid .cp-button {
+  .sync-action-grid .cp-button,
+  .preview-batch-bar .cp-button {
     width: 100%;
   }
 
@@ -2329,7 +2538,8 @@ button {
   }
 
   .preview-summary-grid,
-  .preview-card__head {
+  .preview-card__head,
+  .preview-overlap-grid {
     grid-template-columns: 1fr;
     flex-direction: column;
   }

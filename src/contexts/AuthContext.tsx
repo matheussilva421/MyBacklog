@@ -48,11 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(isFirebaseConfigured);
 
   useEffect(() => {
-    if (!isFirebaseConfigured || !auth) {
-      setLoading(false);
-      setUser(null);
-      return;
-    }
+    if (!isFirebaseConfigured || !auth) return;
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);

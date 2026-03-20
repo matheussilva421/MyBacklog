@@ -16,6 +16,8 @@ export type GamePageGoal = {
 export type GamePageData = {
   game: Game;
   record: LibraryRecord;
+  storeNames: string[];
+  platformNames: string[];
   sessions: PlaySession[];
   review?: Review;
   tags: Tag[];
@@ -74,6 +76,8 @@ export function buildGamePageData(input: {
   game: Game;
   record: LibraryRecord;
   sessions: PlaySession[];
+  storeNames: string[];
+  platformNames: string[];
   review?: Review;
   tags: Tag[];
   lists: List[];
@@ -97,6 +101,8 @@ export function buildGamePageData(input: {
   return {
     game: input.game,
     record: input.record,
+    storeNames: input.storeNames,
+    platformNames: input.platformNames,
     sessions,
     review: input.review,
     tags: input.tags,

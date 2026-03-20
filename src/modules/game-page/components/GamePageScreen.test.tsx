@@ -8,7 +8,9 @@ const data: GamePageData = {
     id: 7,
     title: "Cyberpunk 2077",
     platform: "PC",
+    platforms: ["PC"],
     sourceStore: "Steam",
+    stores: ["Steam"],
     genre: "RPG",
     status: "Jogando",
     progress: 62,
@@ -49,6 +51,8 @@ const data: GamePageData = {
       updatedAt: "2026-03-01T00:00:00.000Z",
     },
   },
+  storeNames: ["Steam"],
+  platformNames: ["PC"],
   sessions: [
     {
       id: 1,

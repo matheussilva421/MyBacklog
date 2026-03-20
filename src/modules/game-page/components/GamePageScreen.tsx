@@ -98,6 +98,12 @@ export function GamePageScreen({
     () => data.lists.map((list) => list.id).filter((listId): listId is number => listId != null),
   );
 
+  const openStoreLink = () => {
+    if (!data.storeLink) return;
+    const openedWindow = window.open(data.storeLink, "_blank", "noopener,noreferrer");
+    if (openedWindow) openedWindow.opener = null;
+  };
+
   const handleReviewSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await onSaveReview(reviewForm);
@@ -211,8 +217,8 @@ export function GamePageScreen({
 
           <div className="game-page-metadata-grid">
             <div className="detail-stat">
-              <span>Fonte</span>
-              <strong>{data.record.libraryEntry.sourceStore || "Manual"}</strong>
+              <span>Stores</span>
+              <strong>{data.storeNames.join(", ") || data.record.libraryEntry.sourceStore || "Manual"}</strong>
             </div>
             <div className="detail-stat">
               <span>Formato</span>
@@ -228,7 +234,7 @@ export function GamePageScreen({
             </div>
             <div className="detail-stat">
               <span>Plataformas</span>
-              <strong>{data.record.game.platforms || data.game.platform}</strong>
+              <strong>{data.platformNames.join(", ") || data.record.game.platforms || data.game.platform}</strong>
             </div>
             <div className="detail-stat">
               <span>RAWG</span>
@@ -264,7 +270,7 @@ export function GamePageScreen({
               Priorizar no planner
             </NotchButton>
             {data.storeLink && (
-              <NotchButton variant="secondary" onClick={() => window.open(data.storeLink, "_blank")}>
+              <NotchButton variant="secondary" onClick={openStoreLink}>
                 <ArrowUpRight size={14} />
                 Ver na loja
               </NotchButton>

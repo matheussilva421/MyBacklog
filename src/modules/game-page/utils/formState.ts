@@ -2,6 +2,7 @@ import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../
 import { mergePlatformList, normalizeGameTitle, priorityToDbPriority, statusToDbStatus } from "../../../backlog/shared";
 import type { Game, GameFormState } from "../../../backlog/shared";
 import { deriveCompletionDate } from "../../../core/catalogIntegrity";
+import { getPrimaryCsvToken, splitCsvTokens } from "../../../core/utils";
 
 type GameFormDefaults = {
   platform?: string;
@@ -9,11 +10,16 @@ type GameFormDefaults = {
 };
 
 export function createGameFormState(game?: Game, defaults?: GameFormDefaults): GameFormState {
+  const platforms = splitCsvTokens(game?.platforms ?? game?.catalogPlatforms ?? game?.platform ?? defaults?.platform ?? "PC");
+  const stores = splitCsvTokens(game?.stores ?? game?.sourceStore ?? defaults?.sourceStore ?? "Manual");
+
   return {
     title: game?.title ?? "",
-    platform: game?.platform ?? defaults?.platform ?? "PC",
-    catalogPlatforms: game?.catalogPlatforms ?? game?.platform ?? defaults?.platform ?? "PC",
-    sourceStore: game?.sourceStore ?? defaults?.sourceStore ?? "Manual",
+    platform: game?.platform ?? getPrimaryCsvToken(platforms, defaults?.platform ?? "PC"),
+    platforms,
+    catalogPlatforms: platforms.join(", "),
+    sourceStore: game?.sourceStore ?? getPrimaryCsvToken(stores, defaults?.sourceStore ?? "Manual"),
+    stores,
     genre: game?.genre ?? "",
     status: game?.status ?? "Backlog",
     priority: game?.priority ?? "Média",
@@ -46,11 +52,12 @@ export function createDbGameFromForm(
   const progress = Math.max(0, Math.min(100, Math.round(Number(form.progress) || 0)));
   const hours = Math.max(0, Number(form.hours) || 0);
   const title = form.title.trim();
-  const platform = form.platform.trim() || "PC";
+  const structuredPlatforms = splitCsvTokens([form.platform, ...(form.platforms ?? []), form.catalogPlatforms]);
+  const platform = getPrimaryCsvToken(structuredPlatforms, form.platform.trim() || "PC");
+  const structuredStores = splitCsvTokens([form.sourceStore, ...(form.stores ?? [])]);
   const now = new Date().toISOString();
   const progressStatus = statusToDbStatus(form.status);
   const completionPercent = form.status === "Terminado" ? 100 : progress;
-  const catalogPlatforms = form.catalogPlatforms.trim() || platform;
 
   return {
     game: {
@@ -65,7 +72,7 @@ export function createDbGameFromForm(
       estimatedTime: form.eta.trim() || undefined,
       difficulty: form.difficulty.trim() || undefined,
       releaseYear: form.year ? Number(form.year) : undefined,
-      platforms: mergePlatformList(current?.game.platforms, catalogPlatforms),
+      platforms: mergePlatformList(current?.game.platforms, structuredPlatforms.join(", ")),
       developer: form.developer.trim() || current?.game.developer,
       publisher: form.publisher.trim() || current?.game.publisher,
       createdAt: current?.game.createdAt || now,
@@ -75,7 +82,7 @@ export function createDbGameFromForm(
       id: current?.libraryEntry.id,
       gameId: current?.game.id ?? 0,
       platform,
-      sourceStore: form.sourceStore.trim() || current?.libraryEntry.sourceStore || "Manual",
+      sourceStore: getPrimaryCsvToken(structuredStores, current?.libraryEntry.sourceStore || "Manual"),
       edition: current?.libraryEntry.edition,
       format: current?.libraryEntry.format || "digital",
       ownershipStatus: form.status === "Wishlist" ? "wishlist" : "owned",
