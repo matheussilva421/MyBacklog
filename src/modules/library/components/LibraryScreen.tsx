@@ -249,7 +249,16 @@ export function LibraryScreen({
                 {savedViews.map((view) => {
                   const savedViewId = view.id;
                   return (
-                  <div key={savedViewId ?? `${view.scope}-${view.name}`} className={cx("saved-view-card", activeSavedView?.id === savedViewId && "saved-view-card--active")}>
+                  <div
+                    key={savedViewId ?? `${view.scope}-${view.name}`}
+                    className={cx(
+                      "saved-view-card",
+                      "app-card",
+                      "app-card--compact",
+                      activeSavedView?.id === savedViewId && "saved-view-card--active",
+                      activeSavedView?.id === savedViewId && "app-card--selected",
+                    )}
+                  >
                     <button type="button" className="saved-view-card__main" onClick={() => onApplySavedView(view)}>
                       <strong>{view.name}</strong>
                       <span>

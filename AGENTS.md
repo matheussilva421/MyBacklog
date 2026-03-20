@@ -27,3 +27,39 @@ Recent history favors short imperative subjects, often in Portuguese, with optio
 
 ## Configuration Tips
 Copy `.env.example` when local configuration is needed. `VITE_RAWG_API_KEY` is optional and should never be committed. Treat local IndexedDB and Firebase-related changes carefully; document migration or sync behavior in the PR when data flow changes.
+
+## Design System: Cards
+
+O sistema usa uma base CSS unificada para cards (`.app-card`) com modificadores de estado e densidade.
+
+### Classes Base
+- `.app-card` - classe base (padding: 16px, gap: 12px, border, background)
+- `.app-card--interactive` - cursor pointer + hover/focus states
+- `.app-card--compact` - padding reduzido (12px)
+- `.app-card--selected` - border cyan (seleção)
+- `.app-card--active` - border yellow (ativo/foco)
+
+### Componente React
+Use o componente `<AppCard>` de `src/components/cards/`:
+
+```tsx
+import { AppCard, AppCardHeader, AppCardTitle, AppCardBody } from "@/components/cards";
+
+<AppCard type="interactive" selected={isSelected} onClick={handleClick}>
+  <AppCardHeader>
+    <AppCardTitle icon={<Icon />}>Título</AppCardTitle>
+  </AppCardHeader>
+  <AppCardBody>Conteúdo</AppCardBody>
+</AppCard>
+```
+
+### Props do AppCard
+- `type`: "informative" | "interactive" | "statistic" | "status" | "selection" | "action" | "analytic" | "history"
+- `density`: "normal" | "compact" | "relaxed"
+- `tone`: "cyan" | "yellow" | "magenta" | "emerald" | "orange" | "violet"
+- `selected`, `active`, `locked`, `disabled`: boolean states
+- `as`: "div" | "article" | "section" | "button"
+
+### Migração de Cards Existentes
+Cards como `library-card`, `session-card`, `planner-card`, `audit-card`, etc. foram migrados para herdar de `.app-card`. Ao criar novos cards, use a base `.app-card` sempre que possível, adicionando apenas especificidades de layout.
+

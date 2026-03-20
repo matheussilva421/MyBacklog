@@ -12,7 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { VerticalBarChart } from "../../../charts";
-import { formatDuration, type Game, type Status } from "../../../backlog/shared";
+import { cx, formatDuration, type Game, type Status } from "../../../backlog/shared";
 import { getGamePlatforms, getGameStores } from "../../../backlog/structuredGameValues";
 import { formatDatePtBr } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
@@ -371,7 +371,7 @@ export function SessionsScreen({
                 <div className="session-list">
                   {group.sessions.slice(0, 6).map((session) => (
                     <article
-                      className="session-card"
+                      className={cx("session-card", "app-card")}
                       key={session.id ?? `${session.libraryEntryId}-${session.date}-${session.durationMinutes}`}
                     >
                       <div>

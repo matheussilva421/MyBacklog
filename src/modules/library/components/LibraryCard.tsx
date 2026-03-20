@@ -24,8 +24,12 @@ export const LibraryCard = React.memo(function LibraryCard({
     <article
       className={cx(
         "library-card-shell",
+        "app-card",
+        "app-card--interactive",
         isActive && "library-card-shell--active",
+        isActive && "app-card--active",
         isSelected && "library-card-shell--selected",
+        isSelected && "app-card--selected",
       )}
     >
       <div className="library-card__toolbar">
@@ -43,7 +47,7 @@ export const LibraryCard = React.memo(function LibraryCard({
 
       <button
         type="button"
-        className="library-card"
+        className={cx("library-card", "app-card", "app-card--interactive")}
         onClick={() => onSelectGame(game.id)}
         aria-label={`Abrir ficha de ${game.title}`}
       >

@@ -42,7 +42,7 @@ export function PlannerScreen({
               if (!game) return null;
 
               return (
-                <button type="button" className="planner-card" key={entry.rank} onClick={() => onOpenGamePage(game.id)}>
+                <button type="button" className={cx("planner-card", "app-card", "app-card--interactive")} key={entry.rank} onClick={() => onOpenGamePage(game.id)}>
                   <div className="planner-card__slot">
                     <span>Slot</span>
                     <strong>{entry.rank}</strong>

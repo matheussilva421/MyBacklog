@@ -6,6 +6,7 @@ import {
   Sparkles,
   Wrench,
 } from "lucide-react";
+import { cx } from "../../../backlog/shared";
 import { EmptyState, NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 import type { CatalogMaintenanceReport } from "../utils/catalogMaintenance";
 
@@ -91,7 +92,7 @@ export function CatalogMaintenanceScreen({
             <EmptyState message="Nenhum grupo duplicado detectado no catálogo." />
           ) : (
             report.duplicateGroups.map((group) => (
-              <article className="audit-card" key={group.id}>
+              <article className={cx("audit-card", "app-card")} key={group.id}>
                 <div className="audit-card__head">
                   <div className="audit-card__title">
                     <GitMerge size={18} />
@@ -137,7 +138,7 @@ export function CatalogMaintenanceScreen({
 
                 <div className="audit-list">
                   {group.candidates.map((candidate) => (
-                    <article className="audit-card audit-card--compact" key={`${group.id}-candidate-${candidate.libraryEntryId}`}>
+                    <article className={cx("audit-card", "audit-card--compact", "app-card", "app-card--compact")} key={`${group.id}-candidate-${candidate.libraryEntryId}`}>
                       <div className="audit-card__head">
                         <div className="audit-card__title">
                           {candidate.libraryEntryId === group.suggestedPrimaryEntryId ? (
@@ -328,7 +329,7 @@ export function CatalogMaintenanceScreen({
             <EmptyState message="Nenhum alias estrutural pendente." />
           ) : (
             report.aliasGroups.map((group) => (
-              <article className="audit-card" key={group.id}>
+              <article className={cx("audit-card", "app-card")} key={group.id}>
                 <div className="audit-card__head">
                   <div className="audit-card__title">
                     <GitMerge size={18} />

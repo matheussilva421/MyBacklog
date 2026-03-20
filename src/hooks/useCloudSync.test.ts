@@ -204,6 +204,83 @@ describe("syncEngine helpers", () => {
       }),
     );
 
+    // Agora divergências reconciliáveis são auto-merge
+    expect(conflict.decision).toBe("auto-merge");
+  });
+
+  it("marca conflito real quando reviews têm scores diferentes", () => {
+    const tablesWithReview = {
+      ...baseTables,
+      reviews: [
+        {
+          id: 1,
+          libraryEntryId: 1,
+          score: 5,
+          shortReview: "Jogo excelente",
+          createdAt: "2026-03-01T10:00:00.000Z",
+          updatedAt: "2026-03-01T10:00:00.000Z",
+        },
+      ],
+    };
+
+    const conflict = resolveInitialSyncDecision(
+      tablesWithReview,
+      createPayload({
+        reviews: [
+          {
+            id: 2,
+            libraryEntryId: 1,
+            score: 3, // Score diferente do local (que é 5)
+            shortReview: "Jogo médio",
+            createdAt: "2026-03-02T10:00:00.000Z",
+            updatedAt: "2026-03-02T10:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    // Conflito real: mesma review com score diferente exige intervenção
+    expect(conflict.decision).toBe("conflict");
+  });
+
+  it("marca conflito real quando sessões têm durações diferentes na mesma data", () => {
+    const tablesWithSession = {
+      ...baseTables,
+      playSessions: [
+        {
+          id: 1,
+          libraryEntryId: 1,
+          date: "2026-03-10",
+          platform: "PC",
+          durationMinutes: 60,
+          completionPercent: 62,
+          note: "Sessão teste",
+          createdAt: "2026-03-01T10:00:00.000Z",
+          updatedAt: "2026-03-01T10:00:00.000Z",
+        },
+      ],
+    };
+
+    const conflict = resolveInitialSyncDecision(
+      tablesWithSession,
+      createPayload({
+        playSessions: [
+          {
+            id: 2,
+            libraryEntryId: 1,
+            date: "2026-03-10", // Mesma data
+            platform: "PC", // Mesma plataforma
+            durationMinutes: 90, // Duração diferente da local (que é 60)
+            completionPercent: 65,
+            note: "Sessão teste cloud",
+            createdAt: "2026-03-02T10:00:00.000Z",
+            updatedAt: "2026-03-02T10:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    // Conflito real: mesma sessão com duração diferente
     expect(conflict.decision).toBe("conflict");
   });
 

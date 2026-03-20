@@ -24,6 +24,17 @@
   --font-body: "Rajdhani", "Segoe UI", sans-serif;
   --panel-clip: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
   --button-clip: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  /* Card tokens - Design System */
+  --card-padding: 16px;
+  --card-padding-compact: 12px;
+  --card-gap: 12px;
+  --card-gap-relaxed: 14px;
+  --card-bg: rgba(7, 9, 13, 0.82);
+  --card-border: 1px solid var(--line-soft);
+  --card-hover-border: rgba(244, 239, 27, 0.2);
+  --card-selected-border: rgba(38, 216, 255, 0.34);
+  --card-active-border: rgba(244, 239, 27, 0.28);
+  --card-transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
 * {
@@ -332,6 +343,44 @@ button {
   width: 62px;
   height: 62px;
   background: rgba(38, 216, 255, 0.14);
+}
+
+/* ============================================
+   APP-CARD: Base class system for cards
+   ============================================ */
+.app-card {
+  display: grid;
+  gap: var(--card-gap, 12px);
+  padding: var(--card-padding, 16px);
+  border: var(--card-border);
+  background: var(--card-bg);
+  clip-path: var(--button-clip);
+  transition: var(--card-transition);
+}
+
+.app-card--interactive {
+  cursor: pointer;
+}
+
+.app-card--interactive:hover,
+.app-card--interactive:focus-visible {
+  border-color: var(--card-hover-border);
+  transform: translateY(-1px);
+}
+
+.app-card--compact {
+  padding: var(--card-padding-compact, 12px);
+  gap: 8px;
+}
+
+.app-card--selected {
+  border-color: var(--card-selected-border);
+  box-shadow: inset 0 0 0 1px rgba(38, 216, 255, 0.08);
+}
+
+.app-card--active {
+  border-color: var(--card-active-border);
+  box-shadow: inset 0 0 0 1px rgba(244, 239, 27, 0.06);
 }
 
 .cp-tag,
@@ -970,6 +1019,7 @@ button {
   background: linear-gradient(90deg, #49d7ff 0%, #8c64ff 100%);
 }
 
+/* Cards que usam app-card como base */
 .continue-card,
 .session-card,
 .detail-note,
@@ -980,10 +1030,10 @@ button {
 .rule-card,
 .achievement-card,
 .profile-card__main {
-  border: 1px solid var(--line-soft);
-  background: rgba(7, 9, 13, 0.82);
+  /* border e background herdados de app-card */
 }
 
+/* Cards com padding específico */
 .continue-card,
 .session-card,
 .priority-card,
@@ -991,7 +1041,7 @@ button {
 .library-card,
 .rule-card,
 .achievement-card {
-  padding: 16px;
+  /* padding herdado de app-card (16px) */
 }
 
 .continue-card__top,
@@ -1059,15 +1109,17 @@ button {
 }
 
 .priority-card,
-.planner-card,
-.library-card {
+.planner-card {
   color: inherit;
   text-align: left;
 }
 
+/* LibraryCard: usa app-card como base, com especificidades */
 .library-card {
   overflow: hidden;
-  padding: 0;
+  padding: 0; /* Cover ocupa largura total */
+  border: 0;
+  background: transparent;
 }
 
 .library-card__cover {
@@ -1119,10 +1171,11 @@ button {
   margin-top: 16px;
 }
 
+/* PlannerCard: usa app-card como base + layout grid específico */
 .planner-card {
-  display: grid;
   grid-template-columns: 58px minmax(0, 1fr);
   gap: 14px;
+  /* padding herdado de app-card */
 }
 
 .planner-card__slot {
@@ -1223,18 +1276,14 @@ button {
   gap: 10px;
 }
 
+/* SavedViewCard: usa app-card como base + especificidades de layout */
 .saved-view-card {
-  display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid rgba(244, 239, 27, 0.12);
-  background: rgba(10, 13, 19, 0.82);
+  /* gap, padding, border, background herdados de app-card */
 }
 
 .saved-view-card--active {
-  border-color: rgba(38, 216, 255, 0.34);
-  box-shadow: inset 0 0 0 1px rgba(38, 216, 255, 0.08);
+  /* border-color e box-shadow herdados de app-card--selected */
 }
 
 .saved-view-card__main,
@@ -1320,20 +1369,19 @@ button {
   gap: 16px;
 }
 
+/* LibraryCardShell: usa app-card como base + especificidades */
 .library-card-shell {
   overflow: hidden;
-  border: 1px solid var(--line-soft);
-  background: rgba(7, 9, 13, 0.82);
+  /* border e background herdados de app-card */
 }
 
+/* Modificadores herdados de app-card--active e app-card--selected */
 .library-card-shell--active {
-  border-color: rgba(244, 239, 27, 0.28);
-  box-shadow: inset 0 0 0 1px rgba(244, 239, 27, 0.06);
+  /* border-color e box-shadow herdados de app-card--active */
 }
 
 .library-card-shell--selected {
-  border-color: rgba(38, 216, 255, 0.34);
-  box-shadow: inset 0 0 0 1px rgba(38, 216, 255, 0.08);
+  /* border-color e box-shadow herdados de app-card--selected */
 }
 
 .library-card__toolbar,
@@ -1398,18 +1446,10 @@ button {
   font-size: 13px;
 }
 
+/* LibraryCard: display grid herdado de app-card, gap específico para conteúdo */
 .library-card {
   display: grid;
-  gap: 12px;
-  width: 100%;
-  padding: 16px;
-  border: 0;
-  background: transparent;
-}
-
-.library-card--active {
-  border-color: rgba(244, 239, 27, 0.28);
-  box-shadow: inset 0 0 0 1px rgba(244, 239, 27, 0.06);
+  gap: 14px; /* Gap do conteúdo interno */
 }
 
 .library-card__platform {
@@ -1499,17 +1539,16 @@ button {
   gap: 12px;
 }
 
+/* AuditCard: usa app-card como base + especificidades */
 .audit-card {
-  display: grid;
   gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--line-soft);
-  background: rgba(7, 9, 13, 0.82);
+  /* padding, border, background herdados de app-card */
 }
 
 .audit-card--compact {
   gap: 8px;
-  padding: 12px;
+  padding: var(--card-padding-compact, 12px);
+  /* usa app-card--compact */
 }
 
 .audit-card__head,
@@ -1676,13 +1715,11 @@ button {
   gap: 12px;
 }
 
+/* BadgeCard: usa app-card como base + especificidades */
 .badge-card {
-  display: grid;
   gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--line-soft);
-  background: rgba(7, 9, 13, 0.82);
   min-width: 0;
+  /* padding, border, background herdados de app-card */
 }
 
 .badge-card--locked {
@@ -2125,12 +2162,10 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
 }
 
+/* SyncHistoryCard: usa app-card como base + especificidades */
 .sync-history-card {
-  display: grid;
   gap: 8px;
-  padding: 14px;
-  border: 1px solid var(--line-soft);
-  background: rgba(7, 9, 13, 0.82);
+  /* padding, border, background herdados de app-card */
 }
 
 .sync-history-card strong {
@@ -2747,12 +2782,10 @@ button {
   gap: 12px;
 }
 
+/* ImportJobCard: usa app-card como base + especificidades */
 .import-job-card {
-  display: grid;
   gap: 10px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 14, 20, 0.82);
+  /* padding, border, background herdados de app-card */
 }
 
 .import-job-card__head,

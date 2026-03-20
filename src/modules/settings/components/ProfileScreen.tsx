@@ -189,7 +189,7 @@ export function ProfileScreen({
             <EmptyState message="Nenhuma inconsistência encontrada no catálogo." />
           ) : (
             catalogAuditReport.issues.map((issue) => (
-              <article className="audit-card" key={issue.id}>
+              <article className={cx("audit-card", "app-card")} key={issue.id}>
                 <div className="audit-card__head">
                   <div className="audit-card__title">
                     {issue.repairable ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}

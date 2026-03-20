@@ -34,11 +34,11 @@ import {
   mergeLibraryEntries,
   mergeReviewRecords,
 } from "../../catalog-maintenance/utils/catalogMaintenance";
-import { localOnlySyncSettingKeys } from "./syncStorage";
+import { localOnlySyncSettingKeys, syncSettingsKeys } from "./syncStorage";
 
 export type SyncTables = Omit<BackupPayload, "version" | "exportedAt" | "source">;
 
-export type InitialSyncDecision = "idle" | "pull-cloud" | "push-local" | "match" | "conflict";
+export type InitialSyncDecision = "idle" | "pull-cloud" | "push-local" | "match" | "auto-merge" | "conflict";
 
 export type SyncBlockKey =
   | "games"
@@ -199,6 +199,39 @@ export function buildSyncFingerprint(tables: SyncTables): string {
   });
 }
 
+/**
+ * Build fingerprint semântico excluindo campos de metadados de sync.
+ * Usado para detectar divergências reais vs diferenças de metadados.
+ */
+export function buildSemanticFingerprint(tables: SyncTables): string {
+  const sanitizedTables = sanitizeSyncTables(tables);
+
+  // Excluir settings de sync (sempre diferem)
+  const settingsForFingerprint = sanitizedTables.settings.filter(
+    (setting) =>
+      !localOnlySyncSettingKeys.has(setting.key) &&
+      setting.key !== syncSettingsKeys.autoSyncEnabled,
+  );
+
+  return JSON.stringify({
+    games: sortRows(sanitizedTables.games),
+    libraryEntries: sortRows(sanitizedTables.libraryEntries),
+    stores: sortRows(sanitizedTables.stores),
+    libraryEntryStores: sortRows(sanitizedTables.libraryEntryStores),
+    platforms: sortRows(sanitizedTables.platforms),
+    gamePlatforms: sortRows(sanitizedTables.gamePlatforms),
+    playSessions: sortRows(sanitizedTables.playSessions),
+    reviews: sortRows(sanitizedTables.reviews),
+    lists: sortRows(sanitizedTables.lists),
+    libraryEntryLists: sortRows(sanitizedTables.libraryEntryLists),
+    tags: sortRows(sanitizedTables.tags),
+    gameTags: sortRows(sanitizedTables.gameTags),
+    goals: sortRows(sanitizedTables.goals),
+    settings: sortRows(settingsForFingerprint),
+    savedViews: sortRows(sanitizedTables.savedViews),
+  });
+}
+
 export function buildBackupPayload(tables: SyncTables): BackupPayload {
   const sanitizedTables = sanitizeSyncTables(tables);
 
@@ -239,9 +272,9 @@ export function resolveInitialSyncDecision(
   cloudFingerprint: string | null;
 } {
   const sanitizedLocalTables = sanitizeSyncTables(localTables);
-  const localFingerprint = buildSyncFingerprint(sanitizedLocalTables);
+  const localFingerprint = buildSemanticFingerprint(sanitizedLocalTables);
   const cloudTables = cloudData ? stripBackupMeta(cloudData) : null;
-  const cloudFingerprint = cloudTables ? buildSyncFingerprint(cloudTables) : null;
+  const cloudFingerprint = cloudTables ? buildSemanticFingerprint(cloudTables) : null;
   const localHasAnyData = hasSyncData(sanitizedLocalTables);
   const cloudHasAnyData = cloudTables ? hasSyncData(cloudTables) : false;
 
@@ -261,7 +294,101 @@ export function resolveInitialSyncDecision(
     return { decision: "match", localFingerprint, cloudFingerprint };
   }
 
+  // Verificar se pode fazer auto-merge
+  if (canAutoMerge(sanitizedLocalTables, cloudTables)) {
+    return { decision: "auto-merge", localFingerprint, cloudFingerprint };
+  }
+
   return { decision: "conflict", localFingerprint, cloudFingerprint };
+}
+
+/**
+ * Verifica se os dados podem ser mesclados automaticamente sem intervenção do usuário.
+ * Auto-merge é seguro quando:
+ * - São adições de registros diferentes (mesma tabela, IDs diferentes)
+ * - São atualizações de campos não conflitantes
+ * - São sessões de jogo diferentes (mesma entrada, datas/horários diferentes)
+ *
+ * Conflito real exige intervenção quando:
+ * - Mesmo registro com valores incompatíveis (ex: review com notas diferentes)
+ * - Metadados de jogo com títulos diferentes
+ */
+export function canAutoMerge(localTables: SyncTables, cloudTables: SyncTables | null): boolean {
+  if (!cloudTables) return false;
+
+  const localSessionsByEntryId = groupBy(localTables.playSessions, (s) => s.libraryEntryId);
+  const cloudSessionsByEntryId = groupBy(cloudTables.playSessions, (s) => s.libraryEntryId);
+
+  // Verificar conflitos de sessão: mesma entrada, mesma data, duração diferente
+  for (const [entryId, localSessions] of localSessionsByEntryId.entries()) {
+    const cloudSessions = cloudSessionsByEntryId.get(entryId) ?? [];
+    for (const localSession of localSessions) {
+      for (const cloudSession of cloudSessions) {
+        if (
+          localSession.date === cloudSession.date &&
+          localSession.platform === cloudSession.platform &&
+          localSession.durationMinutes !== cloudSession.durationMinutes
+        ) {
+          // Conflito real: mesma sessão com duração diferente
+          return false;
+        }
+      }
+    }
+  }
+
+  // Verificar conflitos de review: mesma entrada, notas diferentes
+  const localReviewsByEntryId = new Map(localTables.reviews.map((r) => [r.libraryEntryId, r]));
+  const cloudReviewsByEntryId = new Map(cloudTables.reviews.map((r) => [r.libraryEntryId, r]));
+
+  for (const [entryId, localReview] of localReviewsByEntryId.entries()) {
+    const cloudReview = cloudReviewsByEntryId.get(entryId);
+    // Conflito real: mesma review com score diferente (ambos têm score definido e são diferentes)
+    if (cloudReview && localReview.score != null && cloudReview.score != null && localReview.score !== cloudReview.score) {
+      return false;
+    }
+  }
+
+  // Verificar conflitos de jogos: mesmo ID, títulos normalizados diferentes
+  const localGamesById = new Map(localTables.games.map((g) => [g.id, g]));
+  const cloudGamesById = new Map(cloudTables.games.map((g) => [g.id, g]));
+
+  for (const [gameId, localGame] of localGamesById.entries()) {
+    const cloudGame = cloudGamesById.get(gameId);
+    if (cloudGame) {
+      const localNormalized = normalizeGameTitle(localGame.title);
+      const cloudNormalized = normalizeGameTitle(cloudGame.title);
+      if (localNormalized !== cloudNormalized) {
+        // Conflito real: mesmo jogo com títulos diferentes
+        return false;
+      }
+    }
+  }
+
+  // Verificar conflitos de listas: mesmo nome, createdAt diferente
+  const localListsByName = new Map(localTables.lists.map((l) => [l.name.trim().toLowerCase(), l]));
+  const cloudListsByName = new Map(cloudTables.lists.map((l) => [l.name.trim().toLowerCase(), l]));
+
+  for (const [name, localList] of localListsByName.entries()) {
+    const cloudList = cloudListsByName.get(name);
+    if (cloudList && localList.createdAt !== cloudList.createdAt) {
+      // Conflito potencial: mesma lista criada em tempos diferentes
+      // Permitir auto-merge se for apenas diferença de timestamp
+    }
+  }
+
+  // Se chegou aqui, pode fazer auto-merge seguro
+  return true;
+}
+
+function groupBy<T>(items: T[], keyFn: (item: T) => number | string): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const key = String(keyFn(item));
+    const current = map.get(key) ?? [];
+    current.push(item);
+    map.set(key, current);
+  }
+  return map;
 }
 
 export function buildSyncComparison(

@@ -165,6 +165,7 @@ export function useCloudSync({
   const previousFingerprintRef = useRef<string | null>(null);
   const cloudSnapshotRef = useRef<BackupPayload | null>(null);
   const syncLockRef = useRef<symbol | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const emptySyncTables = useMemo(() => createEmptySyncTables(), []);
 
   useEffect(() => {
@@ -178,8 +179,28 @@ export function useCloudSync({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => {
+      setIsOnline(true);
+      // Agendar reconnect polling quando voltar a ficar online
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      // Tentar sync em 5 segundos
+      reconnectTimeoutRef.current = setTimeout(() => {
+        if (user && isAuthEnabled && autoSyncEnabled) {
+          // Disparar um re-check do sync
+          window.dispatchEvent(new CustomEvent("mybacklog:sync-request"));
+        }
+      }, 5000);
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      // Limpar timeout pendente se ficar offline
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
@@ -187,8 +208,12 @@ export function useCloudSync({
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
     };
-  }, []);
+  }, [autoSyncEnabled, isAuthEnabled, user]);
 
   const persistSyncMeta = useCallback(
     async (nextHistory: SyncHistoryEntry[], nextLastSuccessfulSyncAt: string | null) => {
@@ -355,6 +380,43 @@ export function useCloudSync({
             return;
           }
 
+          if (nextComparison.decision === "auto-merge") {
+            // Auto-merge: reconciliar dados automaticamente
+            if (!cloudData) {
+              // Não deveria acontecer, mas tratar como conflito se cloudData for null
+              setIsWorkingLocal(false);
+              await pushHistory(
+                "conflict",
+                "conflict",
+                "Conflito detectado: dados da nuvem inesperadamente ausentes.",
+              );
+              return;
+            }
+
+            const cloudTables = stripBackupMeta(cloudData);
+            const mergedTables = mergeSyncTables(localTables, cloudTables);
+            const mergedPayload = buildBackupPayload(mergedTables);
+
+            await pushToCloud(user.uid, mergedPayload);
+            if (!active) return;
+
+            await applySnapshotLocally(mergedTables, mergedPayload.exportedAt);
+            commitLastSuccessfulSyncAt(mergedPayload.exportedAt);
+            finalizeMatchState(mergedTables, mergedPayload);
+
+            // Contar registros mesclados para log
+            const mergedSessionCount = mergedTables.playSessions.length;
+            const mergedGameCount = mergedTables.games.length;
+
+            await pushHistory(
+              "auto-pull",
+              "success",
+              `Auto-merge: ${mergedGameCount} jogos e ${mergedSessionCount} sessões reconciliados automaticamente.`,
+              mergedPayload.exportedAt,
+            );
+            return;
+          }
+
           setIsWorkingLocal(false);
           await pushHistory(
             "conflict",
@@ -404,6 +466,47 @@ export function useCloudSync({
     setNotice,
     user,
   ]);
+
+  // Listener para eventos de sync-request (disparado quando volta a ficar online)
+  useEffect(() => {
+    const handleSyncRequest = () => {
+      // Se está online, tem usuário e auto-sync está ativo, tentar sync
+      if (isOnline && user && isAuthEnabled && autoSyncEnabled && !isSyncing) {
+        // Disparar um novo bootstrap do sync
+        void (async () => {
+          const syncToken = acquireSyncLock();
+          if (!syncToken) return;
+
+          try {
+            const localTables = await readBackupTables();
+            const cloudData = await pullFromCloud(user.uid);
+
+            if (cloudData) {
+              const nextComparison = buildSyncComparison(localTables, cloudData);
+
+              if (nextComparison.decision === "match" || nextComparison.decision === "auto-merge") {
+                // Sync bem-sucedido, atualizar estado
+                finalizeMatchState(localTables, cloudData);
+                setNotice("Sincronização restabelecida após reconnect.");
+              } else if (nextComparison.decision === "conflict") {
+                setNotice("Conflito detectado após reconnect. Revise a Central de Sync.");
+              }
+            }
+          } catch (error) {
+            logSyncError("Reconnect sync error:", error);
+          } finally {
+            releaseSyncLock(syncToken);
+          }
+        })();
+      }
+    };
+
+    window.addEventListener("mybacklog:sync-request", handleSyncRequest);
+
+    return () => {
+      window.removeEventListener("mybacklog:sync-request", handleSyncRequest);
+    };
+  }, [acquireSyncLock, autoSyncEnabled, buildSyncComparison, finalizeMatchState, isAuthEnabled, isOnline, isSyncing, readBackupTables, releaseSyncLock, setNotice, user]);
 
   const syncMode = useMemo<SyncMode>(() => {
     if (!isAuthEnabled) return "local-only";

@@ -15,7 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { VerticalBarChart } from "../../../charts";
-import { formatDuration, priorityTone, statusTone } from "../../../backlog/shared";
+import { cx, formatDuration, priorityTone, statusTone } from "../../../backlog/shared";
 import { formatDatePtBr, formatCurrency } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
 import {
@@ -328,7 +328,7 @@ export function GamePageScreen({
             ) : (
               data.sessions.map((session) => (
                 <article
-                  className="session-card"
+                  className={cx("session-card", "app-card")}
                   key={session.id ?? `${session.libraryEntryId}-${session.date}-${session.durationMinutes}`}
                 >
                   <div>

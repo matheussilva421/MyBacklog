@@ -460,7 +460,7 @@ export function SyncCenterScreen({
                 const blockState = describeBlockState(block.state);
 
                 return (
-                  <article className="audit-card audit-card--compact" key={block.key}>
+                  <article className={cx("audit-card", "audit-card--compact", "app-card", "app-card--compact")} key={block.key}>
                     <div className="audit-card__head">
                       <div className="audit-card__title">
                         <h3>{block.label}</h3>
@@ -496,7 +496,7 @@ export function SyncCenterScreen({
           ) : (
             <div className="sync-history-list">
               {syncHistory.map((entry) => (
-                <article className="sync-history-card" key={entry.id}>
+                <article className={cx("sync-history-card", "app-card")} key={entry.id}>
                   <div className="sync-history-card__head">
                     <strong>{describeHistoryAction(entry.action)}</strong>
                     <Pill

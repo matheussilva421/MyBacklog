@@ -14,6 +14,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { DonutChart, VerticalBarChart } from "../../../charts";
+import { cx } from "../../../backlog/shared";
 import {
   formatDuration,
   pieColors,
@@ -182,7 +183,7 @@ export function StatsScreen({
         ) : (
           <div className="import-job-list">
             {importJobs.slice(0, 5).map((job) => (
-              <article key={job.id} className="import-job-card">
+              <article key={job.id} className={cx("import-job-card", "app-card")}>
                 <div className="import-job-card__head">
                   <div className="import-job-card__meta">
                     <Pill tone={job.status === "completed" ? "emerald" : job.status === "failed" ? "magenta" : "cyan"}>
@@ -227,7 +228,7 @@ export function StatsScreen({
                 if (!game) return null;
 
                 return (
-                  <article className="session-card" key={entry.id}>
+                  <article className={cx("session-card", "app-card")} key={entry.id}>
                     <div>
                       <div className="session-card__title">
                         <h3>{game.title}</h3>
