@@ -1,5 +1,15 @@
-import { Suspense, lazy, type ComponentType } from "react";
+import {
+  Suspense,
+  lazy,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import type { useBacklogApp } from "../hooks/useBacklogApp";
+import { useDocumentScrollLock } from "./cyberpunk-ui";
 
 function lazyNamed<TModule extends Record<string, unknown>, TKey extends keyof TModule>(
   loader: () => Promise<TModule>,
@@ -22,9 +32,18 @@ const SessionModal = lazyNamed(() => import("./backlog-modals"), "SessionModal")
 
 type BacklogAppState = ReturnType<typeof useBacklogApp>;
 
+type ModalEntry = {
+  key: string;
+  open: boolean;
+  message: string;
+  node: ReactNode;
+};
+
 function ModalFallback({ message = "Carregando interface..." }: { message?: string }) {
+  useDocumentScrollLock(true);
+
   return (
-    <div className="modal-backdrop modal-backdrop--loading" role="status" aria-live="polite">
+    <div className="modal-backdrop modal-backdrop--loading" role="dialog" aria-modal="true" aria-live="polite">
       <div className="modal-shell">
         <div className="loading-shell loading-shell--modal">
           <span className="loading-shell__pulse" aria-hidden="true" />
@@ -37,34 +56,46 @@ function ModalFallback({ message = "Carregando interface..." }: { message?: stri
 }
 
 export function AppShellModals({ app }: { app: BacklogAppState }) {
-  return (
-    <>
-      {app.gameModalMode ? (
-        <Suspense fallback={<ModalFallback message="Carregando modal do jogo..." />}>
+  const modalEntries = useMemo<ModalEntry[]>(() => {
+    const storeRows = app.storeRows ?? [];
+    const platformRows = app.platforms ?? [];
+    const tagRows = app.tagRows ?? [];
+    const listRows = app.listRows ?? [];
+    const selectedBatchGames = app.selectedBatchGames ?? [];
+    const gameRows = app.games ?? [];
+
+    return [
+      {
+        key: "game",
+        open: Boolean(app.gameModalMode),
+        message: "Carregando modal do jogo...",
+        node: (
           <GameModal
             mode={app.gameModalMode}
             form={app.gameForm}
-            availableStores={app.storeRows.map((store) => store.name)}
-            availablePlatforms={app.platforms.map((platform) => platform.name)}
+            availableStores={storeRows.map((store) => store.name)}
+            availablePlatforms={platformRows.map((platform) => platform.name)}
             rawgApiKey={app.preferences.rawgApiKey}
             submitting={app.submitting}
             onClose={app.closeGameModal}
             onChange={app.handleGameFormChange}
             onSubmit={app.handleGameSubmit}
           />
-        </Suspense>
-      ) : null}
-
-      {app.batchEditModalOpen ? (
-        <Suspense fallback={<ModalFallback message="Carregando edição em lote..." />}>
+        ),
+      },
+      {
+        key: "batch-edit",
+        open: app.batchEditModalOpen,
+        message: "Carregando edição em lote...",
+        node: (
           <BatchEditModal
             open={app.batchEditModalOpen}
             form={app.batchEditForm}
-            selectedGames={app.selectedBatchGames}
-            availableStores={app.storeRows.map((store) => store.name)}
-            availablePlatforms={app.platforms.map((platform) => platform.name)}
-            availableTags={app.tagRows.map((tag) => tag.name)}
-            availableLists={app.listRows
+            selectedGames={selectedBatchGames}
+            availableStores={storeRows.map((store) => store.name)}
+            availablePlatforms={platformRows.map((platform) => platform.name)}
+            availableTags={tagRows.map((tag) => tag.name)}
+            availableLists={listRows
               .filter((list) => list.id != null)
               .map((list) => ({ id: list.id as number, name: list.name }))}
             submitting={app.submitting}
@@ -72,26 +103,30 @@ export function AppShellModals({ app }: { app: BacklogAppState }) {
             onChange={app.handleBatchEditFormChange}
             onSubmit={app.handleBatchEditSubmit}
           />
-        </Suspense>
-      ) : null}
-
-      {app.sessionModalOpen ? (
-        <Suspense fallback={<ModalFallback message="Carregando modal de sessão..." />}>
+        ),
+      },
+      {
+        key: "session",
+        open: app.sessionModalOpen,
+        message: "Carregando modal de sessão...",
+        node: (
           <SessionModal
             open={app.sessionModalOpen}
             mode={app.sessionEditId != null ? "edit" : "create"}
             form={app.sessionForm}
-            libraryGames={app.games}
+            libraryGames={gameRows}
             submitting={app.submitting}
             onClose={app.closeSessionModal}
             onChange={app.handleSessionFormChange}
             onSubmit={app.handleSessionSubmit}
           />
-        </Suspense>
-      ) : null}
-
-      {app.goalModalMode ? (
-        <Suspense fallback={<ModalFallback message="Carregando modal de meta..." />}>
+        ),
+      },
+      {
+        key: "goal",
+        open: Boolean(app.goalModalMode),
+        message: "Carregando modal de meta...",
+        node: (
           <GoalModal
             mode={app.goalModalMode}
             form={app.goalForm}
@@ -100,11 +135,13 @@ export function AppShellModals({ app }: { app: BacklogAppState }) {
             onChange={app.handleGoalFormChange}
             onSubmit={app.handleGoalSubmit}
           />
-        </Suspense>
-      ) : null}
-
-      {app.importModalOpen ? (
-        <Suspense fallback={<ModalFallback message="Carregando fluxo de importação..." />}>
+        ),
+      },
+      {
+        key: "import",
+        open: app.importModalOpen,
+        message: "Carregando fluxo de importação...",
+        node: (
           <ImportModal
             open={app.importModalOpen}
             source={app.importSource}
@@ -127,11 +164,13 @@ export function AppShellModals({ app }: { app: BacklogAppState }) {
             onIgnoreUnsafe={app.handleImportPreviewIgnoreUnsafe}
             onSubmit={app.handleImportSubmit}
           />
-        </Suspense>
-      ) : null}
-
-      {app.restoreModalOpen ? (
-        <Suspense fallback={<ModalFallback message="Carregando fluxo de restauração..." />}>
+        ),
+      },
+      {
+        key: "restore",
+        open: app.restoreModalOpen,
+        message: "Carregando fluxo de restauração...",
+        node: (
           <RestoreModal
             open={app.restoreModalOpen}
             mode={app.restoreMode}
@@ -147,8 +186,31 @@ export function AppShellModals({ app }: { app: BacklogAppState }) {
             onFileChange={app.handleRestoreFileChange}
             onSubmit={app.handleRestoreSubmit}
           />
-        </Suspense>
-      ) : null}
-    </>
-  );
+        ),
+      },
+    ];
+  }, [app]);
+  const previousOpenRef = useRef<Record<string, boolean>>({});
+  const [activeModalKey, setActiveModalKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const openState = Object.fromEntries(modalEntries.map((entry) => [entry.key, entry.open]));
+    const newlyOpened = modalEntries.find((entry) => entry.open && !previousOpenRef.current[entry.key]);
+
+    if (newlyOpened) {
+      setActiveModalKey(newlyOpened.key);
+    } else if (!activeModalKey || !openState[activeModalKey]) {
+      setActiveModalKey(modalEntries.find((entry) => entry.open)?.key ?? null);
+    }
+
+    previousOpenRef.current = openState;
+  }, [activeModalKey, modalEntries]);
+
+  const activeEntry =
+    modalEntries.find((entry) => entry.key === activeModalKey && entry.open) ??
+    modalEntries.find((entry) => entry.open);
+
+  if (!activeEntry) return null;
+
+  return <Suspense fallback={<ModalFallback message={activeEntry.message} />}>{activeEntry.node}</Suspense>;
 }

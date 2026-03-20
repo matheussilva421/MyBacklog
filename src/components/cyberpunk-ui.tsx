@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -8,6 +9,64 @@ import {
 } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cx } from "../backlog/shared";
+
+const focusableSelector = [
+  "button:not([disabled])",
+  "[href]",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(", ");
+
+let scrollLockCount = 0;
+let previousBodyOverflow = "";
+let previousBodyPaddingRight = "";
+let previousRootOverflow = "";
+const modalStack: string[] = [];
+
+function lockDocumentScroll() {
+  if (typeof document === "undefined") return () => undefined;
+
+  const { body, documentElement } = document;
+  if (scrollLockCount === 0) {
+    previousBodyOverflow = body.style.overflow;
+    previousBodyPaddingRight = body.style.paddingRight;
+    previousRootOverflow = documentElement.style.overflow;
+
+    const scrollbarWidth = window.innerWidth - documentElement.clientWidth;
+    body.style.overflow = "hidden";
+    documentElement.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+  }
+
+  scrollLockCount += 1;
+
+  return () => {
+    scrollLockCount = Math.max(0, scrollLockCount - 1);
+    if (scrollLockCount > 0 || typeof document === "undefined") return;
+
+    const { body, documentElement } = document;
+    body.style.overflow = previousBodyOverflow;
+    body.style.paddingRight = previousBodyPaddingRight;
+    documentElement.style.overflow = previousRootOverflow;
+  };
+}
+
+function getFocusableElements(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+    (element) => !element.hasAttribute("disabled") && !element.hidden && element.getAttribute("aria-hidden") !== "true",
+  );
+}
+
+export function useDocumentScrollLock(active = true) {
+  useEffect(() => {
+    if (!active) return;
+    return lockDocumentScroll();
+  }, [active]);
+}
 
 export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -222,57 +281,118 @@ export function Modal({
   title,
   description,
   onClose,
+  closeDisabled = false,
   children,
 }: {
   title: string;
   description: string;
   onClose: () => void;
+  closeDisabled?: boolean;
   children: ReactNode;
 }) {
+  const modalId = useId();
+  const titleId = useId();
+  const descriptionId = useId();
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+
+  useDocumentScrollLock(true);
+
   useEffect(() => {
     if (typeof document === "undefined") return;
 
-    const { body, documentElement } = document;
-    const previousBodyOverflow = body.style.overflow;
-    const previousBodyPaddingRight = body.style.paddingRight;
-    const previousRootOverflow = documentElement.style.overflow;
-    const scrollbarWidth = window.innerWidth - documentElement.clientWidth;
+    previousActiveElementRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    modalStack.push(modalId);
 
-    body.style.overflow = "hidden";
-    documentElement.style.overflow = "hidden";
-    if (scrollbarWidth > 0) {
-      body.style.paddingRight = `${scrollbarWidth}px`;
-    }
+    const focusInitialElement = () => {
+      if (modalStack[modalStack.length - 1] !== modalId) return;
+      const root = modalRef.current;
+      if (!root) return;
+
+      const focusable = getFocusableElements(root);
+      const nextTarget =
+        root.querySelector<HTMLElement>("[data-autofocus]") ??
+        root.querySelector<HTMLElement>("[autofocus]") ??
+        focusable[0] ??
+        root;
+      nextTarget.focus({ preventScroll: true });
+    };
+    focusInitialElement();
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (modalStack[modalStack.length - 1] !== modalId) return;
+
+      if (event.key === "Escape") {
+        if (closeDisabled) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const root = modalRef.current;
+      if (!root) return;
+
+      const focusable = getFocusableElements(root);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        root.focus({ preventScroll: true });
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+      if (event.shiftKey) {
+        if (activeElement === first || !activeElement || !root.contains(activeElement)) {
+          event.preventDefault();
+          last.focus({ preventScroll: true });
+        }
+        return;
+      }
+
+      if (activeElement === last) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      }
     };
     document.addEventListener("keydown", handleKeyDown);
+
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      body.style.overflow = previousBodyOverflow;
-      body.style.paddingRight = previousBodyPaddingRight;
-      documentElement.style.overflow = previousRootOverflow;
+      const stackIndex = modalStack.lastIndexOf(modalId);
+      if (stackIndex >= 0) modalStack.splice(stackIndex, 1);
+      if (previousActiveElementRef.current?.isConnected) {
+        previousActiveElementRef.current.focus({ preventScroll: true });
+      }
     };
-  }, [onClose]);
+  }, [closeDisabled, modalId, onClose]);
 
   return (
     <div
       className="modal-backdrop"
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
       onClick={(event) => {
+        if (closeDisabled) return;
+        if (modalStack[modalStack.length - 1] !== modalId) return;
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="modal-shell">
+      <div ref={modalRef} className="modal-shell" role="document" tabIndex={-1}>
         <Panel className="modal-panel">
           <div className="modal-head">
             <div>
-              <h3>{title}</h3>
-              <p>{description}</p>
+              <h3 id={titleId}>{title}</h3>
+              <p id={descriptionId}>{description}</p>
             </div>
-            <NotchButton variant="ghost" onClick={onClose}>
+            <NotchButton type="button" variant="ghost" onClick={onClose} disabled={closeDisabled}>
               Fechar
             </NotchButton>
           </div>

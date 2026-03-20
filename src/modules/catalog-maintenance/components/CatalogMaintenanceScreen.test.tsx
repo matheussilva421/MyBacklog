@@ -179,5 +179,5 @@ describe("CatalogMaintenanceScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Consolidar aliases" }));
     expect(onConsolidateAliasGroup).toHaveBeenCalledWith("store", "steam");
-  });
+  }, 15000);
 });

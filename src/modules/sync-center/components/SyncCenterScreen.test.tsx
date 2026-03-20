@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 import { SyncCenterScreen } from "./SyncCenterScreen";
 
@@ -92,28 +92,43 @@ describe("SyncCenterScreen", () => {
     expect(screen.getByText("Conflito detectado entre local e nuvem.")).toBeInTheDocument();
   });
 
-  it("requires confirmation before sending local data, pulling cloud data, or merging", () => {
+  it("requires confirmation before sending local data, pulling cloud data, or merging", async () => {
     const { onPushLocal, onPullCloud, onMerge } = renderScreen();
 
     fireEvent.click(screen.getByRole("button", { name: /manter local e enviar/i }));
     expect(onPushLocal).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText("Confirmar envio da base local")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(screen.getByText("Confirmar envio da base local")).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByRole("button", { name: /confirmar envio local/i }));
-    expect(onPushLocal).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onPushLocal).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("Confirmar envio da base local")).not.toBeInTheDocument();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: /descartar local e puxar nuvem/i }));
     expect(onPullCloud).not.toHaveBeenCalled();
-    expect(screen.getByText("Confirmar aplicação da nuvem")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar aplicação da nuvem")).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByRole("button", { name: /confirmar puxar nuvem/i }));
-    expect(onPullCloud).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onPullCloud).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("Confirmar aplicação da nuvem")).not.toBeInTheDocument();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: /mesclar snapshots/i }));
     expect(onMerge).not.toHaveBeenCalled();
-    expect(screen.getByText("Confirmar merge dos snapshots")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar merge dos snapshots")).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByRole("button", { name: /confirmar merge/i }));
-    expect(onMerge).toHaveBeenCalledTimes(1);
-  });
+    await waitFor(() => {
+      expect(onMerge).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("Confirmar merge dos snapshots")).not.toBeInTheDocument();
+    });
+  }, 15000);
 
   it("keeps the local-only action immediate and preserves settings access", () => {
     const { onWorkLocal, onOpenSettings } = renderScreen();

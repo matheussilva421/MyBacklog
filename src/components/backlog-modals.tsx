@@ -1,4 +1,12 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent, type MutableRefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type MutableRefObject,
+} from "react";
 import { Download, Upload } from "lucide-react";
 import {
   cx,
@@ -55,6 +63,29 @@ function formatImportJobChanges(changes?: string): string | null {
   } catch {
     return changes;
   }
+}
+
+function serializeModalValue(value: unknown): string {
+  return JSON.stringify(value ?? null);
+}
+
+function confirmDiscardChanges(message: string): boolean {
+  if (typeof window === "undefined" || typeof window.confirm !== "function") return true;
+  return window.confirm(message);
+}
+
+function useUnsavedChangesWarning(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled || typeof window === "undefined") return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [enabled]);
 }
 
 function RawgCandidateCard({
@@ -131,15 +162,13 @@ export function GameModal(props: {
   const [rawgMessageTone, setRawgMessageTone] = useState<"error" | "success">("success");
   const [platformDraft, setPlatformDraft] = useState("");
   const [storeDraft, setStoreDraft] = useState("");
+  const [initialSnapshot] = useState(() => serializeModalValue(form));
 
-  useEffect(() => {
-    setRawgCandidates([]);
-    setRawgMessage(null);
-    setPlatformDraft("");
-    setStoreDraft("");
-  }, [mode]);
+  const serializedForm = useMemo(() => serializeModalValue(form), [form]);
+  const isDirty =
+    serializedForm !== initialSnapshot || platformDraft.trim().length > 0 || storeDraft.trim().length > 0;
 
-  if (!mode) return null;
+  useUnsavedChangesWarning(isDirty && !submitting);
 
   const setFeedback = (message: string | null, tone: "error" | "success" = "success") => {
     setRawgMessage(message);
@@ -254,18 +283,37 @@ export function GameModal(props: {
     }
   };
 
+  const handleClose = useCallback(() => {
+    if (submitting) return;
+    if (
+      isDirty &&
+      !confirmDiscardChanges("Há alterações não salvas no cadastro do jogo. Deseja descartar e fechar?")
+    ) {
+      return;
+    }
+    onClose();
+  }, [isDirty, onClose, submitting]);
+
+  if (!mode) return null;
+
   return (
     <Modal
       title={mode === "edit" ? "Editar jogo" : "Novo jogo"}
       description="Cadastro manual do catálogo com busca opcional na RAWG para puxar capa, descrição e metadado."
-      onClose={onClose}
+      onClose={handleClose}
+      closeDisabled={submitting}
     >
       <form className="modal-form" onSubmit={onSubmit}>
         <div className="form-grid">
           <label className="field field--wide">
             <span>Título</span>
             <div className="field__aux field__aux--inline">
-              <input value={form.title} onChange={(event) => onChange("title", event.target.value)} />
+              <input
+                autoFocus
+                data-autofocus
+                value={form.title}
+                onChange={(event) => onChange("title", event.target.value)}
+              />
               <NotchButton type="button" variant="secondary" onClick={() => void handleRawgSearch()} disabled={rawgLoading}>
                 {rawgLoading ? "Buscando..." : "Buscar na RAWG"}
               </NotchButton>
@@ -489,7 +537,7 @@ export function GameModal(props: {
         </div>
 
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={onClose}>
+          <NotchButton variant="ghost" type="button" onClick={handleClose} disabled={submitting}>
             Cancelar
           </NotchButton>
           <NotchButton variant="primary" type="submit" disabled={submitting}>
@@ -530,8 +578,16 @@ export function BatchEditModal(props: {
   const [platformDraft, setPlatformDraft] = useState("");
   const [storeDraft, setStoreDraft] = useState("");
   const [tagDraft, setTagDraft] = useState("");
+  const [initialSnapshot] = useState(() => serializeModalValue(form));
 
-  if (!open) return null;
+  const serializedForm = useMemo(() => serializeModalValue(form), [form]);
+  const isDirty =
+    serializedForm !== initialSnapshot ||
+    platformDraft.trim().length > 0 ||
+    storeDraft.trim().length > 0 ||
+    tagDraft.trim().length > 0;
+
+  useUnsavedChangesWarning(isDirty && !submitting);
 
   const selectedCount = selectedGames.length;
   const selectionLabel =
@@ -606,11 +662,25 @@ export function BatchEditModal(props: {
     setTagDraft("");
   };
 
+  const handleClose = useCallback(() => {
+    if (submitting) return;
+    if (
+      isDirty &&
+      !confirmDiscardChanges("Há alterações não aplicadas na edição em lote. Deseja descartar e fechar?")
+    ) {
+      return;
+    }
+    onClose();
+  }, [isDirty, onClose, submitting]);
+
+  if (!open) return null;
+
   return (
     <Modal
       title="Editar em lote"
       description="Aplique status, prioridade, listas, tags e relações estruturadas para vários jogos de uma vez."
-      onClose={onClose}
+      onClose={handleClose}
+      closeDisabled={submitting}
     >
       <form className="modal-form" onSubmit={onSubmit}>
         <div className="batch-edit-summary">
@@ -622,6 +692,8 @@ export function BatchEditModal(props: {
           <label className="field">
             <span>Modo de aplicação</span>
             <select
+              autoFocus
+              data-autofocus
               value={form.applyMode}
               onChange={(event) => onChange("applyMode", event.target.value as LibraryBatchApplyMode)}
             >
@@ -762,7 +834,7 @@ export function BatchEditModal(props: {
         </div>
 
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={onClose}>
+          <NotchButton variant="ghost" type="button" onClick={handleClose} disabled={submitting}>
             Cancelar
           </NotchButton>
           <NotchButton variant="primary" type="submit" disabled={submitting || selectedCount === 0}>
@@ -821,6 +893,7 @@ export function ImportModal(props: {
   
   const [activeTab, setActiveTab] = useState<"import" | "history">("import");
   const [history, setHistory] = useState<ImportJob[]>([]);
+  const [initialSnapshot] = useState(() => serializeModalValue({ source, text, fileName, preview }));
 
   useEffect(() => {
     if (activeTab === "history" && open) {
@@ -833,18 +906,34 @@ export function ImportModal(props: {
     }
   }, [activeTab, open]);
 
-  if (!open) return null;
+  const serializedImportState = useMemo(
+    () => serializeModalValue({ source, text, fileName, preview }),
+    [fileName, preview, source, text],
+  );
+  const isDirty = serializedImportState !== initialSnapshot;
 
-  const handleClose = () => {
+  useUnsavedChangesWarning(isDirty && !submitting);
+
+  const handleClose = useCallback(() => {
+    if (submitting) return;
+    if (
+      isDirty &&
+      !confirmDiscardChanges("Há um preview ou conteúdo de importação não aplicado. Deseja descartar e fechar?")
+    ) {
+      return;
+    }
     setActiveTab("import");
     onClose();
-  };
+  }, [isDirty, onClose, submitting]);
+
+  if (!open) return null;
 
   return (
     <Modal
       title="Importar biblioteca"
       description="Cole CSV ou JSON exportado de Steam, Playnite, Notion ou uma planilha genérica."
       onClose={handleClose}
+      closeDisabled={submitting}
     >
       <div className="modal-tabs" style={{ display: "flex", gap: "10px", marginBottom: "1rem" }}>
         <NotchButton type="button" variant={activeTab === "import" ? "primary" : "ghost"} onClick={() => setActiveTab("import")}>Importar</NotchButton>
@@ -889,7 +978,7 @@ export function ImportModal(props: {
         <div className={cx("form-grid", preview && "flow-hidden")}>
           <label className="field">
             <span>Origem</span>
-            <select value={source} onChange={(event) => onSourceChange(event.target.value as ImportSource)}>
+            <select autoFocus data-autofocus value={source} onChange={(event) => onSourceChange(event.target.value as ImportSource)}>
               {importSources.map((item) => (
                 <option key={item} value={item}>
                   {item === "notion" ? "NOTION (CSV)" : item.toUpperCase()}
@@ -1078,7 +1167,7 @@ export function ImportModal(props: {
         ) : null}
 
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={handleClose}>Cancelar</NotchButton>
+          <NotchButton variant="ghost" type="button" onClick={handleClose} disabled={submitting}>Cancelar</NotchButton>
           <NotchButton variant="primary" type="submit" disabled={submitting}>
             {preview ? "Aplicar importação" : "Gerar preview"}
           </NotchButton>
@@ -1105,15 +1194,42 @@ export function RestoreModal(props: {
   onClose: () => void;
 }) {
   const { open, mode, text, fileName, preview, totals, fileInputRef, submitting = false, onModeChange, onTextChange, onFileChange, onSubmit, onClose } = props;
+
+  const [initialSnapshot] = useState(() => serializeModalValue({ mode, text, fileName, preview }));
+
+  const serializedRestoreState = useMemo(
+    () => serializeModalValue({ mode, text, fileName, preview }),
+    [fileName, mode, preview, text],
+  );
+  const isDirty = serializedRestoreState !== initialSnapshot;
+
+  useUnsavedChangesWarning(isDirty && !submitting);
+
+  const handleClose = useCallback(() => {
+    if (submitting) return;
+    if (
+      isDirty &&
+      !confirmDiscardChanges("Há um preview ou backup carregado que ainda não foi aplicado. Deseja descartar e fechar?")
+    ) {
+      return;
+    }
+    onClose();
+  }, [isDirty, onClose, submitting]);
+
   if (!open) return null;
 
   return (
-    <Modal title="Restaurar backup" description="Carregue um backup JSON do app e escolha entre mesclar ou substituir a base local." onClose={onClose}>
+    <Modal
+      title="Restaurar backup"
+      description="Carregue um backup JSON do app e escolha entre mesclar ou substituir a base local."
+      onClose={handleClose}
+      closeDisabled={submitting}
+    >
       <form className="modal-form" onSubmit={onSubmit}>
         <div className={cx("form-grid", preview && "flow-hidden")}>
           <label className="field">
             <span>Modo</span>
-            <select value={mode} onChange={(event) => onModeChange(event.target.value as RestoreMode)}>
+            <select autoFocus data-autofocus value={mode} onChange={(event) => onModeChange(event.target.value as RestoreMode)}>
               <option value="merge">Mesclar com a base atual</option>
               <option value="replace">Substituir toda a base local</option>
             </select>
@@ -1168,7 +1284,7 @@ export function RestoreModal(props: {
         )}
 
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={onClose}>Cancelar</NotchButton>
+          <NotchButton variant="ghost" type="button" onClick={handleClose} disabled={submitting}>Cancelar</NotchButton>
           <NotchButton variant="primary" type="submit" disabled={submitting}>
             {preview ? (preview.mode === "replace" ? "Substituir base local" : "Aplicar restore") : "Gerar preview"}
           </NotchButton>
@@ -1189,33 +1305,59 @@ export function SessionModal(props: {
   onClose: () => void;
 }) {
   const { open, mode = "create", form, libraryGames, submitting = false, onChange, onSubmit, onClose } = props;
+
+  const [initialSnapshot] = useState(() => serializeModalValue(form));
+
+  const serializedForm = useMemo(() => serializeModalValue(form), [form]);
+  const isDirty = serializedForm !== initialSnapshot;
+
+  useUnsavedChangesWarning(isDirty && !submitting);
+
+  const handleClose = useCallback(() => {
+    if (submitting) return;
+    if (
+      isDirty &&
+      !confirmDiscardChanges("Há alterações não salvas na sessão. Deseja descartar e fechar?")
+    ) {
+      return;
+    }
+    onClose();
+  }, [isDirty, onClose, submitting]);
+
   if (!open) return null;
 
   return (
     <Modal
       title={mode === "edit" ? "Editar sessão" : "Registrar sessão"}
       description={mode === "edit" ? "Altere os dados desta sessão de jogo." : "Atualize o diário de jogo e alimente as estatísticas do sistema."}
-      onClose={onClose}
+      onClose={handleClose}
+      closeDisabled={submitting}
     >
       <form className="modal-form" onSubmit={onSubmit}>
         <div className="form-grid">
           <label className="field field--wide">
             <span>Jogo</span>
-            <select value={form.gameId} onChange={(event) => onChange("gameId", event.target.value)} disabled={mode === "edit"}>
+            <select
+              autoFocus={mode !== "edit"}
+              data-autofocus={mode !== "edit" ? true : undefined}
+              value={form.gameId}
+              onChange={(event) => onChange("gameId", event.target.value)}
+              disabled={mode === "edit"}
+            >
               <option value="">Selecione...</option>
               {libraryGames.map((game) => (
                 <option key={game.id} value={game.id}>{game.title}</option>
               ))}
             </select>
           </label>
-          <label className="field"><span>Data</span><input type="date" value={form.date} onChange={(event) => onChange("date", event.target.value)} /></label>
+          <label className="field"><span>Data</span><input autoFocus={mode === "edit"} data-autofocus={mode === "edit" ? true : undefined} type="date" value={form.date} onChange={(event) => onChange("date", event.target.value)} /></label>
           <label className="field"><span>Duração (min)</span><input type="number" min="1" value={form.durationMinutes} onChange={(event) => onChange("durationMinutes", event.target.value)} /></label>
           <label className="field"><span>Progresso após sessão</span><input type="number" min="0" max="100" value={form.completionPercent} onChange={(event) => onChange("completionPercent", event.target.value)} /></label>
           <label className="field"><span>Mood</span><input value={form.mood} onChange={(event) => onChange("mood", event.target.value)} /></label>
           <label className="field field--wide"><span>Nota rápida</span><textarea rows={4} value={form.note} onChange={(event) => onChange("note", event.target.value)} /></label>
         </div>
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={onClose}>Cancelar</NotchButton>
+          <NotchButton variant="ghost" type="button" onClick={handleClose} disabled={submitting}>Cancelar</NotchButton>
           <NotchButton variant="primary" type="submit" disabled={submitting}>
             {mode === "edit" ? "Salvar alterações" : "Salvar sessão"}
           </NotchButton>
@@ -1234,15 +1376,39 @@ export function GoalModal(props: {
   onClose: () => void;
 }) {
   const { mode, form, submitting = false, onChange, onSubmit, onClose } = props;
+
+  const [initialSnapshot] = useState(() => serializeModalValue(form));
+
+  const serializedForm = useMemo(() => serializeModalValue(form), [form]);
+  const isDirty = serializedForm !== initialSnapshot;
+
+  useUnsavedChangesWarning(isDirty && !submitting);
+
+  const handleClose = useCallback(() => {
+    if (submitting) return;
+    if (
+      isDirty &&
+      !confirmDiscardChanges("Há alterações não salvas na meta. Deseja descartar e fechar?")
+    ) {
+      return;
+    }
+    onClose();
+  }, [isDirty, onClose, submitting]);
+
   if (!mode) return null;
 
   return (
-    <Modal title={mode === "edit" ? "Editar meta" : "Nova meta"} description="Defina um objetivo para acompanhar seu progresso no backlog." onClose={onClose}>
+    <Modal
+      title={mode === "edit" ? "Editar meta" : "Nova meta"}
+      description="Defina um objetivo para acompanhar seu progresso no backlog."
+      onClose={handleClose}
+      closeDisabled={submitting}
+    >
       <form className="modal-form" onSubmit={onSubmit}>
         <div className="form-grid">
           <label className="field">
             <span>Tipo</span>
-            <select value={form.type} onChange={(event) => onChange("type", event.target.value)}>
+            <select autoFocus data-autofocus value={form.type} onChange={(event) => onChange("type", event.target.value)}>
               {goalTypeOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -1262,7 +1428,7 @@ export function GoalModal(props: {
           </label>
         </div>
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={onClose}>Cancelar</NotchButton>
+          <NotchButton variant="ghost" type="button" onClick={handleClose} disabled={submitting}>Cancelar</NotchButton>
           <NotchButton variant="primary" type="submit" disabled={submitting}>
             {mode === "edit" ? "Salvar alterações" : "Criar meta"}
           </NotchButton>

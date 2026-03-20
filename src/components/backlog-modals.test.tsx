@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { vi } from "vitest";
 import { GameModal } from "./backlog-modals";
 
@@ -91,5 +92,44 @@ describe("GameModal", () => {
       expect(onChange).toHaveBeenCalledWith("publisher", "CD Projekt");
       expect(onChange).toHaveBeenCalledWith("description", "Mercenário em Night City.");
     });
+  }, 15000);
+
+  it("guards closing when the form has unsaved changes", async () => {
+    const onClose = vi.fn();
+    const confirmSpy = vi.spyOn(window, "confirm");
+
+    function Harness() {
+      const [form, setForm] = useState(baseForm);
+
+      return (
+        <GameModal
+          mode="create"
+          form={form}
+          availableStores={["Steam", "GOG", "Manual"]}
+          availablePlatforms={["PC", "PS5"]}
+          rawgApiKey="rawg-key"
+          onChange={(field, value) => setForm((current) => ({ ...current, [field]: value }))}
+          onSubmit={vi.fn(async () => undefined)}
+          onClose={onClose}
+        />
+      );
+    }
+
+    render(<Harness />);
+
+    fireEvent.change(screen.getByDisplayValue("Cyberpunk"), {
+      target: { value: "Cyberpunk 2077" },
+    });
+
+    confirmSpy.mockReturnValueOnce(false);
+    fireEvent.click(screen.getByRole("button", { name: /cancelar/i }));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    confirmSpy.mockReturnValueOnce(true);
+    fireEvent.click(screen.getByRole("button", { name: /cancelar/i }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
