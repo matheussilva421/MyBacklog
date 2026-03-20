@@ -16,9 +16,12 @@ describe("SessionsScreen", () => {
       setPeriod: vi.fn(),
       platform: "all",
       setPlatform: vi.fn(),
+      store: "all",
+      setStore: vi.fn(),
       status: "all",
       setStatus: vi.fn(),
       platformOptions: ["all", "PC"],
+      storeOptions: ["all", "Steam"],
       draft: {
         gameId: "7",
         date: "2026-03-18",

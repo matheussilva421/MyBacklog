@@ -161,6 +161,7 @@ export function useBacklogApp() {
   const {
     monthlyProgress,
     platformData,
+    storeData,
     durationBuckets,
     stats,
     personalBadges,
@@ -247,6 +248,10 @@ export function useBacklogApp() {
     reviewRows: data.reviewRows,
     listRows: data.listRows,
     libraryEntryListRows: data.libraryEntryListRows,
+    storeRows: data.storeRows,
+    libraryEntryStoreRows: data.libraryEntryStoreRows,
+    platformRows: data.platformRows,
+    gamePlatformRows: data.gamePlatformRows,
     tagRows: data.tagRows,
     gameTagRows: data.gameTagRows,
   });
@@ -419,6 +424,7 @@ export function useBacklogApp() {
     selectedGamePage,
     monthlyProgress,
     platformData,
+    storeData,
     monthlyHours: sessionInsights.monthlyHours,
     durationBuckets,
     visibleSessions,

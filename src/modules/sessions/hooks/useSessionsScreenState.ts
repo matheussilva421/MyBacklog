@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Game, Status } from "../../../backlog/shared";
+import { getGamePlatforms, getGameStores } from "../../../backlog/structuredGameValues";
 import { getTodayDateInputValue } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
 import {
@@ -54,6 +55,7 @@ export function useSessionsScreenState({
 }) {
   const [period, setPeriod] = useState<SessionPeriod>("30d");
   const [platform, setPlatform] = useState<string>("all");
+  const [store, setStore] = useState<string>("all");
   const [status, setStatus] = useState<Status | "all">("all");
   const initialGameId = useMemo(() => pickInitialGameId(games), [games]);
   const [draft, setDraft] = useState<QuickSessionDraft>(() => createQuickSessionDraft(initialGameId));
@@ -70,7 +72,21 @@ export function useSessionsScreenState({
 
   const gameMap = useMemo(() => new Map(games.map((game) => [game.id, game] as const)), [games]);
   const platformOptions = useMemo(
-    () => ["all", ...Array.from(new Set(games.map((game) => game.platform))).sort((left, right) => left.localeCompare(right))],
+    () => [
+      "all",
+      ...Array.from(new Set(games.flatMap((game) => getGamePlatforms(game)))).sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    ],
+    [games],
+  );
+  const storeOptions = useMemo(
+    () => [
+      "all",
+      ...Array.from(new Set(games.flatMap((game) => getGameStores(game)))).sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    ],
     [games],
   );
   const cadenceMap = useMemo(() => buildSessionCadenceMap(sessions), [sessions]);
@@ -86,11 +102,12 @@ export function useSessionsScreenState({
           game: gameMap.get(session.libraryEntryId),
           period,
           platform,
+          store,
           status,
           query,
         }),
       ),
-    [gameMap, period, platform, query, sessions, status],
+    [gameMap, period, platform, query, sessions, status, store],
   );
 
   const filteredGroups = useMemo(
@@ -130,9 +147,12 @@ export function useSessionsScreenState({
     setPeriod,
     platform,
     setPlatform,
+    store,
+    setStore,
     status,
     setStatus,
     platformOptions,
+    storeOptions,
     draft: resolvedDraft,
     setDraft,
     filteredSessions,

@@ -239,6 +239,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
         stats={app.stats}
         monthlyProgress={app.monthlyProgress}
         platformData={app.platformData}
+        storeData={app.storeData}
         continuePlayingGames={app.continuePlayingGames}
         visiblePlannerQueue={app.visiblePlannerQueue}
         personalBadges={app.personalBadges}
@@ -298,6 +299,9 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
         hasRawgApiKey={Boolean(app.preferences.rawgApiKey.trim())}
         onRepairStructural={app.handleCatalogRepair}
         onMergeDuplicateGroup={app.handleCatalogDuplicateMerge}
+        onNormalizeEntry={app.handleCatalogNormalizeEntry}
+        onNormalizeQueue={app.handleCatalogNormalizeQueue}
+        onConsolidateAliasGroup={app.handleCatalogConsolidateAliasGroup}
         onEnrichMetadata={app.handleCatalogMetadataEnrich}
         onEnrichMetadataQueue={app.handleCatalogMetadataEnrichQueue}
         onOpenGamePage={app.openGamePage}
@@ -355,6 +359,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
         durationBuckets={app.durationBuckets}
         monthlyHours={app.monthlyHours}
         platformData={app.platformData}
+        storeData={app.storeData}
         platforms={app.platforms}
         importJobs={app.importJobRows}
         visibleSessions={app.visibleSessions}

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { VerticalBarChart } from "../../../charts";
 import { formatDuration, type Game, type Status } from "../../../backlog/shared";
+import { getGamePlatforms, getGameStores } from "../../../backlog/structuredGameValues";
 import { formatDatePtBr } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
 import {
@@ -73,9 +74,12 @@ export function SessionsScreen({
     setPeriod,
     platform,
     setPlatform,
+    store,
+    setStore,
     status,
     setStatus,
     platformOptions,
+    storeOptions,
     draft,
     setDraft,
     filteredGroups,
@@ -275,6 +279,16 @@ export function SessionsScreen({
                 </select>
               </label>
               <label className="field">
+                <span>Store</span>
+                <select value={store} onChange={(event) => setStore(event.target.value)}>
+                  {storeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option === "all" ? "Todas" : option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
                 <span>Status</span>
                 <select value={status} onChange={(event) => setStatus(event.target.value as Status | "all")}>
                   {statusOptions.map((option) => (
@@ -318,7 +332,7 @@ export function SessionsScreen({
                       {group.game.title}
                     </button>
                     <p>
-                      {group.game.platform} • {group.game.status} • {group.sessions.length} sessões
+                      {getGamePlatforms(group.game).join(", ")} • {getGameStores(group.game).join(", ")} • {group.game.status} • {group.sessions.length} sessões
                     </p>
                   </div>
                   <div className="session-group__meta">

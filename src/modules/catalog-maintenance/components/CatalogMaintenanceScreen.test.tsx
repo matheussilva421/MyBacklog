@@ -6,6 +6,9 @@ describe("CatalogMaintenanceScreen", () => {
   it("renders maintenance sections and triggers merge/enrichment actions", () => {
     const onRepairStructural = vi.fn();
     const onMergeDuplicateGroup = vi.fn();
+    const onNormalizeEntry = vi.fn();
+    const onNormalizeQueue = vi.fn();
+    const onConsolidateAliasGroup = vi.fn();
     const onEnrichMetadata = vi.fn();
     const onEnrichMetadataQueue = vi.fn();
     const onOpenGamePage = vi.fn();
@@ -22,6 +25,8 @@ describe("CatalogMaintenanceScreen", () => {
             duplicateGroups: 1,
             duplicateEntries: 2,
             metadataQueue: 1,
+            normalizationQueue: 1,
+            aliasGroups: 1,
             orphanSessions: 1,
           },
           audit: {
@@ -55,6 +60,8 @@ describe("CatalogMaintenanceScreen", () => {
               key: "cyberpunk-2077::pc",
               title: "Cyberpunk 2077",
               platform: "PC",
+              overlapPlatforms: ["PC"],
+              overlapStores: [],
               releaseYear: 2020,
               reasons: ["Título normalizado e plataforma coincidem."],
               suggestedAction: "merge",
@@ -67,6 +74,8 @@ describe("CatalogMaintenanceScreen", () => {
                   title: "Cyberpunk 2077",
                   platform: "PC",
                   sourceStore: "Steam",
+                  platforms: ["PC", "Steam Deck"],
+                  stores: ["Steam"],
                   completionPercent: 62,
                   playtimeMinutes: 2880,
                   progressStatus: "playing",
@@ -83,6 +92,8 @@ describe("CatalogMaintenanceScreen", () => {
                   title: "Cyberpunk 2077",
                   platform: "PC",
                   sourceStore: "GOG",
+                  platforms: ["PC"],
+                  stores: ["GOG"],
                   completionPercent: 20,
                   playtimeMinutes: 600,
                   progressStatus: "paused",
@@ -107,9 +118,38 @@ describe("CatalogMaintenanceScreen", () => {
               platforms: ["PC"],
             },
           ],
+          normalizationQueue: [
+            {
+              id: "normalize-7",
+              libraryEntryId: 7,
+              gameId: 1,
+              title: "Cyberpunk 2077",
+              currentPlatform: "PC",
+              recommendedPlatform: "Steam Deck",
+              currentStore: "Steam",
+              recommendedStore: "Steam",
+              platformNames: ["Steam Deck", "PC"],
+              storeNames: ["Steam"],
+              reasons: ["Plataforma principal sugerida: Steam Deck."],
+            },
+          ],
+          aliasGroups: [
+            {
+              id: "store-alias-steam",
+              kind: "store",
+              normalizedName: "steam",
+              canonicalName: "Steam",
+              aliases: ["Steam", "STEAM"],
+              affectedEntries: 2,
+              affectedGames: 0,
+            },
+          ],
         }}
         onRepairStructural={onRepairStructural}
         onMergeDuplicateGroup={onMergeDuplicateGroup}
+        onNormalizeEntry={onNormalizeEntry}
+        onNormalizeQueue={onNormalizeQueue}
+        onConsolidateAliasGroup={onConsolidateAliasGroup}
         onEnrichMetadata={onEnrichMetadata}
         onEnrichMetadataQueue={onEnrichMetadataQueue}
         onOpenGamePage={onOpenGamePage}
@@ -119,6 +159,7 @@ describe("CatalogMaintenanceScreen", () => {
 
     expect(screen.getByText("Detecção de duplicados")).toBeInTheDocument();
     expect(screen.getByText("Fila de metadado faltante")).toBeInTheDocument();
+    expect(screen.getByText("Normalização assistida")).toBeInTheDocument();
     expect(screen.getByText("Integridade estrutural")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Mesclar grupo" }));
@@ -129,5 +170,14 @@ describe("CatalogMaintenanceScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Enriquecer confiáveis" }));
     expect(onEnrichMetadataQueue).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Promover principal" }));
+    expect(onNormalizeEntry).toHaveBeenCalledWith(7);
+
+    fireEvent.click(screen.getByRole("button", { name: "Normalizar fila" }));
+    expect(onNormalizeQueue).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Consolidar aliases" }));
+    expect(onConsolidateAliasGroup).toHaveBeenCalledWith("store", "steam");
   });
 });

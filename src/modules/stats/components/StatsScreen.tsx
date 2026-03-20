@@ -38,6 +38,7 @@ type StatsScreenProps = {
   durationBuckets: BarPoint[];
   monthlyHours: BarPoint[];
   platformData: PiePoint[];
+  storeData: PiePoint[];
   platforms: Platform[];
   visibleSessions: PlaySession[];
   games: Game[];
@@ -53,6 +54,7 @@ export function StatsScreen({
   durationBuckets,
   monthlyHours,
   platformData,
+  storeData,
   platforms,
   visibleSessions,
   games,
@@ -63,7 +65,7 @@ export function StatsScreen({
   onManagePlatforms,
   onClearImportHistory,
 }: StatsScreenProps) {
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform | string | null>(null);
   const [visibleCount, setVisibleCount] = useState(SESSION_PAGE_SIZE);
   const displayedSessions = visibleSessions.slice(0, visibleCount);
   const hasMore = visibleCount < visibleSessions.length;
@@ -108,6 +110,19 @@ export function StatsScreen({
           <ChartFrame className="chart-area--pie">
             {({ width, height }) => (
               <DonutChart width={width} height={height} data={platformData} colors={pieColors} />
+            )}
+          </ChartFrame>
+        </Panel>
+
+        <Panel>
+          <SectionHeader
+            icon={FileText}
+            title="Stores"
+            description="Distribuição estrutural por loja/origem"
+          />
+          <ChartFrame className="chart-area--pie">
+            {({ width, height }) => (
+              <DonutChart width={width} height={height} data={storeData} colors={pieColors} />
             )}
           </ChartFrame>
         </Panel>
@@ -194,7 +209,7 @@ export function StatsScreen({
                     <div>
                       <div className="session-card__title">
                         <h3>{game.title}</h3>
-                        <Pill tone="neutral">{game.platform}</Pill>
+                        <Pill tone="neutral">{(game.platforms ?? [game.platform]).join(", ")}</Pill>
                         <div className="session-card__actions">
                           <NotchButton variant="ghost" onClick={() => entry.id != null && onEditSession(entry.id)}>
                             <Pencil size={12} />

@@ -53,6 +53,7 @@ type DashboardScreenProps = {
   stats: Stats;
   monthlyProgress: LinePoint[];
   platformData: PiePoint[];
+  storeData: PiePoint[];
   continuePlayingGames: Game[];
   visiblePlannerQueue: PlannerEntry[];
   personalBadges: UserBadge[];
@@ -67,6 +68,7 @@ export function DashboardScreen({
   stats,
   monthlyProgress,
   platformData,
+  storeData,
   continuePlayingGames,
   visiblePlannerQueue,
   personalBadges,
@@ -134,7 +136,7 @@ export function DashboardScreen({
           <SectionHeader
             icon={Monitor}
             title="Plataformas"
-            description="Distribuição da sua coleção"
+            description="Distribuição estrutural da sua coleção"
           />
           <ChartFrame className="chart-area--pie">
             {({ width, height }) => (
@@ -143,6 +145,31 @@ export function DashboardScreen({
           </ChartFrame>
           <div className="legend-grid">
             {platformData.map((entry, index) => (
+              <div className="legend-item" key={entry.name}>
+                <span
+                  className="legend-item__dot"
+                  style={{ backgroundColor: pieColors[index % pieColors.length] }}
+                />
+                <span>{entry.name}</span>
+                <strong>{entry.value}%</strong>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel>
+          <SectionHeader
+            icon={LibraryBig}
+            title="Stores"
+            description="Onde sua biblioteca realmente está distribuída"
+          />
+          <ChartFrame className="chart-area--pie">
+            {({ width, height }) => (
+              <DonutChart width={width} height={height} data={storeData} colors={pieColors} />
+            )}
+          </ChartFrame>
+          <div className="legend-grid">
+            {storeData.map((entry, index) => (
               <div className="legend-item" key={entry.name}>
                 <span
                   className="legend-item__dot"
@@ -181,7 +208,7 @@ export function DashboardScreen({
                         <Pill tone="cyan">{game.status}</Pill>
                       </div>
                       <p>
-                        {game.platform} • {game.genre}
+                        {(game.platforms ?? [game.platform]).join(", ")} • {game.genre}
                       </p>
                     </div>
                     <div className="continue-card__actions">

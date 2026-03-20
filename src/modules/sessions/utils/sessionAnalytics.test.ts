@@ -7,6 +7,7 @@ import {
   buildSessionMonthlyHours,
   buildSessionOverview,
   filterSessionsByPeriod,
+  matchesSessionFilters,
 } from "./sessionAnalytics";
 
 function createGame(partial: Partial<Game>): Game {
@@ -14,7 +15,9 @@ function createGame(partial: Partial<Game>): Game {
     id: 1,
     title: "Cyberpunk 2077",
     platform: "PC",
+    platforms: ["PC"],
     sourceStore: "Steam",
+    stores: ["Steam"],
     genre: "RPG",
     status: "Jogando",
     progress: 40,
@@ -91,5 +94,28 @@ describe("sessionAnalytics", () => {
 
     expect(filtered).toHaveLength(1);
     expect(monthly.map((entry) => entry.total)).toEqual([0, 3, 2]);
+  });
+
+  it("matches structured platform and store filters", () => {
+    const game = createGame({
+      platform: "Steam Deck",
+      platforms: ["Steam Deck", "PC"],
+      sourceStore: "Manual",
+      stores: ["Manual", "Steam"],
+    });
+    const session = createSession({ platform: "Steam Deck" });
+
+    expect(
+      matchesSessionFilters({
+        session,
+        game,
+        period: "30d",
+        platform: "PC",
+        store: "Steam",
+        status: "Jogando",
+        query: "steam",
+        now: new Date("2026-03-18T12:00:00.000Z"),
+      }),
+    ).toBe(true);
   });
 });

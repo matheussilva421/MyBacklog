@@ -11,7 +11,7 @@ import {
   resolveStructuredPlatforms,
   resolveStructuredStores,
 } from "../core/structuredRelations";
-import { splitCsvTokens } from "../core/utils";
+import { normalizeToken, splitCsvTokens } from "../core/utils";
 import type {
   Game as DbGameMetadata,
   Goal as DbGoal,
@@ -236,6 +236,48 @@ export function useBacklogActions({
     await refreshData();
     setSelectedGameId(result.libraryEntryId);
     return result;
+  };
+
+  const normalizeStructuredEntry = async (libraryEntryId: number) => {
+    const entry = await db.libraryEntries.get(libraryEntryId);
+    if (!entry?.id) return false;
+    const game = await db.games.get(entry.gameId);
+    if (!game?.id) return false;
+
+    const [storeRows, libraryEntryStoreRows, platformRows, gamePlatformRows] = await Promise.all([
+      db.stores.toArray(),
+      db.libraryEntryStores.where("libraryEntryId").equals(entry.id).toArray(),
+      db.platforms.toArray(),
+      db.gamePlatforms.where("gameId").equals(game.id).toArray(),
+    ]);
+    const storeNamesByEntryId = buildStoreNamesByEntryId(storeRows, libraryEntryStoreRows);
+    const platformNamesByGameId = buildPlatformNamesByGameId(platformRows, gamePlatformRows);
+    const nextStores = resolveStructuredStores(entry, storeNamesByEntryId);
+    const nextPlatforms = resolveStructuredPlatforms(game, entry.platform, platformNamesByGameId);
+    const now = new Date().toISOString();
+
+    const nextEntry: DbLibraryEntry = {
+      ...entry,
+      sourceStore: derivePrimaryStore(nextStores, entry.sourceStore),
+      platform: derivePrimaryPlatform(nextPlatforms, entry.platform),
+      updatedAt: now,
+    };
+    const nextGame: DbGameMetadata = {
+      ...game,
+      platforms: nextPlatforms.join(", "),
+      updatedAt: now,
+    };
+
+    await db.libraryEntries.put(nextEntry);
+    await db.games.put(nextGame);
+    await syncStructuredRelationsForRecord({
+      game: nextGame,
+      libraryEntry: nextEntry,
+      extraStoreNames: nextStores,
+      extraPlatformNames: nextPlatforms,
+    });
+
+    return true;
   };
 
   const handleGameSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1732,6 +1774,220 @@ export function useBacklogActions({
     }
   };
 
+  const handleCatalogNormalizeEntry = async (libraryEntryId: number) => {
+    setSubmitting(true);
+    try {
+      await db.transaction(
+        "rw",
+        [
+          db.games,
+          db.libraryEntries,
+          db.stores,
+          db.libraryEntryStores,
+          db.platforms,
+          db.gamePlatforms,
+        ],
+        async () => {
+          await normalizeStructuredEntry(libraryEntryId);
+        },
+      );
+
+      await refreshData();
+      setSelectedGameId(libraryEntryId);
+      setNotice(`Estrutura normalizada para a entrada #${libraryEntryId}.`);
+    } catch (error) {
+      setNotice(`Falha ao normalizar entrada: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCatalogNormalizeQueue = async () => {
+    if (catalogMaintenanceReport.normalizationQueue.length === 0) {
+      setNotice("Nenhum item pendente na fila de normalização.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const entryIds = Array.from(
+        new Set(catalogMaintenanceReport.normalizationQueue.map((item) => item.libraryEntryId)),
+      );
+
+      await db.transaction(
+        "rw",
+        [
+          db.games,
+          db.libraryEntries,
+          db.stores,
+          db.libraryEntryStores,
+          db.platforms,
+          db.gamePlatforms,
+        ],
+        async () => {
+          for (const entryId of entryIds) {
+            await normalizeStructuredEntry(entryId);
+          }
+        },
+      );
+
+      await refreshData();
+      setNotice(`Fila de normalização aplicada em ${entryIds.length} entrada(s).`);
+    } catch (error) {
+      setNotice(`Falha ao normalizar a fila: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCatalogConsolidateAliasGroup = async (
+    kind: "store" | "platform",
+    normalizedName: string,
+  ) => {
+    setSubmitting(true);
+    try {
+      if (kind === "store") {
+        await db.transaction("rw", [db.stores, db.libraryEntryStores, db.libraryEntries], async () => {
+          const rows = (await db.stores.toArray()).filter(
+            (store) => normalizeToken(store.normalizedName || store.name) === normalizedName,
+          );
+          const ids = rows.map((row) => row.id).filter((id): id is number => typeof id === "number");
+          if (ids.length < 2) return;
+
+          const relations = await db.libraryEntryStores.where("storeId").anyOf(ids).toArray();
+          const relationCountByStoreId = new Map<number, number>();
+          for (const relation of relations) {
+            relationCountByStoreId.set(
+              relation.storeId,
+              (relationCountByStoreId.get(relation.storeId) ?? 0) + 1,
+            );
+          }
+
+          const canonical = [...rows].sort((left, right) => {
+            const leftCount = relationCountByStoreId.get(left.id ?? 0) ?? 0;
+            const rightCount = relationCountByStoreId.get(right.id ?? 0) ?? 0;
+            return rightCount - leftCount || left.name.localeCompare(right.name, "pt-BR");
+          })[0];
+          if (!canonical?.id) return;
+
+          const duplicateIds = ids.filter((id) => id !== canonical.id);
+          const canonicalRelationByEntryId = new Map(
+            relations
+              .filter((relation) => relation.storeId === canonical.id)
+              .map((relation) => [relation.libraryEntryId, relation] as const),
+          );
+
+          for (const relation of relations) {
+            if (!duplicateIds.includes(relation.storeId)) continue;
+            const canonicalRelation = canonicalRelationByEntryId.get(relation.libraryEntryId);
+            if (canonicalRelation?.id != null) {
+              if (relation.isPrimary && !canonicalRelation.isPrimary) {
+                await db.libraryEntryStores.update(canonicalRelation.id, { isPrimary: true });
+              }
+              if (relation.id != null) await db.libraryEntryStores.delete(relation.id);
+              continue;
+            }
+            if (relation.id != null) {
+              await db.libraryEntryStores.update(relation.id, { storeId: canonical.id });
+            }
+          }
+
+          const entries = await db.libraryEntries.toArray();
+          for (const entry of entries) {
+            if (normalizeToken(entry.sourceStore) !== normalizedName || entry.id == null) continue;
+            await db.libraryEntries.update(entry.id, {
+              sourceStore: canonical.name,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+
+          for (const duplicateId of duplicateIds) {
+            await db.stores.delete(duplicateId);
+          }
+        });
+      } else {
+        await db.transaction("rw", [db.platforms, db.gamePlatforms, db.games, db.libraryEntries], async () => {
+          const rows = (await db.platforms.toArray()).filter(
+            (platform) => normalizeToken(platform.normalizedName || platform.name) === normalizedName,
+          );
+          const ids = rows.map((row) => row.id).filter((id): id is number => typeof id === "number");
+          if (ids.length < 2) return;
+
+          const relations = await db.gamePlatforms.where("platformId").anyOf(ids).toArray();
+          const relationCountByPlatformId = new Map<number, number>();
+          for (const relation of relations) {
+            relationCountByPlatformId.set(
+              relation.platformId,
+              (relationCountByPlatformId.get(relation.platformId) ?? 0) + 1,
+            );
+          }
+
+          const canonical = [...rows].sort((left, right) => {
+            const leftCount = relationCountByPlatformId.get(left.id ?? 0) ?? 0;
+            const rightCount = relationCountByPlatformId.get(right.id ?? 0) ?? 0;
+            return rightCount - leftCount || left.name.localeCompare(right.name, "pt-BR");
+          })[0];
+          if (!canonical?.id) return;
+
+          const duplicateIds = ids.filter((id) => id !== canonical.id);
+          const canonicalRelationByGameId = new Map(
+            relations
+              .filter((relation) => relation.platformId === canonical.id)
+              .map((relation) => [relation.gameId, relation] as const),
+          );
+
+          for (const relation of relations) {
+            if (!duplicateIds.includes(relation.platformId)) continue;
+            const canonicalRelation = canonicalRelationByGameId.get(relation.gameId);
+            if (canonicalRelation?.id != null) {
+              if (relation.id != null) await db.gamePlatforms.delete(relation.id);
+              continue;
+            }
+            if (relation.id != null) {
+              await db.gamePlatforms.update(relation.id, { platformId: canonical.id });
+            }
+          }
+
+          const games = await db.games.toArray();
+          for (const game of games) {
+            const nextPlatforms = splitCsvTokens(game.platforms).map((platformName) =>
+              normalizeToken(platformName) === normalizedName ? canonical.name : platformName,
+            );
+            if (nextPlatforms.length === 0 || game.id == null) continue;
+            await db.games.update(game.id, {
+              platforms: splitCsvTokens(nextPlatforms).join(", "),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+
+          const entries = await db.libraryEntries.toArray();
+          for (const entry of entries) {
+            if (normalizeToken(entry.platform) !== normalizedName || entry.id == null) continue;
+            await db.libraryEntries.update(entry.id, {
+              platform: canonical.name,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+
+          for (const duplicateId of duplicateIds) {
+            await db.platforms.delete(duplicateId);
+          }
+        });
+      }
+
+      await refreshData();
+      setNotice(
+        kind === "store"
+          ? `Aliases de store consolidados para "${normalizedName}".`
+          : `Aliases de plataforma consolidados para "${normalizedName}".`,
+      );
+    } catch (error) {
+      setNotice(`Falha ao consolidar aliases: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleCatalogMetadataEnrich = async (gameId: number) => {
     if (!preferences.rawgApiKey.trim()) {
       setNotice("Adicione uma chave RAWG nas preferências para enriquecer metadados.");
@@ -1868,6 +2124,9 @@ export function useBacklogActions({
     handleSessionDelete,
     handleCatalogRepair,
     handleCatalogDuplicateMerge,
+    handleCatalogNormalizeEntry,
+    handleCatalogNormalizeQueue,
+    handleCatalogConsolidateAliasGroup,
     handleCatalogMetadataEnrich,
     handleCatalogMetadataEnrichQueue,
     handleGuidedTourComplete,

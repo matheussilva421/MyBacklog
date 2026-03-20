@@ -1,4 +1,5 @@
 import type { BarPoint, Game, Status } from "../../../backlog/shared";
+import { getGamePlatforms, getGameStores } from "../../../backlog/structuredGameValues";
 import { formatMonthLabel, parseDateInput, startOfLocalDay, startOfWeek, toDateInputValue } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
 
@@ -216,20 +217,30 @@ export function matchesSessionFilters(args: {
   game?: Game;
   period: SessionPeriod;
   platform: string;
+  store: string;
   status: Status | "all";
   query: string;
   now?: Date;
 }): boolean {
-  const { session, game, period, platform, status, query, now = new Date() } = args;
+  const { session, game, period, platform, store, status, query, now = new Date() } = args;
   if (!game) return false;
   const filteredByPeriod = filterSessionsByPeriod([session], period, now).length === 1;
   if (!filteredByPeriod) return false;
-  if (platform !== "all" && game.platform !== platform) return false;
+  if (platform !== "all" && !getGamePlatforms(game).includes(platform) && session.platform !== platform) return false;
+  if (store !== "all" && !getGameStores(game).includes(store)) return false;
   if (status !== "all" && game.status !== status) return false;
 
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) return true;
 
-  return [game.title, game.platform, game.status, session.note ?? "", session.mood ?? ""]
+  return [
+    game.title,
+    game.status,
+    session.platform,
+    session.note ?? "",
+    session.mood ?? "",
+    ...getGamePlatforms(game),
+    ...getGameStores(game),
+  ]
     .some((value) => value.toLowerCase().includes(normalizedQuery));
 }

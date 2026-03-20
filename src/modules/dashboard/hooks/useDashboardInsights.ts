@@ -7,6 +7,7 @@ import {
   type Game,
   type PiePoint,
 } from "../../../backlog/shared";
+import { getGamePlatforms, getGameStores } from "../../../backlog/structuredGameValues";
 import { isCompleted, isWishlistEntry } from "../../../core/libraryEntryDerived";
 import { parseDateInput } from "../../../core/utils";
 import type { LibraryEntry as DbLibraryEntry, PlaySession as DbPlaySession } from "../../../core/types";
@@ -34,6 +35,29 @@ type UseDashboardInsightsArgs = {
   preferences: AppPreferences;
   query: string;
 };
+
+function buildDistribution(games: Game[], valuesForGame: (game: Game) => string[]): PiePoint[] {
+  if (games.length === 0) return [];
+
+  const counts = new Map<string, number>();
+  let total = 0;
+  for (const game of games) {
+    for (const value of valuesForGame(game)) {
+      counts.set(value, (counts.get(value) || 0) + 1);
+      total += 1;
+    }
+  }
+
+  if (total === 0) return [];
+
+  return Array.from(counts.entries())
+    .sort(([, left], [, right]) => right - left)
+    .slice(0, 5)
+    .map(([name, value]) => ({
+      name,
+      value: Math.max(1, Math.round((value / total) * 100)),
+    }));
+}
 
 export function useDashboardInsights({
   games,
@@ -85,21 +109,11 @@ export function useDashboardInsights({
   }, [libraryEntryRows]);
 
   const platformData = useMemo<PiePoint[]>(() => {
-    if (games.length === 0) return platformDistribution;
-    const counts = new Map<string, number>();
-    for (const game of games) {
-      counts.set(game.platform, (counts.get(game.platform) || 0) + 1);
-    }
-
-    const total = games.length;
-    return Array.from(counts.entries())
-      .sort(([, left], [, right]) => right - left)
-      .slice(0, 5)
-      .map(([name, value]) => ({
-        name,
-        value: Math.max(1, Math.round((value / total) * 100)),
-      }));
+    const distribution = buildDistribution(games, getGamePlatforms);
+    return distribution.length > 0 ? distribution : platformDistribution;
   }, [games]);
+
+  const storeData = useMemo<PiePoint[]>(() => buildDistribution(games, getGameStores), [games]);
 
   const durationBuckets = useMemo(() => {
     if (games.length === 0) return backlogByDuration;
@@ -182,7 +196,13 @@ export function useDashboardInsights({
           Boolean(cadence && cadence.sessions30d > 0);
         if (!isOperational || game.status === "Terminado" || game.status === "Wishlist") return false;
         if (!normalizedQuery) return true;
-        return [game.title, game.genre, game.platform, game.notes].some((value) =>
+        return [
+          game.title,
+          game.genre,
+          game.notes,
+          ...getGamePlatforms(game),
+          ...getGameStores(game),
+        ].some((value) =>
           value.toLowerCase().includes(normalizedQuery),
         );
       })
@@ -200,6 +220,7 @@ export function useDashboardInsights({
   return {
     monthlyProgress,
     platformData,
+    storeData,
     durationBuckets,
     stats,
     personalBadges,

@@ -14,6 +14,9 @@ type CatalogMaintenanceScreenProps = {
   hasRawgApiKey: boolean;
   onRepairStructural: () => Promise<void>;
   onMergeDuplicateGroup: (primaryEntryId: number, mergedEntryIds: number[]) => Promise<void>;
+  onNormalizeEntry: (libraryEntryId: number) => Promise<void>;
+  onNormalizeQueue: () => Promise<void>;
+  onConsolidateAliasGroup: (kind: "store" | "platform", normalizedName: string) => Promise<void>;
   onEnrichMetadata: (gameId: number) => Promise<void>;
   onEnrichMetadataQueue: () => Promise<void>;
   onOpenGamePage: (libraryEntryId: number) => void;
@@ -25,6 +28,9 @@ export function CatalogMaintenanceScreen({
   hasRawgApiKey,
   onRepairStructural,
   onMergeDuplicateGroup,
+  onNormalizeEntry,
+  onNormalizeQueue,
+  onConsolidateAliasGroup,
   onEnrichMetadata,
   onEnrichMetadataQueue,
   onOpenGamePage,
@@ -57,6 +63,14 @@ export function CatalogMaintenanceScreen({
           <div className="detail-stat">
             <span>Fila de metadado</span>
             <strong>{report.summary.metadataQueue}</strong>
+          </div>
+          <div className="detail-stat">
+            <span>Normalização</span>
+            <strong>{report.summary.normalizationQueue}</strong>
+          </div>
+          <div className="detail-stat">
+            <span>Aliases</span>
+            <strong>{report.summary.aliasGroups}</strong>
           </div>
           <div className="detail-stat">
             <span>Sessões órfãs</span>
@@ -101,6 +115,16 @@ export function CatalogMaintenanceScreen({
                 <p>{group.reasons.join(" ")}</p>
 
                 <div className="detail-note__tags">
+                  {group.overlapPlatforms.map((platform) => (
+                    <Pill key={`${group.id}-overlap-platform-${platform}`} tone="cyan">
+                      {platform}
+                    </Pill>
+                  ))}
+                  {group.overlapStores.map((store) => (
+                    <Pill key={`${group.id}-overlap-store-${store}`} tone="yellow">
+                      {store}
+                    </Pill>
+                  ))}
                   {group.candidates.map((candidate) => (
                     <Pill
                       key={`${group.id}-${candidate.libraryEntryId}`}
@@ -133,6 +157,18 @@ export function CatalogMaintenanceScreen({
                         {candidate.progressStatus} • {candidate.completionPercent}% • {Math.round(candidate.playtimeMinutes / 60)}h •{" "}
                         {candidate.sessionCount} sessão(ões)
                       </p>
+                      <div className="detail-note__tags">
+                        {candidate.platforms.map((platform) => (
+                          <Pill key={`${group.id}-${candidate.libraryEntryId}-platform-${platform}`} tone="neutral">
+                            {platform}
+                          </Pill>
+                        ))}
+                        {candidate.stores.map((store) => (
+                          <Pill key={`${group.id}-${candidate.libraryEntryId}-store-${store}`} tone="sunset">
+                            {store}
+                          </Pill>
+                        ))}
+                      </div>
                     </article>
                   ))}
                 </div>
@@ -206,6 +242,111 @@ export function CatalogMaintenanceScreen({
                   </NotchButton>
                   <NotchButton variant="secondary" onClick={() => onOpenEditGame(item.representativeEntryId)}>
                     Corrigir manualmente
+                  </NotchButton>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      </Panel>
+
+      <Panel>
+        <SectionHeader
+          icon={DatabaseZap}
+          title="Normalização assistida"
+          description="Promove principais, limpa redundâncias e ajuda a alinhar legado com relações estruturadas."
+          action={
+            <NotchButton
+              variant="secondary"
+              onClick={onNormalizeQueue}
+              disabled={report.normalizationQueue.length === 0}
+            >
+              Normalizar fila
+            </NotchButton>
+          }
+        />
+
+        <div className="audit-list">
+          {report.normalizationQueue.length === 0 ? (
+            <EmptyState message="Nenhum item pendente na fila de normalização." />
+          ) : (
+            report.normalizationQueue.map((item) => (
+              <article className="audit-card" key={item.id}>
+                <div className="audit-card__head">
+                  <div className="audit-card__title">
+                    <DatabaseZap size={18} />
+                    <h3>{item.title}</h3>
+                  </div>
+                  <Pill tone="cyan">entrada #{item.libraryEntryId}</Pill>
+                </div>
+                <p>
+                  Plataforma: {item.currentPlatform} → {item.recommendedPlatform}. Store: {item.currentStore} →{" "}
+                  {item.recommendedStore}.
+                </p>
+                <div className="detail-note__tags">
+                  {item.platformNames.map((platform) => (
+                    <Pill key={`${item.id}-platform-${platform}`} tone="neutral">
+                      {platform}
+                    </Pill>
+                  ))}
+                  {item.storeNames.map((store) => (
+                    <Pill key={`${item.id}-store-${store}`} tone="sunset">
+                      {store}
+                    </Pill>
+                  ))}
+                </div>
+                <div className="detail-note__tags">
+                  {item.reasons.map((reason) => (
+                    <Pill key={`${item.id}-${reason}`} tone="yellow">
+                      {reason}
+                    </Pill>
+                  ))}
+                </div>
+                <div className="modal-actions">
+                  <NotchButton variant="primary" onClick={() => onNormalizeEntry(item.libraryEntryId)}>
+                    Promover principal
+                  </NotchButton>
+                  <NotchButton variant="secondary" onClick={() => onOpenEditGame(item.libraryEntryId)}>
+                    Corrigir manualmente
+                  </NotchButton>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      </Panel>
+
+      <Panel>
+        <SectionHeader
+          icon={GitMerge}
+          title="Consolidação de aliases"
+          description="Unifica stores e plataformas duplicadas por nome normalizado."
+        />
+
+        <div className="audit-list">
+          {report.aliasGroups.length === 0 ? (
+            <EmptyState message="Nenhum alias estrutural pendente." />
+          ) : (
+            report.aliasGroups.map((group) => (
+              <article className="audit-card" key={group.id}>
+                <div className="audit-card__head">
+                  <div className="audit-card__title">
+                    <GitMerge size={18} />
+                    <h3>
+                      {group.kind === "store" ? "Store" : "Plataforma"} • {group.canonicalName}
+                    </h3>
+                  </div>
+                  <Pill tone="neutral">{group.aliases.length} alias(es)</Pill>
+                </div>
+                <p>
+                  {group.aliases.join(", ")}. Impacto: {group.affectedEntries} entrada(s) e {group.affectedGames} jogo(s).
+                </p>
+                <div className="modal-actions">
+                  <NotchButton
+                    variant="primary"
+                    onClick={() => onConsolidateAliasGroup(group.kind, group.normalizedName)}
+                  >
+                    Consolidar aliases
                   </NotchButton>
                 </div>
               </article>

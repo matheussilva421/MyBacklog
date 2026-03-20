@@ -1,5 +1,6 @@
 import { ArrowLeft, BarChart3, Clock3, Coins, Database, Target, Trophy } from "lucide-react";
 import { formatDuration, type Game, type Platform } from "../../../backlog/shared";
+import { getGamePlatforms, getGameStores } from "../../../backlog/structuredGameValues";
 import { NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type PlatformDashboardProps = {
@@ -12,7 +13,7 @@ export function PlatformDashboard({ platform, games, onBack }: PlatformDashboard
   const platformName = typeof platform === "string" ? platform : platform.name;
   const platformMeta = typeof platform === "string" ? null : platform;
 
-  const platformGames = games.filter((game) => game.platform === platformName);
+  const platformGames = games.filter((game) => getGamePlatforms(game).includes(platformName));
   const totalGames = platformGames.length;
   const finishedGames = platformGames.filter((game) => game.status === "Terminado").length;
   const wishlistGames = platformGames.filter((game) => game.status === "Wishlist").length;
@@ -88,7 +89,9 @@ export function PlatformDashboard({ platform, games, onBack }: PlatformDashboard
                 <div className="preview-card__head" style={{ marginBottom: 0 }}>
                   <div>
                     <strong>{game.title}</strong>
-                    <div style={{ fontSize: "0.8rem", color: "var(--foreground-muted)" }}>{game.genre}</div>
+                    <div style={{ fontSize: "0.8rem", color: "var(--foreground-muted)" }}>
+                      {game.genre} • {getGameStores(game).join(", ")}
+                    </div>
                   </div>
                   <Pill tone={game.status === "Terminado" ? "emerald" : game.status === "Jogando" ? "cyan" : "neutral"}>
                     {game.status}

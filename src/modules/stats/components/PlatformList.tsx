@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { ChevronRight, Monitor } from "lucide-react";
 import type { Game, Platform } from "../../../backlog/shared";
+import { getGamePlatforms } from "../../../backlog/structuredGameValues";
 import { Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type PlatformListProps = {
   platforms: Platform[];
   games: Game[];
-  onSelect: (platform: Platform) => void;
+  onSelect: (platform: Platform | string) => void;
 };
 
 type PlatformSummary = {
@@ -20,20 +21,34 @@ export function PlatformList({ platforms, games, onSelect }: PlatformListProps) 
     const map = new Map<string, PlatformSummary>();
 
     for (const game of games) {
-      const current = map.get(game.platform) ?? {
-        totalGames: 0,
-        finishedCount: 0,
-        playingCount: 0,
-      };
+      for (const platformName of getGamePlatforms(game)) {
+        const current = map.get(platformName) ?? {
+          totalGames: 0,
+          finishedCount: 0,
+          playingCount: 0,
+        };
 
-      current.totalGames += 1;
-      if (game.status === "Terminado") current.finishedCount += 1;
-      if (game.status === "Jogando") current.playingCount += 1;
-      map.set(game.platform, current);
+        current.totalGames += 1;
+        if (game.status === "Terminado") current.finishedCount += 1;
+        if (game.status === "Jogando") current.playingCount += 1;
+        map.set(platformName, current);
+      }
     }
 
     return map;
   }, [games]);
+
+  const visiblePlatforms = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          [...platforms, ...Array.from(summaryByPlatform.keys()).map((name) => ({ name } as Platform))].map(
+            (platform) => [platform.name, platform] as const,
+          ),
+        ).values(),
+      ).sort((left, right) => left.name.localeCompare(right.name, "pt-BR")),
+    [platforms, summaryByPlatform],
+  );
 
   return (
     <Panel className="platform-list-panel anim-fade-in">
@@ -44,7 +59,7 @@ export function PlatformList({ platforms, games, onSelect }: PlatformListProps) 
       />
 
       <div className="platform-grid-legacy">
-        {platforms.map((platform) => {
+        {visiblePlatforms.map((platform) => {
           const summary = summaryByPlatform.get(platform.name) ?? {
             totalGames: 0,
             finishedCount: 0,
@@ -56,7 +71,7 @@ export function PlatformList({ platforms, games, onSelect }: PlatformListProps) 
               type="button"
               key={platform.id || platform.name}
               className="platform-card-interactive"
-              onClick={() => onSelect(platform)}
+              onClick={() => onSelect(platform.id != null ? platform : platform.name)}
             >
               {platform.hexColor ? (
                 <span
