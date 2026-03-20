@@ -21,11 +21,13 @@ export const syncSettingsKeys = {
   autoSyncEnabled: "app.autoSyncEnabled",
   lastSuccessfulSyncAt: "app.lastSuccessfulSyncAt",
   syncHistory: "app.syncHistory",
+  skipDefaultSeed: "app.skipDefaultSeed",
 } as const;
 
 export const localOnlySyncSettingKeys = new Set<string>([
   syncSettingsKeys.lastSuccessfulSyncAt,
   syncSettingsKeys.syncHistory,
+  syncSettingsKeys.skipDefaultSeed,
 ]);
 
 function readSetting(rows: DbSetting[], key: string): string | undefined {

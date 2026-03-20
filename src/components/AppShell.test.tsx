@@ -308,6 +308,7 @@ describe("AppShell", () => {
       pullCloudToLocal: vi.fn(),
       mergeLocalAndCloud: vi.fn(),
       workLocal: vi.fn(),
+      resetLocalAndCloud: vi.fn(),
     });
   });
 

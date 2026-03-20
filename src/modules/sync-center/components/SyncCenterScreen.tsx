@@ -10,6 +10,7 @@ import {
   History,
   RefreshCcw,
   ShieldCheck,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { cx } from "../../../backlog/shared";
@@ -39,6 +40,7 @@ type SyncCenterScreenProps = {
   onPullCloud: () => Promise<void> | void;
   onMerge: () => Promise<void> | void;
   onWorkLocal: () => Promise<void> | void;
+  onResetEverywhere: () => Promise<void> | void;
   onOpenSettings: () => void;
 };
 
@@ -203,9 +205,12 @@ export function SyncCenterScreen({
   onPullCloud,
   onMerge,
   onWorkLocal,
+  onResetEverywhere,
   onOpenSettings,
 }: SyncCenterScreenProps) {
   const [pendingAction, setPendingAction] = useState<SyncConflictAction | null>(null);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetConfirmationText, setResetConfirmationText] = useState("");
 
   const modeCopy = describeMode(syncMode, isAuthEnabled);
   const ModeIcon = modeCopy.icon;
@@ -263,6 +268,12 @@ export function SyncCenterScreen({
   const mergeLabel = isConflict ? "Mesclar snapshots" : "Mesclar";
   const workLocalLabel = isConflict ? "Continuar só local" : "Trabalhar local";
   const autoSyncLabel = isConflict ? "Pausado por conflito" : autoSyncEnabled ? "Ativo" : "Pausado";
+  const canResetEverywhere = !isSyncing && (!isAuthEnabled || (isOnline && syncMode !== "auth-required"));
+  const resetAffectsCloud = isAuthEnabled;
+  const resetConfirmationReady = resetConfirmationText.trim().toUpperCase() === "APAGAR TUDO";
+  const resetDescription = resetAffectsCloud
+    ? "Essa ação remove catálogo, sessões, metas, listas, views salvas, histórico de importação e também apaga o snapshot remoto da sua conta."
+    : "Essa ação remove todo o catálogo local, sessões, metas, listas, views salvas e histórico de importação deste dispositivo.";
 
   return (
     <div className="sync-layout">
@@ -378,6 +389,51 @@ export function SyncCenterScreen({
           <NotchButton variant="ghost" onClick={onOpenSettings}>
             <RefreshCcw size={15} />
             Abrir configurações
+          </NotchButton>
+        </div>
+      </Panel>
+
+      <Panel className="sync-danger-panel">
+        <SectionHeader
+          icon={Trash2}
+          title="Reset total"
+          description="Apague tudo e volte ao estado inicial do app quando quiser recomeçar do zero."
+        />
+
+        <div className="sync-danger-panel__body">
+          <div className="sync-helper-row">
+            <Pill tone="yellow">Zona destrutiva</Pill>
+            <Pill tone={resetAffectsCloud ? "magenta" : "neutral"}>
+              {resetAffectsCloud ? "Local + nuvem" : "Somente local"}
+            </Pill>
+          </div>
+          <p className="sync-danger-panel__hint">
+            Isso apaga jogos, biblioteca, sessões, reviews, listas, tags, metas, views salvas e
+            histórico de importação. Use apenas quando quiser começar novamente.
+          </p>
+          {!canResetEverywhere ? (
+            <p className="sync-danger-panel__hint">
+              {syncMode === "auth-required"
+                ? "Faça login antes de apagar também o snapshot remoto."
+                : isAuthEnabled && !isOnline
+                  ? "Reconecte a internet para garantir que local e nuvem sejam apagados juntos."
+                  : "Aguarde a operação atual terminar antes de executar o reset."}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="sync-danger-panel__actions">
+          <NotchButton
+            variant="ghost"
+            className="sync-danger-button"
+            onClick={() => {
+              setResetConfirmationText("");
+              setResetModalOpen(true);
+            }}
+            disabled={!canResetEverywhere}
+          >
+            <Trash2 size={15} />
+            Apagar tudo e recomeçar
           </NotchButton>
         </div>
       </Panel>
@@ -504,6 +560,75 @@ export function SyncCenterScreen({
                 disabled={isSyncing}
               >
                 {pendingActionCopy.confirmLabel}
+              </NotchButton>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+
+      {resetModalOpen ? (
+        <Modal
+          title="Apagar tudo e começar novamente"
+          description={resetDescription}
+          onClose={() => {
+            if (isSyncing) return;
+            setResetModalOpen(false);
+            setResetConfirmationText("");
+          }}
+          closeDisabled={isSyncing}
+        >
+          <div className="sync-reset-confirmation">
+            <div className="sync-reset-confirmation__meta">
+              <Pill tone="yellow">Irreversível</Pill>
+              <Pill tone={resetAffectsCloud ? "magenta" : "neutral"}>
+                {resetAffectsCloud ? "Snapshot remoto será removido" : "Sem nuvem configurada"}
+              </Pill>
+            </div>
+
+            <div className="sync-reset-confirmation__body">
+              <p>
+                Depois da confirmação, a base local será zerada e o app voltará ao onboarding. Os
+                dados apagados não serão recuperados por merge, restore automático ou sync futura.
+              </p>
+              <div className="sync-reset-confirmation__impact">
+                <strong>Isso remove:</strong>
+                <ul className="sync-reset-confirmation__items">
+                  <li>Jogos, biblioteca, sessões, reviews, listas, tags e metas.</li>
+                  <li>Views salvas, histórico de importação e estado de sync persistido.</li>
+                  {resetAffectsCloud ? <li>O snapshot remoto associado à sua conta.</li> : null}
+                </ul>
+              </div>
+            </div>
+
+            <label className="field field--wide">
+              <span>Digite APAGAR TUDO para confirmar</span>
+              <input
+                autoFocus
+                data-autofocus
+                value={resetConfirmationText}
+                onChange={(event) => setResetConfirmationText(event.target.value)}
+                placeholder="APAGAR TUDO"
+              />
+            </label>
+
+            <div className="modal-actions">
+              <NotchButton
+                variant="ghost"
+                onClick={() => {
+                  setResetModalOpen(false);
+                  setResetConfirmationText("");
+                }}
+                disabled={isSyncing}
+              >
+                Cancelar
+              </NotchButton>
+              <NotchButton
+                variant="secondary"
+                className="sync-danger-button"
+                onClick={() => void onResetEverywhere()}
+                disabled={isSyncing || !resetConfirmationReady}
+              >
+                Confirmar reset total
               </NotchButton>
             </div>
           </div>

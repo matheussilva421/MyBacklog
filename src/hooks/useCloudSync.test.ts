@@ -7,6 +7,7 @@ import {
   resolveInitialSyncDecision,
   stripBackupMeta,
 } from "../modules/sync-center/utils/syncEngine";
+import { syncSettingsKeys } from "../modules/sync-center/utils/syncStorage";
 
 const baseTables = {
   games: [
@@ -147,6 +148,41 @@ describe("syncEngine helpers", () => {
     );
 
     expect(decision.decision).toBe("pull-cloud");
+  });
+
+  it("ignora marcadores locais de fresh start ao decidir se existe dado para sync", () => {
+    const decision = resolveInitialSyncDecision(
+      {
+        ...createPayload(),
+        ...{
+          games: [],
+          libraryEntries: [],
+          stores: [],
+          libraryEntryStores: [],
+          platforms: [],
+          gamePlatforms: [],
+          playSessions: [],
+          reviews: [],
+          lists: [],
+          libraryEntryLists: [],
+          tags: [],
+          gameTags: [],
+          goals: [],
+          savedViews: [],
+          settings: [
+            {
+              id: 1,
+              key: syncSettingsKeys.skipDefaultSeed,
+              value: "true",
+              updatedAt: "2026-03-20T10:00:00.000Z",
+            },
+          ],
+        },
+      },
+      null,
+    );
+
+    expect(decision.decision).toBe("idle");
   });
 
   it("envia para a nuvem quando não existe backup remoto", () => {

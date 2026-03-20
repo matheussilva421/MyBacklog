@@ -210,6 +210,26 @@ export function buildBackupPayload(tables: SyncTables): BackupPayload {
   };
 }
 
+export function createEmptySyncTables(): SyncTables {
+  return {
+    games: [],
+    libraryEntries: [],
+    stores: [],
+    libraryEntryStores: [],
+    platforms: [],
+    gamePlatforms: [],
+    playSessions: [],
+    reviews: [],
+    lists: [],
+    libraryEntryLists: [],
+    tags: [],
+    gameTags: [],
+    goals: [],
+    settings: [],
+    savedViews: [],
+  };
+}
+
 export function resolveInitialSyncDecision(
   localTables: SyncTables,
   cloudData: BackupPayload | null,

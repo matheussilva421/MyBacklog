@@ -2037,6 +2037,50 @@ button {
     rgba(7, 9, 13, 0.9);
 }
 
+.sync-danger-panel {
+  border-color: rgba(255, 142, 43, 0.22);
+}
+
+.sync-danger-panel .cp-panel__content {
+  display: grid;
+  gap: 14px;
+}
+
+.sync-danger-panel__body,
+.sync-danger-panel__actions,
+.sync-reset-confirmation,
+.sync-reset-confirmation__body,
+.sync-reset-confirmation__impact {
+  display: grid;
+  gap: 12px;
+}
+
+.sync-danger-panel__body {
+  padding: 16px;
+  border: 1px solid rgba(255, 142, 43, 0.18);
+  background:
+    linear-gradient(135deg, rgba(255, 142, 43, 0.1), rgba(14, 17, 24, 0.88)),
+    rgba(7, 9, 13, 0.88);
+}
+
+.sync-danger-panel__hint {
+  margin: 0;
+  color: var(--text-soft);
+}
+
+.sync-danger-button {
+  border-color: rgba(255, 142, 43, 0.36);
+  color: #ffd2ae;
+  background: linear-gradient(135deg, rgba(255, 142, 43, 0.18), rgba(255, 87, 201, 0.08));
+}
+
+.sync-danger-button:hover:not(:disabled),
+.sync-danger-button:focus-visible:not(:disabled) {
+  border-color: rgba(255, 142, 43, 0.7);
+  background: linear-gradient(135deg, rgba(255, 142, 43, 0.28), rgba(255, 87, 201, 0.12));
+  color: #fff2e6;
+}
+
 .sync-conflict-callout__head {
   align-items: flex-start;
 }
@@ -2114,6 +2158,30 @@ button {
 .sync-confirmation__body {
   display: grid;
   gap: 14px;
+}
+
+.sync-reset-confirmation__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.sync-reset-confirmation__impact strong {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.sync-reset-confirmation__items {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-soft);
 }
 
 .modal-backdrop {

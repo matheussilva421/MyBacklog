@@ -2,6 +2,7 @@ import type { BackupTables } from "../backlog/shared";
 import { defaultGameToDbGame, defaultGameToDbLibraryEntry, defaultGames } from "../backlog/shared";
 import { db } from "../core/db";
 import { syncStructuredRelationsForRecord } from "../core/structuredDataSync";
+import { syncSettingsKeys } from "../modules/sync-center/utils/syncStorage";
 import type {
   Game as DbGameMetadata,
   GamePlatform as DbGamePlatform,
@@ -63,6 +64,28 @@ function sortByUpdatedAtDesc<T extends { updatedAt: string }>(rows: T[]) {
   return [...rows].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
+export function shouldSeedDefaultLibrary(args: {
+  seedIfEmpty: boolean;
+  libraryEntryCount: number;
+  settingRows: Pick<DbSetting, "key" | "value">[];
+}) {
+  if (!args.seedIfEmpty || args.libraryEntryCount > 0) return false;
+
+  return !args.settingRows.some(
+    (row) => row.key === syncSettingsKeys.skipDefaultSeed && row.value === "true",
+  );
+}
+
+export function createFreshStartLocalSettings(timestamp = new Date().toISOString()): DbSetting[] {
+  return [
+    {
+      key: syncSettingsKeys.skipDefaultSeed,
+      value: "true",
+      updatedAt: timestamp,
+    },
+  ];
+}
+
 export async function seedDefaultLibrary() {
   try {
     await db.transaction(
@@ -96,7 +119,14 @@ export async function seedDefaultLibrary() {
 
 export async function readBacklogDataSnapshot(seedIfEmpty = false): Promise<BacklogDataSnapshot> {
   let storedEntries = await db.libraryEntries.orderBy("updatedAt").reverse().toArray();
-  if (seedIfEmpty && storedEntries.length === 0) {
+  const initialSettings = await db.settings.toArray();
+  if (
+    shouldSeedDefaultLibrary({
+      seedIfEmpty,
+      libraryEntryCount: storedEntries.length,
+      settingRows: initialSettings,
+    })
+  ) {
     await seedDefaultLibrary();
     storedEntries = await db.libraryEntries.orderBy("updatedAt").reverse().toArray();
   }
@@ -153,6 +183,52 @@ export async function readBacklogDataSnapshot(seedIfEmpty = false): Promise<Back
     platformRows: storedPlatforms,
     gamePlatformRows: storedGamePlatforms,
   };
+}
+
+export async function clearBacklogDataForFreshStart() {
+  const freshStartSettings = createFreshStartLocalSettings();
+
+  await db.transaction(
+    "rw",
+    [
+      db.games,
+      db.libraryEntries,
+      db.stores,
+      db.libraryEntryStores,
+      db.platforms,
+      db.gamePlatforms,
+      db.playSessions,
+      db.reviews,
+      db.lists,
+      db.libraryEntryLists,
+      db.tags,
+      db.gameTags,
+      db.goals,
+      db.settings,
+      db.savedViews,
+      db.importJobs,
+    ],
+    async () => {
+      await db.gamePlatforms.clear();
+      await db.platforms.clear();
+      await db.libraryEntryStores.clear();
+      await db.stores.clear();
+      await db.libraryEntryLists.clear();
+      await db.gameTags.clear();
+      await db.reviews.clear();
+      await db.playSessions.clear();
+      await db.goals.clear();
+      await db.tags.clear();
+      await db.lists.clear();
+      await db.libraryEntries.clear();
+      await db.games.clear();
+      await db.settings.clear();
+      await db.savedViews.clear();
+      await db.importJobs.clear();
+
+      await db.settings.bulkPut(freshStartSettings);
+    },
+  );
 }
 
 export async function readBackupTables(): Promise<BackupTables> {

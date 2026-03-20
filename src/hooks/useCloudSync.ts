@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "firebase/auth";
 import type { BackupPayload } from "../backlog/shared";
 import { db } from "../core/db";
-import { pullFromCloud, pushToCloud } from "../lib/sync";
+import { clearCloudBackup, pullFromCloud, pushToCloud } from "../lib/sync";
 import { upsertSettingsRows } from "../modules/settings/utils/settingsStorage";
 import {
   buildBackupPayload,
   buildSyncComparison,
   buildSyncFingerprint,
+  createEmptySyncTables,
   mergeSyncTables,
   stripBackupMeta,
   type SyncComparison,
@@ -20,6 +21,7 @@ import {
   syncSettingsKeys,
   type SyncHistoryEntry,
 } from "../modules/sync-center/utils/syncStorage";
+import { clearBacklogDataForFreshStart } from "../services/backlogRepository";
 
 export {
   buildSyncFingerprint,
@@ -163,6 +165,7 @@ export function useCloudSync({
   const previousFingerprintRef = useRef<string | null>(null);
   const cloudSnapshotRef = useRef<BackupPayload | null>(null);
   const syncLockRef = useRef<symbol | null>(null);
+  const emptySyncTables = useMemo(() => createEmptySyncTables(), []);
 
   useEffect(() => {
     historyRef.current = syncHistory;
@@ -444,6 +447,20 @@ export function useCloudSync({
           return;
         }
 
+        if (nextComparison.decision === "idle") {
+          previousFingerprintRef.current = nextComparison.localFingerprint;
+          setIsWorkingLocal(false);
+          if (action === "manual-push") {
+            await pushHistory(
+              action,
+              "skipped",
+              "Nada para enviar. A base local e a nuvem já estão vazias.",
+            );
+            setNotice("Nada para enviar. Local e nuvem já estão vazios.");
+          }
+          return;
+        }
+
         if (
           action === "auto-push" &&
           nextComparison.localFingerprint === previousFingerprintRef.current &&
@@ -495,6 +512,66 @@ export function useCloudSync({
       user,
     ],
   );
+
+  const resetLocalAndCloud = useCallback(async () => {
+    if (isAuthEnabled && !user) {
+      setNotice("Faça login antes de apagar também o snapshot remoto.");
+      return;
+    }
+
+    if (isAuthEnabled && !isOnline) {
+      setNotice("Você está offline. Reconecte para apagar local e nuvem ao mesmo tempo.");
+      return;
+    }
+
+    const syncToken = acquireSyncLock();
+    if (!syncToken) return;
+
+    let cloudCleared = false;
+
+    try {
+      if (isAuthEnabled && user) {
+        await clearCloudBackup(user.uid);
+        cloudCleared = true;
+      }
+
+      await clearBacklogDataForFreshStart();
+      await refreshData();
+
+      historyRef.current = [];
+      setSyncHistory([]);
+      commitLastSuccessfulSyncAt(null);
+      setComparison(buildSyncComparison(emptySyncTables, null));
+      previousFingerprintRef.current = buildSyncFingerprint(emptySyncTables);
+      cloudSnapshotRef.current = null;
+      setIsWorkingLocal(false);
+
+      setNotice(
+        isAuthEnabled
+          ? "Base local e snapshot remoto foram apagados. O app voltou ao estado inicial."
+          : "Base local apagada. Como a nuvem não está configurada, o reset foi aplicado só neste dispositivo.",
+      );
+    } catch (error) {
+      logSyncError("Cloud sync reset error:", error);
+      setNotice(
+        cloudCleared
+          ? "O snapshot remoto foi apagado, mas a limpeza local falhou. Tente novamente antes de continuar."
+          : "Falha ao apagar local e nuvem. Nenhum reset completo foi concluído.",
+      );
+    } finally {
+      releaseSyncLock(syncToken);
+    }
+  }, [
+    acquireSyncLock,
+    commitLastSuccessfulSyncAt,
+    emptySyncTables,
+    isAuthEnabled,
+    isOnline,
+    refreshData,
+    releaseSyncLock,
+    setNotice,
+    user,
+  ]);
 
   const pullCloudToLocal = useCallback(async () => {
     if (!user || !isAuthEnabled) return;
@@ -648,5 +725,6 @@ export function useCloudSync({
     pullCloudToLocal,
     mergeLocalAndCloud,
     workLocal,
+    resetLocalAndCloud,
   };
 }

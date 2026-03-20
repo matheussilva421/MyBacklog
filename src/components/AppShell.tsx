@@ -96,6 +96,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
     pullCloudToLocal,
     mergeLocalAndCloud,
     workLocal,
+    resetLocalAndCloud,
   } = useAppShellSync({ app, user, isAuthEnabled });
   const guidedTourOpen = app.guidedTourOpen;
   const guidedTourScreen = app.guidedTourStep.screen;
@@ -313,6 +314,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
               pullCloudToLocal={pullCloudToLocal}
               mergeLocalAndCloud={mergeLocalAndCloud}
               workLocal={workLocal}
+              resetLocalAndCloud={resetLocalAndCloud}
             />
           </div>
         </main>

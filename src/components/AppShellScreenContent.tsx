@@ -81,6 +81,7 @@ type AppShellScreenContentProps = {
   pullCloudToLocal: () => Promise<void>;
   mergeLocalAndCloud: () => Promise<void>;
   workLocal: () => Promise<void>;
+  resetLocalAndCloud: () => Promise<void>;
 };
 
 export function AppShellScreenContent({
@@ -97,6 +98,7 @@ export function AppShellScreenContent({
   pullCloudToLocal,
   mergeLocalAndCloud,
   workLocal,
+  resetLocalAndCloud,
 }: AppShellScreenContentProps) {
   let screenContent = null;
 
@@ -193,6 +195,7 @@ export function AppShellScreenContent({
         onPullCloud={pullCloudToLocal}
         onMerge={mergeLocalAndCloud}
         onWorkLocal={workLocal}
+        onResetEverywhere={resetLocalAndCloud}
         onOpenSettings={() => app.setScreen("profile")}
       />
     );

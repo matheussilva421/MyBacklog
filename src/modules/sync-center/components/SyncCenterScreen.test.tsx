@@ -40,6 +40,7 @@ function renderScreen() {
   const onPullCloud = vi.fn();
   const onMerge = vi.fn();
   const onWorkLocal = vi.fn();
+  const onResetEverywhere = vi.fn();
   const onOpenSettings = vi.fn();
 
   render(
@@ -65,6 +66,7 @@ function renderScreen() {
       onPullCloud={onPullCloud}
       onMerge={onMerge}
       onWorkLocal={onWorkLocal}
+      onResetEverywhere={onResetEverywhere}
       onOpenSettings={onOpenSettings}
     />,
   );
@@ -74,6 +76,7 @@ function renderScreen() {
     onPullCloud,
     onMerge,
     onWorkLocal,
+    onResetEverywhere,
     onOpenSettings,
   };
 }
@@ -139,5 +142,29 @@ describe("SyncCenterScreen", () => {
     expect(onWorkLocal).toHaveBeenCalledTimes(1);
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("requires typed confirmation before resetting local and cloud data", async () => {
+    const { onResetEverywhere } = renderScreen();
+
+    fireEvent.click(screen.getByRole("button", { name: /apagar tudo e recomeçar/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Apagar tudo e começar novamente")).toBeInTheDocument();
+    });
+
+    const confirmButton = screen.getByRole("button", { name: /confirmar reset total/i });
+    expect(confirmButton).toBeDisabled();
+
+    fireEvent.change(screen.getByPlaceholderText("APAGAR TUDO"), {
+      target: { value: "apagar tudo" },
+    });
+
+    expect(confirmButton).toBeEnabled();
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => {
+      expect(onResetEverywhere).toHaveBeenCalledTimes(1);
+    });
   });
 });

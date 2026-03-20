@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
 import type { BackupPayload } from "../backlog/shared";
 import { cloudDb } from "./firebase";
 
@@ -30,4 +30,10 @@ export async function pullFromCloud(uid: string): Promise<BackupPayload | null> 
   }
 
   return null;
+}
+
+export async function clearCloudBackup(uid: string) {
+  const firestore = requireCloudDb();
+  const userRef = doc(firestore, "users", uid);
+  await deleteDoc(userRef);
 }
