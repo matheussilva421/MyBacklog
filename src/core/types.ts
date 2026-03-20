@@ -203,6 +203,7 @@ export interface ImportJob {
   totalItems?: number;
   processedItems?: number;
   summary?: string;
+  changes?: string;
   createdAt: string;
   updatedAt: string;
 }

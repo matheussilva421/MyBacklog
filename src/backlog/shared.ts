@@ -1,4 +1,4 @@
-﻿import {
+import {
   BarChart3,
   CalendarDays,
   Cloud,
@@ -62,7 +62,7 @@ export type {
   SavedViewScope,
 };
 
-export type ImportSource = "csv" | "steam" | "playnite";
+export type ImportSource = "csv" | "steam" | "playnite" | "notion";
 
 export type ImportPayload = {
   title: string;
@@ -398,7 +398,7 @@ export const filterOptions: StatusFilter[] = [
 ];
 export const gameStatuses: Status[] = ["Backlog", "Jogando", "Pausado", "Terminado", "Wishlist"];
 export const gamePriorities: Priority[] = ["Alta", "Média", "Baixa"];
-export const importSources: ImportSource[] = ["csv", "steam", "playnite"];
+export const importSources: ImportSource[] = ["csv", "steam", "playnite", "notion"];
 
 export {
   cx,

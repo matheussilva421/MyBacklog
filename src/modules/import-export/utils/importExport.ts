@@ -181,7 +181,7 @@ function fromCsvRows(rows: Array<Record<string, string>>, source: ImportSource, 
   const fallbackStore = defaultStoreForSource(source, defaults);
   return rows
     .map((row) => {
-      const title = row.title || row.name;
+      const title = row.title || row.name || row.nome;
       if (!title) return null;
 
       const payload = defaultPayload(title, defaults);
@@ -189,23 +189,23 @@ function fromCsvRows(rows: Array<Record<string, string>>, source: ImportSource, 
       payload.platforms = splitCsvTokens(row.platforms || row.plataformas || payload.platform);
       payload.sourceStore = row.sourcestore || row.loja || row.source || getPrimaryCsvToken(row.stores || row.lojas, fallbackStore);
       payload.stores = splitCsvTokens(row.stores || row.lojas || payload.sourceStore);
-      payload.ownershipStatus = mapOwnership(row.ownershipstatus || row.ownership || row.posse || "");
-      payload.progressStatus = mapProgress(row.progressstatus || row.progress || row.status || "");
+      payload.ownershipStatus = mapOwnership(row.ownershipstatus || row.ownership || row.posse || row.propriedade || "");
+      payload.progressStatus = mapProgress(row.progressstatus || row.progress || row.status || row.estado || row.progresso || "");
       payload.priority = mapPriority(row.priority || row.prioridade || "");
-      payload.genres = row.genres || row.generos || "";
-      payload.notes = row.notes || row.notas || "";
-      payload.personalRating = Number(row.personalrating || row.rating || row.userscore || 0) || undefined;
-      payload.playtimeMinutes = parseMinutes(row.playtimeminutes || row.playtime_forever || row.playtime || 0);
+      payload.genres = row.genres || row.generos || row.gêneros || "";
+      payload.notes = row.notes || row.notas || row.observações || "";
+      payload.personalRating = Number(row.personalrating || row.rating || row.userscore || row.score || row.nota || 0) || undefined;
+      payload.playtimeMinutes = parseMinutes(row.playtimeminutes || row.playtime_forever || row.playtime || row.tempo || 0);
       if (!payload.playtimeMinutes && row.playtimehours) payload.playtimeMinutes = parseHoursToMinutes(row.playtimehours);
-      payload.completionPercent = Number(row.completionpercent || row.progresspercent || 0) || 0;
-      payload.estimatedTime = row.estimatedtime || row.eta || undefined;
+      payload.completionPercent = Number(row.completionpercent || row.progresspercent || row.porcentagem || 0) || 0;
+      payload.estimatedTime = row.estimatedtime || row.eta || row.estimativa || undefined;
       payload.difficulty = row.difficulty || row.dificuldade || undefined;
       payload.releaseYear = Number(row.releaseyear || row.year || row.ano || 0) || undefined;
-      payload.completionDate = parseOptionalDate(row.completiondate || row.dataconclusao || row.finishedat);
-      payload.coverUrl = row.coverurl || row.cover || undefined;
-      payload.developer = row.developer || row.studio || undefined;
-      payload.publisher = row.publisher || row.publishers || undefined;
-      payload.description = row.description || row.descricao || undefined;
+      payload.completionDate = parseOptionalDate(row.completiondate || row.dataconclusao || row.finishedat || row.conclusão);
+      payload.coverUrl = row.coverurl || row.cover || row.capa || undefined;
+      payload.developer = row.developer || row.studio || row.desenvolvedora || undefined;
+      payload.publisher = row.publisher || row.publishers || row.publicadora || undefined;
+      payload.description = row.description || row.descricao || row.descrição || undefined;
       return applyImportDefaults(payload, defaults);
     })
     .filter((value): value is ImportPayload => Boolean(value));

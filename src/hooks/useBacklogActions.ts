@@ -452,9 +452,19 @@ export function useBacklogActions({
       setScreen("library");
       setNotice(`${created} criados, ${updated} atualizados e ${ignored} ignorados na importação.`);
     } catch (error) {
-      setNotice(
-        `Falha ao processar importação: ${error instanceof Error ? error.message : "erro desconhecido"}.`,
-      );
+      const errorMessage = error instanceof Error ? error.message : "erro desconhecido";
+      const now = new Date().toISOString();
+      await db.importJobs.add({
+        source: importState.importSource,
+        status: "failed",
+        totalItems: importState.importPreview?.length ?? 0,
+        processedItems: 0,
+        summary: `Falha: ${errorMessage}`,
+        createdAt: now,
+        updatedAt: now,
+      }).catch(() => {});
+      
+      setNotice(`Falha ao processar importação: ${errorMessage}.`);
     } finally {
       setSubmitting(false);
     }

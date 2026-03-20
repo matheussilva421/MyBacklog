@@ -23,6 +23,8 @@ import {
   searchRawgCandidates,
   type RawgCandidate,
 } from "../modules/import-export/utils/rawg";
+import { db } from "../core/db";
+import type { ImportJob } from "../core/types";
 
 type ImportPreviewSummary = {
   create: number;
@@ -364,17 +366,70 @@ export function ImportModal(props: {
     onMatchChange,
     onGameChange,
     onRawgChange,
-    onSubmit,
-    onClose,
   } = props;
+  
+  const [activeTab, setActiveTab] = useState<"import" | "history">("import");
+  const [history, setHistory] = useState<ImportJob[]>([]);
+
+  useEffect(() => {
+    if (activeTab === "history" && open) {
+      db.importJobs
+        .orderBy("createdAt")
+        .reverse()
+        .toArray()
+        .then(setHistory)
+        .catch(() => {});
+    }
+  }, [activeTab, open]);
+
   if (!open) return null;
+
+  const handleClose = () => {
+    setActiveTab("import");
+    onClose();
+  };
 
   return (
     <Modal
       title="Importar biblioteca"
-      description="Cole CSV ou JSON exportado de Steam, Playnite ou uma planilha genérica."
-      onClose={onClose}
+      description="Cole CSV ou JSON exportado de Steam, Playnite, Notion ou uma planilha genérica."
+      onClose={handleClose}
     >
+      <div className="modal-tabs" style={{ display: "flex", gap: "10px", marginBottom: "1rem" }}>
+        <NotchButton type="button" variant={activeTab === "import" ? "primary" : "ghost"} onClick={() => setActiveTab("import")}>Importar</NotchButton>
+        <NotchButton type="button" variant={activeTab === "history" ? "primary" : "ghost"} onClick={() => setActiveTab("history")}>Histórico</NotchButton>
+      </div>
+
+      {activeTab === "history" ? (
+        <div className="preview-list" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+          {history.length === 0 ? (
+            <p className="preview-card__hint">Nenhum histórico de importação encontrado.</p>
+          ) : (
+            history.map((job) => (
+              <article className="preview-card" key={job.id}>
+                <div className="preview-card__head">
+                  <div>
+                    <strong>Origem: {job.source.toUpperCase()}</strong>
+                    <span>{new Date(job.createdAt).toLocaleString("pt-BR")}</span>
+                  </div>
+                  <Pill tone={job.status === "completed" ? "emerald" : job.status === "failed" ? "magenta" : "cyan"}>
+                    {job.status === "completed" ? "Sucesso" : job.status === "failed" ? "Falha" : job.status}
+                  </Pill>
+                </div>
+                <p>{job.summary}</p>
+                {job.changes && job.changes !== "[]" ? (
+                  <details style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "var(--foreground-muted)" }}>
+                    <summary style={{ cursor: "pointer", outline: "none" }}>Ver alterações</summary>
+                    <pre style={{ whiteSpace: "pre-wrap", background: "rgba(0,0,0,0.2)", padding: "0.5rem", borderRadius: "4px", marginTop: "0.5rem" }}>
+                      {JSON.stringify(JSON.parse(job.changes), null, 2)}
+                    </pre>
+                  </details>
+                ) : null}
+              </article>
+            ))
+          )}
+        </div>
+      ) : (
       <form className="modal-form" onSubmit={onSubmit}>
         <div className={cx("form-grid", preview && "flow-hidden")}>
           <label className="field">
@@ -507,12 +562,13 @@ export function ImportModal(props: {
         ) : null}
 
         <div className="modal-actions">
-          <NotchButton variant="ghost" type="button" onClick={onClose}>Cancelar</NotchButton>
+          <NotchButton variant="ghost" type="button" onClick={handleClose}>Cancelar</NotchButton>
           <NotchButton variant="primary" type="submit" disabled={submitting}>
             {preview ? "Aplicar importação" : "Gerar preview"}
           </NotchButton>
         </div>
       </form>
+      )}
     </Modal>
   );
 }
