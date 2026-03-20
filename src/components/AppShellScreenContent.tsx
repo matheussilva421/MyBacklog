@@ -57,8 +57,10 @@ const GamePageScreen = lazyNamed(
 
 function ModuleFallback({ message = "Carregando módulo..." }: { message?: string }) {
   return (
-    <div className="system-banner">
-      <span>{message}</span>
+    <div className="loading-shell loading-shell--inline" role="status" aria-live="polite">
+      <span className="loading-shell__pulse" aria-hidden="true" />
+      <strong>{message}</strong>
+      <p>Preparando os dados visuais desta área do app.</p>
     </div>
   );
 }

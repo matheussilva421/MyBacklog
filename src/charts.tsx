@@ -16,6 +16,11 @@ type BarPoint = {
 
 const defaultPieColors = ["#f4ef1b", "#26d8ff", "#ff57c9", "#ff8e2b", "#8c64ff"];
 
+function buildLabelStep(width: number, count: number, minSlotWidth: number): number {
+  if (count <= 1) return 1;
+  return Math.max(1, Math.ceil((count * minSlotWidth) / Math.max(width, 1)));
+}
+
 function formatTick(value: number): string {
   if (Number.isInteger(value)) return String(value);
   if (Math.abs(value) < 1) {
@@ -88,6 +93,14 @@ function buildDonutSegments(params: {
 }) {
   const { data, total, centerX, centerY, radius, colors } = params;
   const segments: Array<{ name: string; path: string; color: string }> = [];
+  if (data.length === 1) {
+    segments.push({
+      name: data[0]?.name ?? "segment",
+      path: "",
+      color: colors[0] ?? defaultPieColors[0],
+    });
+    return segments;
+  }
   let cursor = 0;
 
   for (const [index, entry] of data.entries()) {
@@ -124,8 +137,10 @@ export function TrendLineChart({
   const ticks = buildTicks(maxValue, 5);
   const scaleMax = ticks[ticks.length - 1] || 1;
   const stepX = data.length > 1 ? innerWidth / (data.length - 1) : innerWidth;
+  const labelStep = buildLabelStep(innerWidth, data.length, 54);
   const toY = (value: number) => margins.top + innerHeight - (value / scaleMax) * innerHeight;
-  const toX = (index: number) => margins.left + stepX * index;
+  const toX = (index: number) =>
+    data.length <= 1 ? margins.left + innerWidth / 2 : margins.left + stepX * index;
   const finishedPoints = data.map((entry, index) => ({ x: toX(index), y: toY(entry.finished), value: entry.finished }));
   const startedPoints = data.map((entry, index) => ({ x: toX(index), y: toY(entry.started), value: entry.started }));
 
@@ -149,17 +164,19 @@ export function TrendLineChart({
         );
       })}
 
-      {data.map((entry, index) => (
-        <text
-          key={entry.month}
-          className="chart-svg__label"
-          x={toX(index)}
-          y={height - 8}
-          textAnchor="middle"
-        >
-          {entry.month}
-        </text>
-      ))}
+      {data.map((entry, index) =>
+        index % labelStep === 0 || index === data.length - 1 ? (
+          <text
+            key={entry.month}
+            className="chart-svg__label"
+            x={toX(index)}
+            y={height - 8}
+            textAnchor="middle"
+          >
+            {entry.month}
+          </text>
+        ) : null,
+      )}
 
       <path className="chart-svg__line chart-svg__line--yellow" d={buildLinePath(finishedPoints)} />
       <path className="chart-svg__line chart-svg__line--cyan" d={buildLinePath(startedPoints)} />
@@ -222,16 +239,28 @@ export function DonutChart({
         strokeWidth={strokeWidth}
       />
 
-      {segments.map((segment) => (
-        <path
-          key={segment.name}
-          d={segment.path}
-          fill="none"
-          stroke={segment.color}
-          strokeWidth={strokeWidth}
-          strokeLinecap="butt"
-        />
-      ))}
+      {segments.map((segment) =>
+        segment.path ? (
+          <path
+            key={segment.name}
+            d={segment.path}
+            fill="none"
+            stroke={segment.color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="butt"
+          />
+        ) : (
+          <circle
+            key={segment.name}
+            cx={centerX}
+            cy={centerY}
+            r={radius}
+            fill="none"
+            stroke={segment.color}
+            strokeWidth={strokeWidth}
+          />
+        ),
+      )}
     </svg>
   );
 }
@@ -255,6 +284,7 @@ export function VerticalBarChart({
   const scaleMax = ticks[ticks.length - 1] || 1;
   const slotWidth = innerWidth / Math.max(1, data.length);
   const barWidth = Math.min(92, Math.max(18, slotWidth * 0.62));
+  const labelStep = buildLabelStep(innerWidth, data.length, 64);
   const toY = (value: number) => margins.top + innerHeight - (value / scaleMax) * innerHeight;
 
   return (
@@ -291,9 +321,16 @@ export function VerticalBarChart({
               height={Math.max(0, barHeight)}
               fill={color}
             />
-            <text className="chart-svg__label" x={x + barWidth / 2} y={height - 10} textAnchor="middle">
-              {entry.name}
-            </text>
+            {index % labelStep === 0 || index === data.length - 1 ? (
+              <text
+                className="chart-svg__label"
+                x={x + barWidth / 2}
+                y={height - 10}
+                textAnchor="middle"
+              >
+                {entry.name}
+              </text>
+            ) : null}
           </g>
         );
       })}

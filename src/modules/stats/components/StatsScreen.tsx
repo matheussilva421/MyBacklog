@@ -69,6 +69,10 @@ export function StatsScreen({
   const [visibleCount, setVisibleCount] = useState(SESSION_PAGE_SIZE);
   const displayedSessions = visibleSessions.slice(0, visibleCount);
   const hasMore = visibleCount < visibleSessions.length;
+  const hasMonthlyHours = monthlyHours.some((entry) => entry.total > 0);
+  const hasDurationBuckets = durationBuckets.some((entry) => entry.total > 0);
+  const hasPlatformData = platformData.some((entry) => entry.value > 0);
+  const hasStoreData = storeData.some((entry) => entry.value > 0);
 
   if (selectedPlatform) {
     return (
@@ -89,15 +93,19 @@ export function StatsScreen({
             title="Horas por mês"
             description="Evolução do tempo jogado nos últimos meses"
           />
-          <ChartFrame className="chart-area--bar">
-            {({ width, height }) => (
-              <VerticalBarChart width={width} height={height} data={monthlyHours} color="#26d8ff" />
-            )}
-          </ChartFrame>
+          {hasMonthlyHours ? (
+            <ChartFrame className="chart-area--bar">
+              {({ width, height }) => (
+                <VerticalBarChart width={width} height={height} data={monthlyHours} color="#26d8ff" />
+              )}
+            </ChartFrame>
+          ) : (
+            <EmptyState message="As horas por mês aparecem aqui quando houver sessões suficientes para compor histórico." />
+          )}
         </Panel>
 
         <Panel>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "1rem" }}>
+          <div className="panel-inline-header">
             <SectionHeader
               icon={Monitor}
               title="Distribuição"
@@ -107,11 +115,15 @@ export function StatsScreen({
               <Wrench size={16} />
             </NotchButton>
           </div>
-          <ChartFrame className="chart-area--pie">
-            {({ width, height }) => (
-              <DonutChart width={width} height={height} data={platformData} colors={pieColors} />
-            )}
-          </ChartFrame>
+          {hasPlatformData ? (
+            <ChartFrame className="chart-area--pie">
+              {({ width, height }) => (
+                <DonutChart width={width} height={height} data={platformData} colors={pieColors} />
+              )}
+            </ChartFrame>
+          ) : (
+            <EmptyState message="A distribuição por hardware aparece quando a biblioteca tiver plataformas estruturadas." />
+          )}
         </Panel>
 
         <Panel>
@@ -120,11 +132,15 @@ export function StatsScreen({
             title="Stores"
             description="Distribuição estrutural por loja/origem"
           />
-          <ChartFrame className="chart-area--pie">
-            {({ width, height }) => (
-              <DonutChart width={width} height={height} data={storeData} colors={pieColors} />
-            )}
-          </ChartFrame>
+          {hasStoreData ? (
+            <ChartFrame className="chart-area--pie">
+              {({ width, height }) => (
+                <DonutChart width={width} height={height} data={storeData} colors={pieColors} />
+              )}
+            </ChartFrame>
+          ) : (
+            <EmptyState message="A distribuição por store aparece quando o catálogo tiver origens estruturadas suficientes." />
+          )}
         </Panel>
       </div>
 
@@ -136,15 +152,19 @@ export function StatsScreen({
           title="Backlog por duração"
           description="Onde está o gargalo do seu acervo"
         />
-        <ChartFrame className="chart-area--bar">
-          {({ width, height }) => (
-            <VerticalBarChart width={width} height={height} data={durationBuckets} />
-          )}
-        </ChartFrame>
+        {hasDurationBuckets ? (
+          <ChartFrame className="chart-area--bar">
+            {({ width, height }) => (
+              <VerticalBarChart width={width} height={height} data={durationBuckets} />
+            )}
+          </ChartFrame>
+        ) : (
+          <EmptyState message="As faixas de duração serão exibidas quando a biblioteca tiver estimativas consolidadas." />
+        )}
       </Panel>
 
       <Panel>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "1rem" }}>
+        <div className="panel-inline-header">
           <SectionHeader
             icon={FileText}
             title="Histórico de Importação"
@@ -156,34 +176,36 @@ export function StatsScreen({
             </NotchButton>
           )}
         </div>
-        
+
         {importJobs.length === 0 ? (
-          <div style={{ padding: "2rem", textAlign: "center", opacity: 0.5, border: "1px dashed rgba(255,255,255,0.1)" }}>
-            <p>Nenhum registro de importação encontrado.</p>
-          </div>
+          <EmptyState message="Nenhum registro de importação encontrado." />
         ) : (
-          <div className="log-list" style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div className="import-job-list">
             {importJobs.slice(0, 5).map((job) => (
-              <div key={job.id} style={{ padding: "1rem", backgroundColor: "rgba(255,255,255,0.03)", borderLeft: "2px solid" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              <article key={job.id} className="import-job-card">
+                <div className="import-job-card__head">
+                  <div className="import-job-card__meta">
                     <Pill tone={job.status === "completed" ? "emerald" : job.status === "failed" ? "magenta" : "cyan"}>
                       {job.source.toUpperCase()}
                     </Pill>
-                    <span style={{ fontSize: "0.8rem", opacity: 0.6 }}>
-                      {new Date(job.createdAt).toLocaleDateString()} {new Date(job.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <span>
+                      {new Date(job.createdAt).toLocaleDateString()}{" "}
+                      {new Date(job.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </span>
                   </div>
-                  <div style={{ fontSize: "0.9rem", fontWeight: "bold" }}>
+                  <strong className="import-job-card__count">
                     {job.totalItems != null ? (
                       <span>{job.processedItems ?? 0}/{job.totalItems} itens</span>
                     ) : (
                       <span>{job.status === "completed" ? "Sucesso" : "Falha"}</span>
                     )}
-                  </div>
+                  </strong>
                 </div>
-                {job.summary && <div style={{ fontSize: "0.85rem", opacity: 0.8 }}>{job.summary}</div>}
-              </div>
+                {job.summary ? <p className="import-job-card__summary">{job.summary}</p> : null}
+              </article>
             ))}
           </div>
         )}

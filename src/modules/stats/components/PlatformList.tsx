@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { ChevronRight, Monitor } from "lucide-react";
 import type { Game, Platform } from "../../../backlog/shared";
 import { getGamePlatforms } from "../../../backlog/structuredGameValues";
-import { Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
+import { EmptyState, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type PlatformListProps = {
   platforms: Platform[];
@@ -58,49 +58,53 @@ export function PlatformList({ platforms, games, onSelect }: PlatformListProps) 
         description="Gerencie e visualize dados por hardware"
       />
 
-      <div className="platform-grid-legacy">
-        {visiblePlatforms.map((platform) => {
-          const summary = summaryByPlatform.get(platform.name) ?? {
-            totalGames: 0,
-            finishedCount: 0,
-            playingCount: 0,
-          };
+      {visiblePlatforms.length === 0 ? (
+        <EmptyState message="Nenhuma plataforma estruturada foi encontrada para exibir nesta visão." />
+      ) : (
+        <div className="platform-grid-legacy">
+          {visiblePlatforms.map((platform) => {
+            const summary = summaryByPlatform.get(platform.name) ?? {
+              totalGames: 0,
+              finishedCount: 0,
+              playingCount: 0,
+            };
 
-          return (
-            <button
-              type="button"
-              key={platform.id || platform.name}
-              className="platform-card-interactive"
-              onClick={() => onSelect(platform.id != null ? platform : platform.name)}
-            >
-              {platform.hexColor ? (
-                <span
-                  className="platform-card-interactive__accent"
-                  style={{ background: platform.hexColor }}
-                  aria-hidden="true"
-                />
-              ) : null}
+            return (
+              <button
+                type="button"
+                key={platform.id || platform.name}
+                className="platform-card-interactive"
+                onClick={() => onSelect(platform.id != null ? platform : platform.name)}
+              >
+                {platform.hexColor ? (
+                  <span
+                    className="platform-card-interactive__accent"
+                    style={{ background: platform.hexColor }}
+                    aria-hidden="true"
+                  />
+                ) : null}
 
-              <div className="platform-card-interactive__head">
-                <div>
-                  <h3>{platform.name}</h3>
-                  <span className="platform-card-interactive__meta">
-                    {platform.brand || "Desconhecido"}
-                    {platform.generation ? ` • G${platform.generation}` : ""}
-                  </span>
+                <div className="platform-card-interactive__head">
+                  <div>
+                    <h3>{platform.name}</h3>
+                    <span className="platform-card-interactive__meta">
+                      {platform.brand || "Desconhecido"}
+                      {platform.generation ? ` • G${platform.generation}` : ""}
+                    </span>
+                  </div>
+                  <ChevronRight size={18} className="platform-card-interactive__arrow" />
                 </div>
-                <ChevronRight size={18} className="platform-card-interactive__arrow" />
-              </div>
 
-              <div className="platform-card-interactive__pills">
-                <Pill tone="neutral">{summary.totalGames} jogos</Pill>
-                {summary.playingCount > 0 ? <Pill tone="cyan">{summary.playingCount} jogando</Pill> : null}
-                {summary.finishedCount > 0 ? <Pill tone="emerald">{summary.finishedCount} zerados</Pill> : null}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+                <div className="platform-card-interactive__pills">
+                  <Pill tone="neutral">{summary.totalGames} jogos</Pill>
+                  {summary.playingCount > 0 ? <Pill tone="cyan">{summary.playingCount} jogando</Pill> : null}
+                  {summary.finishedCount > 0 ? <Pill tone="emerald">{summary.finishedCount} zerados</Pill> : null}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </Panel>
   );
 }

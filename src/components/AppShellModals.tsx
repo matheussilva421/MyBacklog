@@ -22,11 +22,25 @@ const SessionModal = lazyNamed(() => import("./backlog-modals"), "SessionModal")
 
 type BacklogAppState = ReturnType<typeof useBacklogApp>;
 
+function ModalFallback({ message = "Carregando interface..." }: { message?: string }) {
+  return (
+    <div className="modal-backdrop modal-backdrop--loading" role="status" aria-live="polite">
+      <div className="modal-shell">
+        <div className="loading-shell loading-shell--modal">
+          <span className="loading-shell__pulse" aria-hidden="true" />
+          <strong>{message}</strong>
+          <p>Preparando controles e conteúdo.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AppShellModals({ app }: { app: BacklogAppState }) {
   return (
     <>
       {app.gameModalMode ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ModalFallback message="Carregando modal do jogo..." />}>
           <GameModal
             mode={app.gameModalMode}
             form={app.gameForm}
@@ -42,7 +56,7 @@ export function AppShellModals({ app }: { app: BacklogAppState }) {
       ) : null}
 
       {app.batchEditModalOpen ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ModalFallback message="Carregando edição em lote..." />}>
           <BatchEditModal
             open={app.batchEditModalOpen}
             form={app.batchEditForm}
@@ -62,7 +76,7 @@ export function AppShellModals({ app }: { app: BacklogAppState }) {
       ) : null}
 
       {app.sessionModalOpen ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ModalFallback message="Carregando modal de sessão..." />}>
           <SessionModal
             open={app.sessionModalOpen}
             mode={app.sessionEditId != null ? "edit" : "create"}
@@ -77,7 +91,7 @@ export function AppShellModals({ app }: { app: BacklogAppState }) {
       ) : null}
 
       {app.goalModalMode ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ModalFallback message="Carregando modal de meta..." />}>
           <GoalModal
             mode={app.goalModalMode}
             form={app.goalForm}
@@ -90,7 +104,7 @@ export function AppShellModals({ app }: { app: BacklogAppState }) {
       ) : null}
 
       {app.importModalOpen ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ModalFallback message="Carregando fluxo de importação..." />}>
           <ImportModal
             open={app.importModalOpen}
             source={app.importSource}
@@ -117,7 +131,7 @@ export function AppShellModals({ app }: { app: BacklogAppState }) {
       ) : null}
 
       {app.restoreModalOpen ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ModalFallback message="Carregando fluxo de restauração..." />}>
           <RestoreModal
             open={app.restoreModalOpen}
             mode={app.restoreMode}

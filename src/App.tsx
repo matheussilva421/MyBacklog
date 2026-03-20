@@ -10,8 +10,10 @@ function ModuleFallback({ message }: { message: string }) {
       <div className="app-shell__backdrop" aria-hidden="true" />
       <div className="app-layout">
         <main className="main-column">
-          <div className="system-banner">
-            <span>{message}</span>
+          <div className="loading-shell" role="status" aria-live="polite">
+            <span className="loading-shell__pulse" aria-hidden="true" />
+            <strong>{message}</strong>
+            <p>Aguarde enquanto o Arsenal Gamer prepara a próxima camada da interface.</p>
           </div>
         </main>
       </div>

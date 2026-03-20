@@ -92,6 +92,7 @@ export function SessionsScreen({
     useTimerValue,
     resetDraft,
   } = useSessionsScreenState({ games, sessions, query });
+  const hasMonthlyHours = monthlyHours.some((entry) => entry.total > 0);
 
   const handleQuickSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -301,11 +302,15 @@ export function SessionsScreen({
             </div>
           </div>
 
-          <ChartFrame className="chart-area--bar chart-area--sessions">
-            {({ width, height }) => (
-              <VerticalBarChart width={width} height={height} data={monthlyHours} color="#26d8ff" />
-            )}
-          </ChartFrame>
+          {hasMonthlyHours ? (
+            <ChartFrame className="chart-area--bar chart-area--sessions">
+              {({ width, height }) => (
+                <VerticalBarChart width={width} height={height} data={monthlyHours} color="#26d8ff" />
+              )}
+            </ChartFrame>
+          ) : (
+            <EmptyState message="O pulso das sessões aparece aqui quando houver histórico suficiente dentro do filtro atual." />
+          )}
         </Panel>
       </div>
 

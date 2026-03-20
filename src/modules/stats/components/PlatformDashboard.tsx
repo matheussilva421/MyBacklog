@@ -1,7 +1,8 @@
+import type { CSSProperties } from "react";
 import { ArrowLeft, BarChart3, Clock3, Coins, Database, Target, Trophy } from "lucide-react";
 import { formatDuration, type Game, type Platform } from "../../../backlog/shared";
 import { getGamePlatforms, getGameStores } from "../../../backlog/structuredGameValues";
-import { NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
+import { EmptyState, NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 
 type PlatformDashboardProps = {
   platform: Platform | string;
@@ -28,16 +29,20 @@ export function PlatformDashboard({ platform, games, onBack }: PlatformDashboard
 
   return (
     <div className="platform-dashboard anim-fade-in">
-      <div style={{ marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+      <div className="platform-dashboard__header">
         <NotchButton variant="ghost" onClick={onBack}>
           <ArrowLeft size={18} />
         </NotchButton>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <h2 className="glitch-text" data-text={platformName} style={{ marginBottom: 0, color: accentColor }}>
+        <div className="platform-dashboard__title-block">
+          <h2
+            className="glitch-text platform-dashboard__title"
+            data-text={platformName}
+            style={{ "--platform-accent": accentColor } as CSSProperties}
+          >
             {platformName}
           </h2>
           {platformMeta?.brand && (
-            <span style={{ fontSize: "0.75rem", color: "var(--foreground-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>
+            <span className="platform-dashboard__eyebrow">
               {platformMeta.brand} {platformMeta.generation ? `• Geração ${platformMeta.generation}` : ""}
             </span>
           )}
@@ -66,7 +71,7 @@ export function PlatformDashboard({ platform, games, onBack }: PlatformDashboard
         </Panel>
       </div>
 
-      <div className="dashboard-grid" style={{ marginTop: "1rem" }}>
+      <div className="dashboard-grid platform-dashboard__summary-grid">
         <Panel className="stat-card stat-card--accent">
           <SectionHeader icon={Coins} title="Investimento" description="Valor total pago" />
           <div className="stat-card__value">{currency} {totalSpent.toFixed(2)}</div>
@@ -80,26 +85,30 @@ export function PlatformDashboard({ platform, games, onBack }: PlatformDashboard
         </Panel>
       </div>
 
-      <div style={{ marginTop: "1rem" }}>
+      <div className="platform-dashboard__games">
         <Panel>
           <SectionHeader icon={BarChart3} title="Jogos na Plataforma" description="Lista resumida de entradas" />
-          <div className="preview-list" style={{ maxHeight: "40vh", overflowY: "auto" }}>
-            {platformGames.map((game) => (
-              <div key={game.id} className="preview-card" style={{ padding: "0.75rem" }}>
-                <div className="preview-card__head" style={{ marginBottom: 0 }}>
-                  <div>
-                    <strong>{game.title}</strong>
-                    <div style={{ fontSize: "0.8rem", color: "var(--foreground-muted)" }}>
-                      {game.genre} • {getGameStores(game).join(", ")}
+          {platformGames.length === 0 ? (
+            <EmptyState message={`Nenhum jogo foi associado a ${platformName} ainda.`} />
+          ) : (
+            <div className="preview-list preview-list--platform">
+              {platformGames.map((game) => (
+                <div key={game.id} className="preview-card preview-card--platform">
+                  <div className="preview-card__head preview-card__head--compact">
+                    <div>
+                      <strong>{game.title}</strong>
+                      <div className="platform-dashboard__game-meta">
+                        {game.genre} • {getGameStores(game).join(", ")}
+                      </div>
                     </div>
+                    <Pill tone={game.status === "Terminado" ? "emerald" : game.status === "Jogando" ? "cyan" : "neutral"}>
+                      {game.status}
+                    </Pill>
                   </div>
-                  <Pill tone={game.status === "Terminado" ? "emerald" : game.status === "Jogando" ? "cyan" : "neutral"}>
-                    {game.status}
-                  </Pill>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </Panel>
       </div>
     </div>

@@ -161,6 +161,7 @@ export function MetricCard({
 export function EmptyState({ message }: { message: string }) {
   return (
     <div className="empty-state">
+      <span className="empty-state__eyebrow">Sem dados</span>
       <p>{message}</p>
     </div>
   );
@@ -205,7 +206,14 @@ export function ChartFrame({
 
   return (
     <div ref={ref} className={cx("chart-area", className)}>
-      {size.width > 0 && size.height > 0 ? children(size) : null}
+      {size.width > 0 && size.height > 0 ? (
+        children(size)
+      ) : (
+        <div className="chart-area__placeholder" aria-hidden="true">
+          <span className="chart-area__pulse" />
+          <span>Inicializando gráfico...</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -222,11 +230,30 @@ export function Modal({
   children: ReactNode;
 }) {
   useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyPaddingRight = body.style.paddingRight;
+    const previousRootOverflow = documentElement.style.overflow;
+    const scrollbarWidth = window.innerWidth - documentElement.clientWidth;
+
+    body.style.overflow = "hidden";
+    documentElement.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      body.style.overflow = previousBodyOverflow;
+      body.style.paddingRight = previousBodyPaddingRight;
+      documentElement.style.overflow = previousRootOverflow;
+    };
   }, [onClose]);
 
   return (

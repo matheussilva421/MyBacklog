@@ -78,6 +78,10 @@ export function DashboardScreen({
   onOpenGamePage,
   onOpenPlanner,
 }: DashboardScreenProps) {
+  const hasMonthlyProgress = monthlyProgress.length > 0;
+  const hasPlatformData = platformData.some((entry) => entry.value > 0);
+  const hasStoreData = storeData.some((entry) => entry.value > 0);
+
   return (
     <div className="screen-stack">
       <div className="metric-grid">
@@ -125,11 +129,15 @@ export function DashboardScreen({
             title="Evolução do ano"
             description="Jogos iniciados vs. finalizados por mês"
           />
-          <ChartFrame className="chart-area--line">
-            {({ width, height }) => (
-              <TrendLineChart width={width} height={height} data={monthlyProgress} />
-            )}
-          </ChartFrame>
+          {hasMonthlyProgress ? (
+            <ChartFrame className="chart-area--line">
+              {({ width, height }) => (
+                <TrendLineChart width={width} height={height} data={monthlyProgress} />
+              )}
+            </ChartFrame>
+          ) : (
+            <EmptyState message="A evolução anual aparecerá aqui quando houver progresso registrado por mês." />
+          )}
         </Panel>
 
         <Panel>
@@ -138,23 +146,29 @@ export function DashboardScreen({
             title="Plataformas"
             description="Distribuição estrutural da sua coleção"
           />
-          <ChartFrame className="chart-area--pie">
-            {({ width, height }) => (
-              <DonutChart width={width} height={height} data={platformData} colors={pieColors} />
-            )}
-          </ChartFrame>
-          <div className="legend-grid">
-            {platformData.map((entry, index) => (
-              <div className="legend-item" key={entry.name}>
-                <span
-                  className="legend-item__dot"
-                  style={{ backgroundColor: pieColors[index % pieColors.length] }}
-                />
-                <span>{entry.name}</span>
-                <strong>{entry.value}%</strong>
+          {hasPlatformData ? (
+            <>
+              <ChartFrame className="chart-area--pie">
+                {({ width, height }) => (
+                  <DonutChart width={width} height={height} data={platformData} colors={pieColors} />
+                )}
+              </ChartFrame>
+              <div className="legend-grid">
+                {platformData.map((entry, index) => (
+                  <div className="legend-item" key={entry.name}>
+                    <span
+                      className="legend-item__dot"
+                      style={{ backgroundColor: pieColors[index % pieColors.length] }}
+                    />
+                    <span>{entry.name}</span>
+                    <strong>{entry.value}%</strong>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <EmptyState message="A distribuição por plataforma aparece quando a biblioteca tiver relações estruturadas registradas." />
+          )}
         </Panel>
 
         <Panel>
@@ -163,23 +177,29 @@ export function DashboardScreen({
             title="Stores"
             description="Onde sua biblioteca realmente está distribuída"
           />
-          <ChartFrame className="chart-area--pie">
-            {({ width, height }) => (
-              <DonutChart width={width} height={height} data={storeData} colors={pieColors} />
-            )}
-          </ChartFrame>
-          <div className="legend-grid">
-            {storeData.map((entry, index) => (
-              <div className="legend-item" key={entry.name}>
-                <span
-                  className="legend-item__dot"
-                  style={{ backgroundColor: pieColors[index % pieColors.length] }}
-                />
-                <span>{entry.name}</span>
-                <strong>{entry.value}%</strong>
+          {hasStoreData ? (
+            <>
+              <ChartFrame className="chart-area--pie">
+                {({ width, height }) => (
+                  <DonutChart width={width} height={height} data={storeData} colors={pieColors} />
+                )}
+              </ChartFrame>
+              <div className="legend-grid">
+                {storeData.map((entry, index) => (
+                  <div className="legend-item" key={entry.name}>
+                    <span
+                      className="legend-item__dot"
+                      style={{ backgroundColor: pieColors[index % pieColors.length] }}
+                    />
+                    <span>{entry.name}</span>
+                    <strong>{entry.value}%</strong>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <EmptyState message="As stores serão exibidas aqui quando o catálogo tiver origem estruturada suficiente." />
+          )}
         </Panel>
       </div>
 

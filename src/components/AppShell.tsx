@@ -23,8 +23,10 @@ import { AppShellScreenContent } from "./AppShellScreenContent";
 
 function ModuleFallback({ message = "Carregando módulo..." }: { message?: string }) {
   return (
-    <div className="system-banner">
-      <span>{message}</span>
+    <div className="loading-shell loading-shell--inline" role="status" aria-live="polite">
+      <span className="loading-shell__pulse" aria-hidden="true" />
+      <strong>{message}</strong>
+      <p>Processando estado local, navegação e telemetria visual.</p>
     </div>
   );
 }
