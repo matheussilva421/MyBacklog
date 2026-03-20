@@ -7,6 +7,8 @@ import {
   goalPeriodOptions,
   goalTypeOptions,
   importSources,
+  type LibraryBatchApplyMode,
+  type LibraryBatchEditState,
   type Game,
   type GameFormState,
   type GoalFormState,
@@ -492,6 +494,279 @@ export function GameModal(props: {
           </NotchButton>
           <NotchButton variant="primary" type="submit" disabled={submitting}>
             {mode === "edit" ? "Salvar alterações" : "Criar jogo"}
+          </NotchButton>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+export function BatchEditModal(props: {
+  open: boolean;
+  form: LibraryBatchEditState;
+  selectedGames: Game[];
+  availableStores: string[];
+  availablePlatforms: string[];
+  availableTags: string[];
+  availableLists: Array<{ id: number; name: string }>;
+  submitting?: boolean;
+  onChange: <K extends keyof LibraryBatchEditState>(field: K, value: LibraryBatchEditState[K]) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onClose: () => void;
+}) {
+  const {
+    open,
+    form,
+    selectedGames,
+    availableStores,
+    availablePlatforms,
+    availableTags,
+    availableLists,
+    submitting = false,
+    onChange,
+    onSubmit,
+    onClose,
+  } = props;
+  const [platformDraft, setPlatformDraft] = useState("");
+  const [storeDraft, setStoreDraft] = useState("");
+  const [tagDraft, setTagDraft] = useState("");
+
+  if (!open) return null;
+
+  const selectedCount = selectedGames.length;
+  const selectionLabel =
+    selectedCount === 0
+      ? "Nenhum jogo selecionado"
+      : selectedCount <= 3
+        ? selectedGames.map((game) => game.title).join(", ")
+        : `${selectedCount} jogos selecionados`;
+
+  const platformOptions = Array.from(new Set([...availablePlatforms, ...form.platforms]))
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right, "pt-BR"));
+  const storeOptions = Array.from(new Set([...availableStores, ...form.stores]))
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right, "pt-BR"));
+  const tagOptions = Array.from(new Set([...availableTags, ...splitCsvTokens(form.tags)]))
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right, "pt-BR"));
+
+  const updatePlatforms = (nextPlatforms: string[]) => {
+    const normalized = splitCsvTokens(nextPlatforms);
+    onChange("platforms", normalized);
+    onChange("primaryPlatform", normalized.includes(form.primaryPlatform) ? form.primaryPlatform : normalized[0] ?? "");
+  };
+
+  const updateStores = (nextStores: string[]) => {
+    const normalized = splitCsvTokens(nextStores);
+    onChange("stores", normalized);
+    onChange("primaryStore", normalized.includes(form.primaryStore) ? form.primaryStore : normalized[0] ?? "");
+  };
+
+  const updateTags = (nextTags: string[]) => {
+    onChange("tags", splitCsvTokens(nextTags).join(", "));
+  };
+
+  const toggleToken = (
+    currentValues: string[],
+    value: string,
+    update: (values: string[]) => void,
+  ) => {
+    update(
+      currentValues.includes(value)
+        ? currentValues.filter((item) => item !== value)
+        : [...currentValues, value],
+    );
+  };
+
+  const toggleListId = (listId: number) => {
+    onChange(
+      "listIds",
+      form.listIds.includes(listId)
+        ? form.listIds.filter((item) => item !== listId)
+        : [...form.listIds, listId],
+    );
+  };
+
+  const addPlatformsFromDraft = () => {
+    if (!platformDraft.trim()) return;
+    updatePlatforms([...form.platforms, ...splitCsvTokens(platformDraft)]);
+    setPlatformDraft("");
+  };
+
+  const addStoresFromDraft = () => {
+    if (!storeDraft.trim()) return;
+    updateStores([...form.stores, ...splitCsvTokens(storeDraft)]);
+    setStoreDraft("");
+  };
+
+  const addTagsFromDraft = () => {
+    if (!tagDraft.trim()) return;
+    updateTags([...splitCsvTokens(form.tags), ...splitCsvTokens(tagDraft)]);
+    setTagDraft("");
+  };
+
+  return (
+    <Modal
+      title="Editar em lote"
+      description="Aplique status, prioridade, listas, tags e relações estruturadas para vários jogos de uma vez."
+      onClose={onClose}
+    >
+      <form className="modal-form" onSubmit={onSubmit}>
+        <div className="batch-edit-summary">
+          <strong>{selectedCount} item(ns)</strong>
+          <span>{selectionLabel}</span>
+        </div>
+
+        <div className="form-grid">
+          <label className="field">
+            <span>Modo de aplicação</span>
+            <select
+              value={form.applyMode}
+              onChange={(event) => onChange("applyMode", event.target.value as LibraryBatchApplyMode)}
+            >
+              <option value="merge">Mesclar com dados atuais</option>
+              <option value="replace">Substituir listas/tags/relações</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Status</span>
+            <select value={form.status} onChange={(event) => onChange("status", event.target.value as LibraryBatchEditState["status"])}>
+              <option value="">Manter atual</option>
+              {gameStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Prioridade</span>
+            <select value={form.priority} onChange={(event) => onChange("priority", event.target.value as LibraryBatchEditState["priority"])}>
+              <option value="">Manter atual</option>
+              {gamePriorities.map((priority) => (
+                <option key={priority} value={priority}>
+                  {priority}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="field field--wide">
+            <span>Plataformas estruturadas</span>
+            <div className="selection-chip-grid">
+              {platformOptions.map((platformName) => (
+                <button
+                  key={`batch-platform-${platformName}`}
+                  type="button"
+                  className={cx("selection-chip", form.platforms.includes(platformName) && "selection-chip--active")}
+                  onClick={() => toggleToken(form.platforms, platformName, updatePlatforms)}
+                >
+                  {platformName}
+                </button>
+              ))}
+            </div>
+            <div className="field__aux field__aux--inline">
+              <input
+                value={platformDraft}
+                onChange={(event) => setPlatformDraft(event.target.value)}
+                placeholder="Adicionar plataformas"
+              />
+              <NotchButton type="button" variant="secondary" onClick={addPlatformsFromDraft}>
+                Adicionar
+              </NotchButton>
+            </div>
+          </div>
+          <label className="field">
+            <span>Plataforma principal</span>
+            <select value={form.primaryPlatform} onChange={(event) => onChange("primaryPlatform", event.target.value)}>
+              <option value="">Derivar automaticamente</option>
+              {form.platforms.map((platformName) => (
+                <option key={`batch-primary-platform-${platformName}`} value={platformName}>
+                  {platformName}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="field field--wide">
+            <span>Stores estruturadas</span>
+            <div className="selection-chip-grid">
+              {storeOptions.map((storeName) => (
+                <button
+                  key={`batch-store-${storeName}`}
+                  type="button"
+                  className={cx("selection-chip", form.stores.includes(storeName) && "selection-chip--active")}
+                  onClick={() => toggleToken(form.stores, storeName, updateStores)}
+                >
+                  {storeName}
+                </button>
+              ))}
+            </div>
+            <div className="field__aux field__aux--inline">
+              <input value={storeDraft} onChange={(event) => setStoreDraft(event.target.value)} placeholder="Adicionar stores" />
+              <NotchButton type="button" variant="secondary" onClick={addStoresFromDraft}>
+                Adicionar
+              </NotchButton>
+            </div>
+          </div>
+          <label className="field">
+            <span>Store principal</span>
+            <select value={form.primaryStore} onChange={(event) => onChange("primaryStore", event.target.value)}>
+              <option value="">Derivar automaticamente</option>
+              {form.stores.map((storeName) => (
+                <option key={`batch-primary-store-${storeName}`} value={storeName}>
+                  {storeName}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="field field--wide">
+            <span>Tags</span>
+            <div className="selection-chip-grid">
+              {tagOptions.map((tagName) => (
+                <button
+                  key={`batch-tag-${tagName}`}
+                  type="button"
+                  className={cx("selection-chip", splitCsvTokens(form.tags).includes(tagName) && "selection-chip--active")}
+                  onClick={() => toggleToken(splitCsvTokens(form.tags), tagName, updateTags)}
+                >
+                  {tagName}
+                </button>
+              ))}
+            </div>
+            <div className="field__aux field__aux--inline">
+              <input value={tagDraft} onChange={(event) => setTagDraft(event.target.value)} placeholder="Adicionar tags" />
+              <NotchButton type="button" variant="secondary" onClick={addTagsFromDraft}>
+                Adicionar
+              </NotchButton>
+            </div>
+          </div>
+
+          <div className="field field--wide">
+            <span>Listas</span>
+            <div className="selection-chip-grid">
+              {availableLists.map((list) => (
+                <button
+                  key={`batch-list-${list.id}`}
+                  type="button"
+                  className={cx("selection-chip", form.listIds.includes(list.id) && "selection-chip--active")}
+                  onClick={() => toggleListId(list.id)}
+                >
+                  {list.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <NotchButton variant="ghost" type="button" onClick={onClose}>
+            Cancelar
+          </NotchButton>
+          <NotchButton variant="primary" type="submit" disabled={submitting || selectedCount === 0}>
+            Aplicar edição em lote
           </NotchButton>
         </div>
       </form>

@@ -133,6 +133,10 @@ export function useBacklogApp() {
   }, [data.goalRows]);
 
   const findGame = (id: number) => games.find((game) => game.id === id);
+  const selectedBatchGames = useMemo(
+    () => games.filter((game) => ui.selectedLibraryIds.includes(game.id)),
+    [games, ui.selectedLibraryIds],
+  );
   const sessionInsights = useBuildSessionInsights({ sessionRows: data.sessionRows });
   const dynamicTacticalGoals = useMemo(
     () => buildDynamicTacticalGoals(games, data.sessionRows),
@@ -309,9 +313,11 @@ export function useBacklogApp() {
     selectedRecord,
     selectedGame,
     selectedListFilter: effectiveSelectedListFilter,
+    selectedLibraryIds: ui.selectedLibraryIds,
     currentLibraryView: currentViewDraft,
     gameModalMode: ui.gameModalMode,
     gameForm: ui.gameForm,
+    batchEditForm: ui.batchEditForm,
     sessionForm: ui.sessionForm,
     sessionEditId: ui.sessionEditId,
     goalForm: ui.goalForm,
@@ -333,9 +339,11 @@ export function useBacklogApp() {
     setLibraryGroupBy: ui.setLibraryGroupBy,
     setQuery: ui.setQuery,
     setGameModalMode: ui.setGameModalMode,
+    setSelectedLibraryIds: ui.setSelectedLibraryIds,
     setSessionModalOpen: ui.setSessionModalOpen,
     setSessionEditId: ui.setSessionEditId,
     setGoalModalMode: ui.setGoalModalMode,
+    setBatchEditModalOpen: ui.setBatchEditModalOpen,
   });
 
   const guidedTourStep = guidedTourSteps[ui.guidedTourStepIndex] ?? guidedTourSteps[0];
@@ -380,6 +388,7 @@ export function useBacklogApp() {
     setLibraryGroupBy: ui.setLibraryGroupBy,
     selectedGameId: resolvedSelectedGameId,
     setSelectedGameId: ui.setSelectedGameId,
+    selectedLibraryIds: ui.selectedLibraryIds,
     loading: data.loading,
     notice: data.notice,
     setNotice: data.setNotice,
@@ -423,6 +432,8 @@ export function useBacklogApp() {
     findGame,
     gameModalMode: ui.gameModalMode,
     gameForm: ui.gameForm,
+    batchEditModalOpen: ui.batchEditModalOpen,
+    batchEditForm: ui.batchEditForm,
     sessionModalOpen: ui.sessionModalOpen,
     sessionForm: ui.sessionForm,
     sessionEditId: ui.sessionEditId,
@@ -433,6 +444,7 @@ export function useBacklogApp() {
     groupedLibraryGames,
     activeSavedView,
     selectedGameLists,
+    selectedBatchGames,
     goalModalMode: ui.goalModalMode,
     goalForm: ui.goalForm,
     storeRows: data.storeRows,
@@ -457,6 +469,8 @@ export function useBacklogApp() {
     openEditGameModal,
     openEditGameModalFor,
     closeGameModal: ui.closeGameModal,
+    openBatchEditModal: ui.openBatchEditModal,
+    closeBatchEditModal: ui.closeBatchEditModal,
     openSessionModal: ui.openSessionModal,
     closeSessionModal: ui.closeSessionModal,
     openEditSessionModal: ui.openEditSessionModal,
@@ -467,8 +481,12 @@ export function useBacklogApp() {
     closeRestoreFlow: importState.closeRestoreFlow,
     resetRestorePreview: importState.resetRestorePreview,
     handleGameFormChange: ui.handleGameFormChange,
+    handleBatchEditFormChange: ui.handleBatchEditFormChange,
     handleSessionFormChange: ui.handleSessionFormChange,
     handleGoalFormChange: ui.handleGoalFormChange,
+    toggleLibrarySelection: ui.toggleLibrarySelection,
+    clearLibrarySelection: ui.clearLibrarySelection,
+    selectVisibleLibraryGames: ui.selectVisibleLibraryGames,
     handleImportSourceChange: importState.handleImportSourceChange,
     handleImportTextChange: importState.handleImportTextChange,
     handleRestoreModeChange: importState.handleRestoreModeChange,

@@ -36,7 +36,9 @@ function createGame(partial: Partial<Game>): Game {
     id: 1,
     title: "Cyberpunk 2077",
     platform: "PC",
+    platforms: ["PC"],
     sourceStore: "Steam",
+    stores: ["Steam"],
     genre: "RPG",
     status: "Jogando",
     progress: 40,
@@ -149,5 +151,42 @@ describe("planner goals", () => {
     });
 
     expect(liveScore).toBeGreaterThan(coldScore);
+  });
+
+  it("considers structured stores and platforms in preference boosts", () => {
+    const structuredPreferred = createGame({
+      id: 5,
+      platform: "Xbox",
+      platforms: ["Xbox", "PC"],
+      sourceStore: "Manual",
+      stores: ["Manual", "Steam"],
+    });
+    const nonPreferred = createGame({
+      id: 6,
+      platform: "Xbox",
+      platforms: ["Xbox"],
+      sourceStore: "Manual",
+      stores: ["Manual"],
+    });
+
+    const preferredScore = computePlannerScore(structuredPreferred, undefined, {
+      plannerPreference: "balanced",
+      primaryPlatforms: ["PC"],
+      defaultStores: ["Steam"],
+    });
+    const nonPreferredScore = computePlannerScore(nonPreferred, undefined, {
+      plannerPreference: "balanced",
+      primaryPlatforms: ["PC"],
+      defaultStores: ["Steam"],
+    });
+
+    expect(preferredScore).toBeGreaterThan(nonPreferredScore);
+    expect(
+      buildPlannerReason(structuredPreferred, undefined, {
+        plannerPreference: "balanced",
+        primaryPlatforms: ["PC"],
+        defaultStores: ["Steam"],
+      }),
+    ).toContain("fontes padrão");
   });
 });

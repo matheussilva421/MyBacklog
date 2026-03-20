@@ -291,6 +291,20 @@ export type GameFormState = {
   storeLink: string;
 };
 
+export type LibraryBatchApplyMode = "merge" | "replace";
+
+export type LibraryBatchEditState = {
+  applyMode: LibraryBatchApplyMode;
+  status: "" | Status;
+  priority: "" | Priority;
+  primaryPlatform: string;
+  platforms: string[];
+  primaryStore: string;
+  stores: string[];
+  tags: string;
+  listIds: number[];
+};
+
 export type SessionFormState = {
   gameId: string;
   date: string;

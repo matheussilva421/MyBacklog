@@ -155,21 +155,25 @@ export function sortLibraryGames(
   });
 }
 
-function resolveGroupLabel(game: Game, record: LibraryRecord | undefined, groupBy: LibraryViewGroupBy) {
+function resolveGroupLabels(game: Game, record: LibraryRecord | undefined, groupBy: LibraryViewGroupBy) {
   switch (groupBy) {
     case "status":
-      return game.status;
+      return [game.status];
     case "priority":
-      return game.priority;
+      return [game.priority];
     case "platform":
-      return game.platform || "Sem plataforma";
+      return Array.from(new Set((game.platforms ?? [game.platform]).filter(Boolean))).map(
+        (platform) => platform || "Sem plataforma",
+      );
     case "sourceStore":
-      return game.sourceStore || "Sem origem";
+      return Array.from(new Set((game.stores ?? [game.sourceStore]).filter(Boolean))).map(
+        (store) => store || "Sem origem",
+      );
     case "ownership":
-      return record ? resolveLibraryEntrySemantics(record.libraryEntry).label : "Sem acesso";
+      return [record ? resolveLibraryEntrySemantics(record.libraryEntry).label : "Sem acesso"];
     case "none":
     default:
-      return "Todos";
+      return ["Todos"];
   }
 }
 
@@ -184,10 +188,12 @@ export function groupLibraryGames(
 
   const groups = new Map<string, Game[]>();
   for (const game of games) {
-    const label = resolveGroupLabel(game, recordsByEntryId.get(game.id), groupBy);
-    const current = groups.get(label);
-    if (current) current.push(game);
-    else groups.set(label, [game]);
+    const labels = resolveGroupLabels(game, recordsByEntryId.get(game.id), groupBy);
+    for (const label of labels) {
+      const current = groups.get(label);
+      if (current) current.push(game);
+      else groups.set(label, [game]);
+    }
   }
 
   return Array.from(groups.entries())

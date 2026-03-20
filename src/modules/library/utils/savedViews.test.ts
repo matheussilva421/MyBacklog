@@ -7,7 +7,9 @@ const baseGames = [
     id: 1,
     title: "Alan Wake 2",
     platform: "PC",
+    platforms: ["PC", "PS5"],
     sourceStore: "Epic",
+    stores: ["Epic", "Steam"],
     genre: "Survival Horror",
     status: "Jogando" as const,
     progress: 40,
@@ -24,7 +26,9 @@ const baseGames = [
     id: 2,
     title: "A Short Hike",
     platform: "Switch",
+    platforms: ["Switch"],
     sourceStore: "Nintendo eShop",
+    stores: ["Nintendo eShop"],
     genre: "Adventure",
     status: "Backlog" as const,
     progress: 0,
@@ -130,5 +134,19 @@ describe("savedViews helpers", () => {
     const grouped = groupLibraryGames(baseGames, recordsByEntryId, "ownership");
     expect(grouped).toHaveLength(1);
     expect(grouped[0]?.games).toHaveLength(2);
+  });
+
+  it("agrupa por plataformas estruturadas sem depender só da principal", () => {
+    const grouped = groupLibraryGames(baseGames, recordsByEntryId, "platform");
+
+    expect(grouped.map((group) => group.label)).toContain("PS5");
+    expect(grouped.find((group) => group.label === "PS5")?.games.map((game) => game.title)).toContain("Alan Wake 2");
+  });
+
+  it("agrupa por stores estruturadas sem depender só da origem principal", () => {
+    const grouped = groupLibraryGames(baseGames, recordsByEntryId, "sourceStore");
+
+    expect(grouped.map((group) => group.label)).toContain("Steam");
+    expect(grouped.find((group) => group.label === "Steam")?.games.map((game) => game.title)).toContain("Alan Wake 2");
   });
 });

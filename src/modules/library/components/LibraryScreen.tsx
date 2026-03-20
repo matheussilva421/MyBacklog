@@ -29,6 +29,7 @@ type LibraryScreenProps = {
   libraryGames: Game[];
   groupedLibraryGames: GroupedLibraryGames[];
   selectedGame?: Game;
+  selectedLibraryIds: number[];
   selectedGameLists: DbList[];
   filter: StatusFilter;
   selectedListFilter: LibraryListFilter;
@@ -47,10 +48,14 @@ type LibraryScreenProps = {
   onApplySavedView: (view: SavedView) => void;
   onDeleteSavedView: (viewId: number) => void;
   onSelectGame: (gameId: number) => void;
+  onToggleLibrarySelection: (gameId: number) => void;
+  onClearLibrarySelection: () => void;
+  onSelectVisibleLibraryGames: (gameIds: number[]) => void;
   onExport: () => void;
   onBackupExport: () => void;
   onOpenRestore: () => void;
   onOpenCreate: () => void;
+  onOpenBatchEdit: () => void;
   onOpenEdit: () => void;
   onDeleteSelected: () => void;
   onResumeSelected: () => void;
@@ -64,6 +69,7 @@ export function LibraryScreen({
   libraryGames,
   groupedLibraryGames,
   selectedGame,
+  selectedLibraryIds,
   selectedGameLists,
   filter,
   selectedListFilter,
@@ -82,10 +88,14 @@ export function LibraryScreen({
   onApplySavedView,
   onDeleteSavedView,
   onSelectGame,
+  onToggleLibrarySelection,
+  onClearLibrarySelection,
+  onSelectVisibleLibraryGames,
   onExport,
   onBackupExport,
   onOpenRestore,
   onOpenCreate,
+  onOpenBatchEdit,
   onOpenEdit,
   onDeleteSelected,
   onResumeSelected,
@@ -94,59 +104,90 @@ export function LibraryScreen({
   onOpenGamePage,
   onSendSelectedToPlanner,
 }: LibraryScreenProps) {
-  const renderLibraryCard = (game: Game) => (
-    <button
-      type="button"
-      key={game.id}
-      className={cx("library-card", selectedGame?.id === game.id && "library-card--active")}
-      onClick={() => onSelectGame(game.id)}
-    >
-      <div className="library-card__cover">
-        {game.coverUrl ? (
-          <img src={game.coverUrl} alt={`Capa de ${game.title}`} />
-        ) : (
-          <div className="library-card__cover-placeholder">
-            <ImageIcon size={18} />
-            <span>Sem capa</span>
-          </div>
-        )}
-      </div>
+  const visibleLibraryIds = libraryGames.map((game) => game.id);
+  const selectedCount = selectedLibraryIds.length;
 
-      <div className="library-card__content">
-        <div className="library-card__platform">
-          <span>{game.platform}</span>
-          <ArrowUpRight size={15} />
+  const renderLibraryCard = (game: Game) => {
+    const isSelected = selectedLibraryIds.includes(game.id);
+
+    return (
+      <article
+        key={game.id}
+        className={cx(
+          "library-card-shell",
+          selectedGame?.id === game.id && "library-card-shell--active",
+          isSelected && "library-card-shell--selected",
+        )}
+      >
+        <div className="library-card__toolbar">
+          <button
+            type="button"
+            className={cx("library-card__select", isSelected && "library-card__select--active")}
+            onClick={() => onToggleLibrarySelection(game.id)}
+            aria-pressed={isSelected}
+            aria-label={isSelected ? `Remover ${game.title} da seleção` : `Selecionar ${game.title}`}
+          >
+            {isSelected ? "Selecionado" : "Selecionar"}
+          </button>
+          <span className="library-card__toolbar-meta">
+            {(game.platforms ?? [game.platform]).slice(0, 2).join(" • ")}
+          </span>
         </div>
-        <h3>{game.title}</h3>
-        <p className="library-card__genre">{game.genre}</p>
-        <div className="library-card__chips">
-          <Pill tone={statusTone[game.status]}>{game.status}</Pill>
-          <Pill tone={priorityTone[game.priority]}>{game.priority}</Pill>
-        </div>
-        <div className="library-card__progress">
-          <div className="library-card__progress-head">
-            <span>Progresso</span>
-            <strong>{game.progress}%</strong>
+
+        <button
+          type="button"
+          className="library-card"
+          onClick={() => onSelectGame(game.id)}
+          aria-label={`Abrir ficha de ${game.title}`}
+        >
+          <div className="library-card__cover">
+            {game.coverUrl ? (
+              <img src={game.coverUrl} alt={`Capa de ${game.title}`} />
+            ) : (
+              <div className="library-card__cover-placeholder">
+                <ImageIcon size={18} />
+                <span>Sem capa</span>
+              </div>
+            )}
           </div>
-          <ProgressBar value={game.progress} tone="cyan" thin />
-        </div>
-        <div className="library-card__metrics">
-          <div>
-            <span>Nota</span>
-            <strong>{game.score.toFixed(1)}</strong>
+
+          <div className="library-card__content">
+            <div className="library-card__platform">
+              <span>{game.platform}</span>
+              <ArrowUpRight size={15} />
+            </div>
+            <h3>{game.title}</h3>
+            <p className="library-card__genre">{game.genre}</p>
+            <div className="library-card__chips">
+              <Pill tone={statusTone[game.status]}>{game.status}</Pill>
+              <Pill tone={priorityTone[game.priority]}>{game.priority}</Pill>
+            </div>
+            <div className="library-card__progress">
+              <div className="library-card__progress-head">
+                <span>Progresso</span>
+                <strong>{game.progress}%</strong>
+              </div>
+              <ProgressBar value={game.progress} tone="cyan" thin />
+            </div>
+            <div className="library-card__metrics">
+              <div>
+                <span>Nota</span>
+                <strong>{game.score.toFixed(1)}</strong>
+              </div>
+              <div>
+                <span>Horas</span>
+                <strong>{game.hours}h</strong>
+              </div>
+              <div>
+                <span>ETA</span>
+                <strong>{game.eta}</strong>
+              </div>
+            </div>
           </div>
-          <div>
-            <span>Horas</span>
-            <strong>{game.hours}h</strong>
-          </div>
-          <div>
-            <span>ETA</span>
-            <strong>{game.eta}</strong>
-          </div>
-        </div>
-      </div>
-    </button>
-  );
+        </button>
+      </article>
+    );
+  };
 
   return (
     <div className="library-layout">
@@ -178,6 +219,28 @@ export function LibraryScreen({
         />
 
         <div className="filter-stack">
+          <div className="library-batch-bar">
+            <div>
+              <strong>{selectedCount} selecionado(s)</strong>
+              <span>
+                {selectedCount > 0
+                  ? "Use a edição em lote para stores, plataformas, listas, tags, status e prioridade."
+                  : "Selecione itens para aplicar mudanças estruturadas em lote."}
+              </span>
+            </div>
+            <div className="panel-toolbar">
+              <NotchButton variant="secondary" onClick={() => onSelectVisibleLibraryGames(visibleLibraryIds)} disabled={visibleLibraryIds.length === 0}>
+                Selecionar filtrados
+              </NotchButton>
+              <NotchButton variant="ghost" onClick={onClearLibrarySelection} disabled={selectedCount === 0}>
+                Limpar seleção
+              </NotchButton>
+              <NotchButton variant="primary" onClick={onOpenBatchEdit} disabled={selectedCount === 0}>
+                Editar em lote
+              </NotchButton>
+            </div>
+          </div>
+
           <div className="filter-group">
             <span className="filter-group__label">Status</span>
             <div className="filter-bar">

@@ -14,14 +14,24 @@ function normalizeTokens(values: string[]): Set<string> {
   return new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean));
 }
 
+function getStructuredPlatformTokens(game: Game): Set<string> {
+  return normalizeTokens(game.platforms?.length ? game.platforms : [game.platform]);
+}
+
+function getStructuredStoreTokens(game: Game): Set<string> {
+  return normalizeTokens(game.stores?.length ? game.stores : [game.sourceStore]);
+}
+
 function getPreferenceBoost(game: Game, preferences?: PlannerPreferenceContext): number {
   if (!preferences) return 0;
 
   let boost = 0;
   const preferredPlatforms = normalizeTokens(preferences.primaryPlatforms);
   const preferredStores = normalizeTokens(preferences.defaultStores);
-  if (preferredPlatforms.has(game.platform.toLowerCase())) boost += 8;
-  if (preferredStores.has(game.sourceStore.toLowerCase())) boost += 5;
+  const gamePlatforms = getStructuredPlatformTokens(game);
+  const gameStores = getStructuredStoreTokens(game);
+  if (Array.from(gamePlatforms).some((platform) => preferredPlatforms.has(platform))) boost += 8;
+  if (Array.from(gameStores).some((store) => preferredStores.has(store))) boost += 5;
 
   switch (preferences.plannerPreference) {
     case "clear_backlog":
@@ -136,6 +146,8 @@ export function buildPlannerReason(
 ): string {
   const reasons: string[] = [];
   const etaHours = parseEtaHours(game.eta);
+  const preferredPlatforms = preferences ? normalizeTokens(preferences.primaryPlatforms) : null;
+  const preferredStores = preferences ? normalizeTokens(preferences.defaultStores) : null;
 
   if (goalSignals?.finishPressure && goalSignals.finishPressure >= 0.35 && game.progress > 0) {
     reasons.push("Empurra a meta de conclusão com progresso já acumulado.");
@@ -149,10 +161,20 @@ export function buildPlannerReason(
   if (goalSignals?.backlogPressure && goalSignals.backlogPressure >= 0.35 && game.status !== "Wishlist" && game.status !== "Terminado") {
     reasons.push("Reduz backlog parado ao transformar fila em avanço real.");
   }
-  if (preferences && normalizeTokens(preferences.primaryPlatforms).has(game.platform.toLowerCase())) {
+  if (
+    preferredPlatforms &&
+    Array.from(getStructuredPlatformTokens(game)).some((platform) =>
+      preferredPlatforms.has(platform),
+    )
+  ) {
     reasons.push("Roda na sua plataforma principal, com baixo atrito operacional.");
   }
-  if (preferences && normalizeTokens(preferences.defaultStores).has(game.sourceStore.toLowerCase())) {
+  if (
+    preferredStores &&
+    Array.from(getStructuredStoreTokens(game)).some((store) =>
+      preferredStores.has(store),
+    )
+  ) {
     reasons.push("Está dentro das suas fontes padrão e entra fácil no fluxo atual.");
   }
   if (cadence?.sessions30d && cadence.sessions30d >= 3) {

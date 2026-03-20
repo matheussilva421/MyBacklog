@@ -9,6 +9,7 @@ import type {
 import {
   createGameFormState,
   createSessionFormState,
+  type LibraryBatchEditState,
   type GameFormState,
   type GoalFormState,
   type LibraryListFilter,
@@ -26,6 +27,20 @@ function createGoalDraft(goal?: DbGoal): GoalFormState {
   };
 }
 
+function createBatchEditDraft(): LibraryBatchEditState {
+  return {
+    applyMode: "merge",
+    status: "",
+    priority: "",
+    primaryPlatform: "",
+    platforms: [],
+    primaryStore: "",
+    stores: [],
+    tags: "",
+    listIds: [],
+  };
+}
+
 export function useBacklogUiState(args: { preferences: AppPreferences }) {
   const { preferences } = args;
   const [screen, setScreen] = useState<ScreenKey>("dashboard");
@@ -36,9 +51,12 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
   const [librarySortDirection, setLibrarySortDirection] = useState<LibraryViewSortDirection>("desc");
   const [libraryGroupBy, setLibraryGroupBy] = useState<LibraryViewGroupBy>("none");
   const [selectedGameId, setSelectedGameId] = useState(0);
+  const [selectedLibraryIds, setSelectedLibraryIds] = useState<number[]>([]);
 
   const [gameModalMode, setGameModalMode] = useState<"create" | "edit" | null>(null);
   const [gameForm, setGameForm] = useState<GameFormState>(() => createGameFormState());
+  const [batchEditModalOpen, setBatchEditModalOpen] = useState(false);
+  const [batchEditForm, setBatchEditForm] = useState<LibraryBatchEditState>(() => createBatchEditDraft());
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
   const [sessionForm, setSessionForm] = useState<SessionFormState>(() => createSessionFormState());
   const [sessionEditId, setSessionEditId] = useState<number | null>(null);
@@ -62,6 +80,11 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
   };
 
   const closeGameModal = () => setGameModalMode(null);
+  const openBatchEditModal = () => {
+    setBatchEditForm(createBatchEditDraft());
+    setBatchEditModalOpen(true);
+  };
+  const closeBatchEditModal = () => setBatchEditModalOpen(false);
 
   const openSessionModal = (gameId?: number) => {
     setSessionEditId(null);
@@ -124,10 +147,21 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
 
   const handleGameFormChange = <K extends keyof GameFormState>(field: K, value: GameFormState[K]) =>
     setGameForm((current) => ({ ...current, [field]: value }));
+  const handleBatchEditFormChange = <K extends keyof LibraryBatchEditState>(
+    field: K,
+    value: LibraryBatchEditState[K],
+  ) => setBatchEditForm((current) => ({ ...current, [field]: value }));
   const handleSessionFormChange = <K extends keyof SessionFormState>(field: K, value: SessionFormState[K]) =>
     setSessionForm((current) => ({ ...current, [field]: value }));
   const handleGoalFormChange = <K extends keyof GoalFormState>(field: K, value: GoalFormState[K]) =>
     setGoalForm((current) => ({ ...current, [field]: value }));
+  const toggleLibrarySelection = (gameId: number) =>
+    setSelectedLibraryIds((current) =>
+      current.includes(gameId) ? current.filter((id) => id !== gameId) : [...current, gameId],
+    );
+  const clearLibrarySelection = () => setSelectedLibraryIds([]);
+  const selectVisibleLibraryGames = (gameIds: number[]) =>
+    setSelectedLibraryIds(Array.from(new Set(gameIds.filter((gameId) => gameId > 0))));
 
   return {
     screen,
@@ -147,10 +181,16 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
     setLibraryGroupBy,
     selectedGameId,
     setSelectedGameId,
+    selectedLibraryIds,
+    setSelectedLibraryIds,
     gameModalMode,
     setGameModalMode,
     gameForm,
     setGameForm,
+    batchEditModalOpen,
+    setBatchEditModalOpen,
+    batchEditForm,
+    setBatchEditForm,
     sessionModalOpen,
     setSessionModalOpen,
     sessionForm,
@@ -167,6 +207,8 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
     guidedTourOriginScreen,
     openCreateGameModal,
     closeGameModal,
+    openBatchEditModal,
+    closeBatchEditModal,
     openSessionModal,
     closeSessionModal,
     openEditSessionModal,
@@ -178,7 +220,11 @@ export function useBacklogUiState(args: { preferences: AppPreferences }) {
     nextGuidedTourStep,
     previousGuidedTourStep,
     handleGameFormChange,
+    handleBatchEditFormChange,
     handleSessionFormChange,
     handleGoalFormChange,
+    toggleLibrarySelection,
+    clearLibrarySelection,
+    selectVisibleLibraryGames,
   };
 }

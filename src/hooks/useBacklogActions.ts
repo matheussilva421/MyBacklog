@@ -3,7 +3,15 @@ import { db } from "../core/db";
 import {
   syncStructuredRelationsForRecord,
 } from "../core/structuredDataSync";
-import { buildPlatformNamesByGameId, buildStoreNamesByEntryId } from "../core/structuredRelations";
+import {
+  buildPlatformNamesByGameId,
+  buildStoreNamesByEntryId,
+  derivePrimaryPlatform,
+  derivePrimaryStore,
+  resolveStructuredPlatforms,
+  resolveStructuredStores,
+} from "../core/structuredRelations";
+import { splitCsvTokens } from "../core/utils";
 import type {
   Game as DbGameMetadata,
   Goal as DbGoal,
@@ -31,11 +39,14 @@ import {
   onboardingGoalTemplates,
   parseBackupText,
   parseImportText,
+  priorityToDbPriority,
   preferencesToSettingPairs,
   recordToImportPayload,
+  statusToDbStatus,
   type BackupPayload,
   type BackupTables,
   type Game,
+  type LibraryBatchEditState,
   type GameFormState,
   type GoalFormState,
   type ImportPayload,
@@ -76,9 +87,11 @@ type UseBacklogActionsArgs = {
   selectedRecord?: LibraryRecord;
   selectedGame?: Game;
   selectedListFilter: LibraryListFilter;
+  selectedLibraryIds: number[];
   currentLibraryView: LibraryViewState;
   gameModalMode: "create" | "edit" | null;
   gameForm: GameFormState;
+  batchEditForm: LibraryBatchEditState;
   sessionForm: SessionFormState;
   sessionEditId: number | null;
   goalForm: GoalFormState;
@@ -100,9 +113,11 @@ type UseBacklogActionsArgs = {
   setLibraryGroupBy: (value: LibraryViewGroupBy) => void;
   setQuery: (value: string) => void;
   setGameModalMode: (value: "create" | "edit" | null) => void;
+  setSelectedLibraryIds: (value: number[]) => void;
   setSessionModalOpen: (value: boolean) => void;
   setSessionEditId: (value: number | null) => void;
   setGoalModalMode: (value: "create" | "edit" | null) => void;
+  setBatchEditModalOpen: (value: boolean) => void;
 };
 
 async function fetchRawgCandidateMap(
@@ -163,6 +178,11 @@ function logRawgWarning(message: string, error: unknown) {
   console.warn(message, error);
 }
 
+function mergeTokenLists(current: string[], incoming: string[], mode: "merge" | "replace"): string[] {
+  if (incoming.length === 0) return current;
+  return mode === "replace" ? splitCsvTokens(incoming) : splitCsvTokens([...current, ...incoming]);
+}
+
 export function useBacklogActions({
   records,
   libraryEntryRows,
@@ -171,9 +191,11 @@ export function useBacklogActions({
   selectedRecord,
   selectedGame,
   selectedListFilter,
+  selectedLibraryIds,
   currentLibraryView,
   gameModalMode,
   gameForm,
+  batchEditForm,
   sessionForm,
   sessionEditId,
   goalForm,
@@ -195,9 +217,11 @@ export function useBacklogActions({
   setLibraryGroupBy,
   setQuery,
   setGameModalMode,
+  setSelectedLibraryIds,
   setSessionModalOpen,
   setSessionEditId,
   setGoalModalMode,
+  setBatchEditModalOpen,
 }: UseBacklogActionsArgs) {
   const persistSession = async (payload: {
     sessionId?: number | null;
@@ -1087,6 +1111,165 @@ export function useBacklogActions({
     setNotice(nextListIds.length > 0 ? "Listas sincronizadas para este jogo." : "Jogo removido de todas as listas.");
   };
 
+  const handleBatchEditSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const entryIds = Array.from(new Set(selectedLibraryIds)).filter((entryId) => entryId > 0);
+    if (entryIds.length === 0) {
+      setNotice("Selecione ao menos um jogo para editar em lote.");
+      return;
+    }
+
+    const normalizedStores = splitCsvTokens(batchEditForm.stores);
+    const normalizedPlatforms = splitCsvTokens(batchEditForm.platforms);
+    const normalizedTagNames = splitCsvTokens(batchEditForm.tags);
+    const validListIds = Array.from(new Set(batchEditForm.listIds)).filter((listId) =>
+      listRows.some((list) => list.id === listId),
+    );
+    const hasChanges =
+      normalizedStores.length > 0 ||
+      normalizedPlatforms.length > 0 ||
+      normalizedTagNames.length > 0 ||
+      validListIds.length > 0 ||
+      batchEditForm.applyMode === "replace" ||
+      Boolean(batchEditForm.status) ||
+      Boolean(batchEditForm.priority) ||
+      Boolean(batchEditForm.primaryPlatform.trim()) ||
+      Boolean(batchEditForm.primaryStore.trim());
+
+    if (!hasChanges) {
+      setNotice("Defina ao menos um campo para aplicar na edição em lote.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await db.transaction(
+        "rw",
+        [
+          db.games,
+          db.libraryEntries,
+          db.stores,
+          db.libraryEntryStores,
+          db.platforms,
+          db.gamePlatforms,
+          db.tags,
+          db.gameTags,
+          db.libraryEntryLists,
+        ],
+        async () => {
+          const entries = (await db.libraryEntries.bulkGet(entryIds)).filter(
+            (entry): entry is DbLibraryEntry => Boolean(entry?.id),
+          );
+          const gamesById = new Map(
+            (await db.games.bulkGet(Array.from(new Set(entries.map((entry) => entry.gameId)))))
+              .filter((game): game is DbGameMetadata => Boolean(game?.id))
+              .map((game) => [game.id, game] as const),
+          );
+          const storeRows = await db.stores.toArray();
+          const libraryEntryStoreRows = await db.libraryEntryStores.where("libraryEntryId").anyOf(entryIds).toArray();
+          const platformRows = await db.platforms.toArray();
+          const gamePlatformRows = await db.gamePlatforms.where("gameId").anyOf(Array.from(new Set(entries.map((entry) => entry.gameId)))).toArray();
+          const storeNamesByEntryId = buildStoreNamesByEntryId(storeRows, libraryEntryStoreRows);
+          const platformNamesByGameId = buildPlatformNamesByGameId(platformRows, gamePlatformRows);
+          const currentTagRows = await db.tags.toArray();
+          const tagsByName = new Map(currentTagRows.map((tag) => [tag.name.trim().toLowerCase(), tag] as const));
+          const ensuredTagIds: number[] = [];
+
+          for (const tagName of normalizedTagNames) {
+            const key = tagName.trim().toLowerCase();
+            if (!key) continue;
+            const existing = tagsByName.get(key);
+            if (existing?.id != null) {
+              ensuredTagIds.push(existing.id);
+              continue;
+            }
+            const tagId = Number(await db.tags.add({ name: tagName }));
+            tagsByName.set(key, { id: tagId, name: tagName });
+            ensuredTagIds.push(tagId);
+          }
+
+          const now = new Date().toISOString();
+          for (const entry of entries) {
+            const game = gamesById.get(entry.gameId);
+            if (!game?.id || !entry.id) continue;
+
+            const existingStores = resolveStructuredStores(entry, storeNamesByEntryId);
+            const existingPlatforms = resolveStructuredPlatforms(game, entry.platform, platformNamesByGameId);
+            const nextStores = mergeTokenLists(existingStores, normalizedStores, batchEditForm.applyMode);
+            const nextPlatforms = mergeTokenLists(existingPlatforms, normalizedPlatforms, batchEditForm.applyMode);
+            const nextEntry: DbLibraryEntry = {
+              ...entry,
+              sourceStore: batchEditForm.primaryStore.trim() || derivePrimaryStore(nextStores, entry.sourceStore),
+              platform: batchEditForm.primaryPlatform.trim() || derivePrimaryPlatform(nextPlatforms, entry.platform),
+              ownershipStatus: batchEditForm.status ? (batchEditForm.status === "Wishlist" ? "wishlist" : "owned") : entry.ownershipStatus,
+              progressStatus: batchEditForm.status ? statusToDbStatus(batchEditForm.status) : entry.progressStatus,
+              priority: batchEditForm.priority ? priorityToDbPriority(batchEditForm.priority) : entry.priority,
+              updatedAt: now,
+            };
+            const nextGame: DbGameMetadata = {
+              ...game,
+              platforms: nextPlatforms.join(", "),
+              updatedAt: now,
+            };
+
+            await db.libraryEntries.put(nextEntry);
+            await db.games.put(nextGame);
+            await syncStructuredRelationsForRecord({
+              game: nextGame,
+              libraryEntry: nextEntry,
+              extraStoreNames: nextStores,
+              extraPlatformNames: nextPlatforms,
+            });
+
+            const currentListRelations = await db.libraryEntryLists.where("libraryEntryId").equals(entry.id).toArray();
+            const currentListIds = currentListRelations.map((relation) => relation.listId);
+            const nextListIds =
+              batchEditForm.applyMode === "replace"
+                ? validListIds
+                : Array.from(new Set([...currentListIds, ...validListIds]));
+            for (const relation of currentListRelations) {
+              if (!nextListIds.includes(relation.listId) && relation.id != null) {
+                await db.libraryEntryLists.delete(relation.id);
+              }
+            }
+            for (const listId of nextListIds) {
+              if (!currentListIds.includes(listId)) {
+                await db.libraryEntryLists.add({ libraryEntryId: entry.id, listId, createdAt: now });
+              }
+            }
+
+            const currentTagRelations = await db.gameTags.where("libraryEntryId").equals(entry.id).toArray();
+            const currentTagIds = currentTagRelations.map((relation) => relation.tagId);
+            const nextTagIds =
+              batchEditForm.applyMode === "replace"
+                ? ensuredTagIds
+                : Array.from(new Set([...currentTagIds, ...ensuredTagIds]));
+            for (const relation of currentTagRelations) {
+              if (!nextTagIds.includes(relation.tagId) && relation.id != null) {
+                await db.gameTags.delete(relation.id);
+              }
+            }
+            for (const tagId of nextTagIds) {
+              if (!currentTagIds.includes(tagId)) {
+                await db.gameTags.add({ libraryEntryId: entry.id, tagId });
+              }
+            }
+          }
+        },
+      );
+
+      await refreshData();
+      setBatchEditModalOpen(false);
+      setSelectedLibraryIds([]);
+      setNotice(`Edição em lote aplicada a ${entryIds.length} jogo(s).`);
+    } catch (error) {
+      setNotice(`Falha na edição em lote: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleDeleteSelectedGame = async () => {
     if (!selectedRecord || !selectedGame) return;
     const confirmed = window.confirm(`Excluir ${selectedGame.title} da biblioteca?`);
@@ -1667,6 +1850,7 @@ export function useBacklogActions({
     handleGameReviewSave,
     handleGameTagsSave,
     handleGameListsSave,
+    handleBatchEditSubmit,
     handleDeleteSelectedGame,
     handleResumeSelectedGame,
     handleFavoriteSelectedGame,

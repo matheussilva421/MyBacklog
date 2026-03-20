@@ -73,6 +73,7 @@ const GamePageScreen = lazyNamed(
 );
 
 const GameModal = lazyNamed(() => import("./backlog-modals"), "GameModal");
+const BatchEditModal = lazyNamed(() => import("./backlog-modals"), "BatchEditModal");
 const GoalModal = lazyNamed(() => import("./backlog-modals"), "GoalModal");
 const ImportModal = lazyNamed(() => import("./backlog-modals"), "ImportModal");
 const RestoreModal = lazyNamed(() => import("./backlog-modals"), "RestoreModal");
@@ -254,6 +255,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
         libraryGames={app.libraryGames}
         groupedLibraryGames={app.groupedLibraryGames}
         selectedGame={app.selectedGame}
+        selectedLibraryIds={app.selectedLibraryIds}
         selectedGameLists={app.selectedGameLists}
         filter={app.filter}
         selectedListFilter={app.selectedListFilter}
@@ -272,10 +274,14 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
         onApplySavedView={app.handleApplySavedView}
         onDeleteSavedView={(viewId: number) => void app.handleDeleteSavedView(viewId)}
         onSelectGame={(gameId: number) => app.setSelectedGameId(gameId)}
+        onToggleLibrarySelection={app.toggleLibrarySelection}
+        onClearLibrarySelection={app.clearLibrarySelection}
+        onSelectVisibleLibraryGames={app.selectVisibleLibraryGames}
         onExport={app.handleExport}
         onBackupExport={app.handleBackupExport}
         onOpenRestore={app.openRestoreFlow}
         onOpenCreate={app.openCreateGameModal}
+        onOpenBatchEdit={app.openBatchEditModal}
         onOpenEdit={app.openEditGameModal}
         onDeleteSelected={app.handleDeleteSelectedGame}
         onResumeSelected={app.handleResumeSelectedGame}
@@ -611,6 +617,26 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
             onClose={app.closeGameModal}
             onChange={app.handleGameFormChange}
             onSubmit={app.handleGameSubmit}
+          />
+        </Suspense>
+      ) : null}
+
+      {app.batchEditModalOpen ? (
+        <Suspense fallback={null}>
+          <BatchEditModal
+            open={app.batchEditModalOpen}
+            form={app.batchEditForm}
+            selectedGames={app.selectedBatchGames}
+            availableStores={app.storeRows.map((store) => store.name)}
+            availablePlatforms={app.platforms.map((platform) => platform.name)}
+            availableTags={app.tagRows.map((tag) => tag.name)}
+            availableLists={app.listRows
+              .filter((list) => list.id != null)
+              .map((list) => ({ id: list.id as number, name: list.name }))}
+            submitting={app.submitting}
+            onClose={app.closeBatchEditModal}
+            onChange={app.handleBatchEditFormChange}
+            onSubmit={app.handleBatchEditSubmit}
           />
         </Suspense>
       ) : null}
