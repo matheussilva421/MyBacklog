@@ -9,75 +9,17 @@ import {
   Upload,
   Zap,
 } from "lucide-react";
-import {
-  Suspense,
-  lazy,
-  useEffect,
-  type ComponentType,
-} from "react";
+import { useEffect } from "react";
 import type { User } from "firebase/auth";
 import { cx, navigationItems } from "../backlog/shared";
 import { NotchButton, Panel, Pill, SectionHeader, SidebarItem, Tag } from "./cyberpunk-ui";
 import { useBacklogApp } from "../hooks/useBacklogApp";
-import { useCloudSync, type SyncMode } from "../hooks/useCloudSync";
+import type { SyncMode } from "../hooks/useCloudSync";
+import { useAppShellSync } from "../hooks/useAppShellSync";
 import { GuidedTourModal } from "../modules/onboarding/components/GuidedTourModal";
 import { OnboardingScreen } from "../modules/onboarding/components/OnboardingScreen";
-
-function lazyNamed<TModule extends Record<string, unknown>, TKey extends keyof TModule>(
-  loader: () => Promise<TModule>,
-  key: TKey,
-) {
-  return lazy(async () => {
-    const module = await loader();
-    return {
-      default: module[key] as ComponentType<Record<string, unknown>>,
-    };
-  });
-}
-
-const DashboardScreen = lazyNamed(
-  () => import("../modules/dashboard/components/DashboardScreen"),
-  "DashboardScreen",
-);
-const LibraryScreen = lazyNamed(
-  () => import("../modules/library/components/LibraryScreen"),
-  "LibraryScreen",
-);
-const CatalogMaintenanceScreen = lazyNamed(
-  () => import("../modules/catalog-maintenance/components/CatalogMaintenanceScreen"),
-  "CatalogMaintenanceScreen",
-);
-const SyncCenterScreen = lazyNamed(
-  () => import("../modules/sync-center/components/SyncCenterScreen"),
-  "SyncCenterScreen",
-);
-const SessionsScreen = lazyNamed(
-  () => import("../modules/sessions/components/SessionsScreen"),
-  "SessionsScreen",
-);
-const PlannerScreen = lazyNamed(
-  () => import("../modules/planner/components/PlannerScreen"),
-  "PlannerScreen",
-);
-const StatsScreen = lazyNamed(
-  () => import("../modules/stats/components/StatsScreen"),
-  "StatsScreen",
-);
-const ProfileScreen = lazyNamed(
-  () => import("../modules/settings/components/ProfileScreen"),
-  "ProfileScreen",
-);
-const GamePageScreen = lazyNamed(
-  () => import("../modules/game-page/components/GamePageScreen"),
-  "GamePageScreen",
-);
-
-const GameModal = lazyNamed(() => import("./backlog-modals"), "GameModal");
-const BatchEditModal = lazyNamed(() => import("./backlog-modals"), "BatchEditModal");
-const GoalModal = lazyNamed(() => import("./backlog-modals"), "GoalModal");
-const ImportModal = lazyNamed(() => import("./backlog-modals"), "ImportModal");
-const RestoreModal = lazyNamed(() => import("./backlog-modals"), "RestoreModal");
-const SessionModal = lazyNamed(() => import("./backlog-modals"), "SessionModal");
+import { AppShellModals } from "./AppShellModals";
+import { AppShellScreenContent } from "./AppShellScreenContent";
 
 function ModuleFallback({ message = "Carregando módulo..." }: { message?: string }) {
   return (
@@ -148,54 +90,15 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
     cloudExportedAt,
     lastSuccessfulSyncAt,
     syncHistory,
-    triggerSyncToCloud,
     pushLocalToCloud,
     pullCloudToLocal,
     mergeLocalAndCloud,
     workLocal,
-  } = useCloudSync({
-    user: isAuthEnabled ? user : null,
-    isAuthEnabled,
-    autoSyncEnabled: app.preferences.autoSyncEnabled,
-    readBackupTables: app.readBackupTables,
-    refreshData: app.refreshData,
-    setNotice: app.setNotice,
-  });
+  } = useAppShellSync({ app, user, isAuthEnabled });
   const guidedTourOpen = app.guidedTourOpen;
   const guidedTourScreen = app.guidedTourStep.screen;
   const currentScreen = app.screen;
   const setScreen = app.setScreen;
-
-  useEffect(() => {
-    if (!isAuthEnabled || !user || app.loading || !app.preferences.autoSyncEnabled) {
-      return;
-    }
-
-    void triggerSyncToCloud();
-  }, [
-    app.games,
-    app.reviewRows,
-    app.tagRows,
-    app.gameTagRows,
-    app.goalRows,
-    app.listRows,
-    app.libraryEntryListRows,
-    app.savedViewRows,
-    app.platforms,
-    app.loading,
-    app.preferences.autoSyncEnabled,
-    app.preferences.operatorName,
-    app.preferences.plannerPreference,
-    app.preferences.rawgApiKey,
-    app.preferences.onboardingCompleted,
-    app.preferences.guidedTourCompleted,
-    app.preferences.primaryPlatforms,
-    app.preferences.defaultStores,
-    app.sessionRows,
-    isAuthEnabled,
-    triggerSyncToCloud,
-    user,
-  ]);
 
   useEffect(() => {
     if (!guidedTourOpen) return;
@@ -230,205 +133,6 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
   }
 
   const syncCopy = describeSyncMode(syncMode, isAuthEnabled);
-
-  let screenContent = null;
-
-  if (app.screen === "dashboard") {
-    screenContent = (
-      <DashboardScreen
-        stats={app.stats}
-        monthlyProgress={app.monthlyProgress}
-        platformData={app.platformData}
-        storeData={app.storeData}
-        continuePlayingGames={app.continuePlayingGames}
-        visiblePlannerQueue={app.visiblePlannerQueue}
-        personalBadges={app.personalBadges}
-        monthlyRecap={app.monthlyRecap}
-        findGame={app.findGame}
-        onOpenLibrary={app.openLibraryGame}
-        onOpenGamePage={app.openGamePage}
-        onOpenPlanner={() => app.setScreen("planner")}
-      />
-    );
-  } else if (app.screen === "library") {
-    screenContent = (
-      <LibraryScreen
-        libraryGames={app.libraryGames}
-        groupedLibraryGames={app.groupedLibraryGames}
-        selectedGame={app.selectedGame}
-        selectedLibraryIds={app.selectedLibraryIds}
-        selectedGameLists={app.selectedGameLists}
-        filter={app.filter}
-        selectedListFilter={app.selectedListFilter}
-        sortBy={app.librarySortBy}
-        sortDirection={app.librarySortDirection}
-        groupBy={app.libraryGroupBy}
-        listOptions={app.listOptions}
-        savedViews={app.savedViewRows}
-        activeSavedView={app.activeSavedView}
-        onFilterChange={(value: typeof app.filter) => app.setFilter(value)}
-        onListFilterChange={(value: typeof app.selectedListFilter) => app.setSelectedListFilter(value)}
-        onSortByChange={app.setLibrarySortBy}
-        onSortDirectionChange={app.setLibrarySortDirection}
-        onGroupByChange={app.setLibraryGroupBy}
-        onSaveCurrentView={() => void app.handleSaveLibraryView()}
-        onApplySavedView={app.handleApplySavedView}
-        onDeleteSavedView={(viewId: number) => void app.handleDeleteSavedView(viewId)}
-        onSelectGame={(gameId: number) => app.setSelectedGameId(gameId)}
-        onToggleLibrarySelection={app.toggleLibrarySelection}
-        onClearLibrarySelection={app.clearLibrarySelection}
-        onSelectVisibleLibraryGames={app.selectVisibleLibraryGames}
-        onExport={app.handleExport}
-        onBackupExport={app.handleBackupExport}
-        onOpenRestore={app.openRestoreFlow}
-        onOpenCreate={app.openCreateGameModal}
-        onOpenBatchEdit={app.openBatchEditModal}
-        onOpenEdit={app.openEditGameModal}
-        onDeleteSelected={app.handleDeleteSelectedGame}
-        onResumeSelected={app.handleResumeSelectedGame}
-        onFavoriteSelected={app.handleFavoriteSelectedGame}
-        onOpenSession={app.openSessionModal}
-        onOpenGamePage={app.openGamePage}
-        onSendSelectedToPlanner={app.handleSendSelectedToPlanner}
-      />
-    );
-  } else if (app.screen === "maintenance") {
-    screenContent = (
-      <CatalogMaintenanceScreen
-        report={app.catalogMaintenanceReport}
-        hasRawgApiKey={Boolean(app.preferences.rawgApiKey.trim())}
-        onRepairStructural={app.handleCatalogRepair}
-        onMergeDuplicateGroup={app.handleCatalogDuplicateMerge}
-        onNormalizeEntry={app.handleCatalogNormalizeEntry}
-        onNormalizeQueue={app.handleCatalogNormalizeQueue}
-        onConsolidateAliasGroup={app.handleCatalogConsolidateAliasGroup}
-        onEnrichMetadata={app.handleCatalogMetadataEnrich}
-        onEnrichMetadataQueue={app.handleCatalogMetadataEnrichQueue}
-        onOpenGamePage={app.openGamePage}
-        onOpenEditGame={app.openEditGameModalFor}
-      />
-    );
-  } else if (app.screen === "sync") {
-    screenContent = (
-      <SyncCenterScreen
-        isAuthEnabled={isAuthEnabled}
-        isOnline={isOnline}
-        isSyncing={isSyncing}
-        syncMode={syncMode}
-        autoSyncEnabled={app.preferences.autoSyncEnabled}
-        comparison={comparison}
-        syncHistory={syncHistory}
-        lastSuccessfulSyncAt={lastSuccessfulSyncAt}
-        cloudExportedAt={cloudExportedAt}
-        onPushLocal={pushLocalToCloud}
-        onPullCloud={pullCloudToLocal}
-        onMerge={mergeLocalAndCloud}
-        onWorkLocal={workLocal}
-        onOpenSettings={() => app.setScreen("profile")}
-      />
-    );
-  } else if (app.screen === "planner") {
-    screenContent = (
-      <PlannerScreen
-        visiblePlannerQueue={app.visiblePlannerQueue}
-        goalProgress={app.goalProgress}
-        goalRows={app.goalRows}
-        systemRules={app.systemRules}
-        findGame={app.findGame}
-        onOpenGamePage={app.openGamePage}
-        onCreateGoal={app.openCreateGoalModal}
-        onEditGoal={app.openEditGoalModal}
-        onDeleteGoal={app.handleGoalDelete}
-      />
-    );
-  } else if (app.screen === "sessions") {
-    screenContent = (
-      <SessionsScreen
-        games={app.games}
-        sessions={app.sessionRows}
-        query={app.deferredQuery}
-        onQuickRegister={app.handleQuickSessionCreate}
-        onEditSession={app.openEditSessionModal}
-        onDeleteSession={app.handleSessionDelete}
-        onOpenGamePage={app.openGamePage}
-      />
-    );
-  } else if (app.screen === "stats") {
-    screenContent = (
-      <StatsScreen
-        durationBuckets={app.durationBuckets}
-        monthlyHours={app.monthlyHours}
-        platformData={app.platformData}
-        storeData={app.storeData}
-        platforms={app.platforms}
-        importJobs={app.importJobRows}
-        visibleSessions={app.visibleSessions}
-        games={app.games}
-        findGame={app.findGame}
-        onEditSession={app.openEditSessionModal}
-        onDeleteSession={app.handleSessionDelete}
-        onClearImportHistory={app.handleClearImportHistory}
-        onManagePlatforms={() => app.setScreen("profile")}
-      />
-    );
-  } else if (app.screen === "profile") {
-    screenContent = (
-      <ProfileScreen
-        personalBadges={app.personalBadges}
-        totalGames={app.stats.total}
-        totalHours={app.stats.hours}
-        preferences={app.preferences}
-        listRows={app.listRows}
-        catalogAuditReport={app.catalogAuditReport}
-        onPreferencesSave={app.handlePreferencesSave}
-        onListCreate={app.handleListCreate}
-        onListDelete={app.handleListDelete}
-        onRepairCatalog={app.handleCatalogRepair}
-        onOpenMaintenance={() => app.setScreen("maintenance")}
-        onOpenGuidedTour={() => app.openGuidedTour("profile")}
-      />
-    );
-  } else if (app.screen === "game") {
-    screenContent = app.selectedGamePage ? (
-      <GamePageScreen
-        key={[
-          app.selectedGamePage.game.id,
-          app.selectedGamePage.review?.score ?? "",
-          app.selectedGamePage.review?.shortReview ?? "",
-          app.selectedGamePage.review?.longReview ?? "",
-          app.selectedGamePage.tags.map((tag) => tag.id).join(","),
-          app.selectedGamePage.lists.map((list) => list.id).join(","),
-          app.selectedGamePage.sessions.length,
-        ].join("|")}
-        data={app.selectedGamePage}
-        availableLists={app.listOptions.map((list) => ({ id: list.id, name: list.name }))}
-        onBack={() => app.openLibraryGame(app.selectedGamePage?.game.id)}
-        onOpenEdit={app.openEditGameModal}
-        onOpenSession={app.openSessionModal}
-        onEditSession={app.openEditSessionModal}
-        onDeleteSession={app.handleSessionDelete}
-        onToggleFavorite={app.handleFavoriteSelectedGame}
-        onSendToPlanner={app.handleSendSelectedToPlanner}
-        onDelete={app.handleDeleteSelectedGame}
-        onSaveReview={app.handleGameReviewSave}
-        onSaveTags={app.handleGameTagsSave}
-        onSaveLists={app.handleGameListsSave}
-      />
-    ) : (
-      <Panel>
-        <SectionHeader
-          icon={Cpu}
-          title="Página do jogo"
-          description="Selecione um item da biblioteca, dashboard ou planner para abrir a ficha dedicada."
-          action={
-            <NotchButton variant="secondary" onClick={() => app.openLibraryGame()}>
-              Catálogo
-            </NotchButton>
-          }
-        />
-      </Panel>
-    );
-  }
 
   return (
     <div className={cx("app-shell", app.guidedTourOpen && "app-shell--touring")}>
@@ -593,7 +297,21 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
                 "tour-focus",
             )}
           >
-            <Suspense fallback={<ModuleFallback />}>{screenContent}</Suspense>
+            <AppShellScreenContent
+              app={app}
+              isAuthEnabled={isAuthEnabled}
+              isOnline={isOnline}
+              isSyncing={isSyncing}
+              syncMode={syncMode}
+              comparison={comparison}
+              cloudExportedAt={cloudExportedAt}
+              lastSuccessfulSyncAt={lastSuccessfulSyncAt}
+              syncHistory={syncHistory}
+              pushLocalToCloud={pushLocalToCloud}
+              pullCloudToLocal={pullCloudToLocal}
+              mergeLocalAndCloud={mergeLocalAndCloud}
+              workLocal={workLocal}
+            />
           </div>
         </main>
       </div>
@@ -610,116 +328,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
         onFinish={app.finishGuidedTour}
       />
 
-      {app.gameModalMode ? (
-        <Suspense fallback={null}>
-          <GameModal
-            mode={app.gameModalMode}
-            form={app.gameForm}
-            availableStores={app.storeRows.map((store) => store.name)}
-            availablePlatforms={app.platforms.map((platform) => platform.name)}
-            rawgApiKey={app.preferences.rawgApiKey}
-            submitting={app.submitting}
-            onClose={app.closeGameModal}
-            onChange={app.handleGameFormChange}
-            onSubmit={app.handleGameSubmit}
-          />
-        </Suspense>
-      ) : null}
-
-      {app.batchEditModalOpen ? (
-        <Suspense fallback={null}>
-          <BatchEditModal
-            open={app.batchEditModalOpen}
-            form={app.batchEditForm}
-            selectedGames={app.selectedBatchGames}
-            availableStores={app.storeRows.map((store) => store.name)}
-            availablePlatforms={app.platforms.map((platform) => platform.name)}
-            availableTags={app.tagRows.map((tag) => tag.name)}
-            availableLists={app.listRows
-              .filter((list) => list.id != null)
-              .map((list) => ({ id: list.id as number, name: list.name }))}
-            submitting={app.submitting}
-            onClose={app.closeBatchEditModal}
-            onChange={app.handleBatchEditFormChange}
-            onSubmit={app.handleBatchEditSubmit}
-          />
-        </Suspense>
-      ) : null}
-
-      {app.sessionModalOpen ? (
-        <Suspense fallback={null}>
-          <SessionModal
-            open={app.sessionModalOpen}
-            mode={app.sessionEditId != null ? "edit" : "create"}
-            form={app.sessionForm}
-            libraryGames={app.games}
-            submitting={app.submitting}
-            onClose={app.closeSessionModal}
-            onChange={app.handleSessionFormChange}
-            onSubmit={app.handleSessionSubmit}
-          />
-        </Suspense>
-      ) : null}
-
-      {app.goalModalMode ? (
-        <Suspense fallback={null}>
-          <GoalModal
-            mode={app.goalModalMode}
-            form={app.goalForm}
-            submitting={app.submitting}
-            onClose={app.closeGoalModal}
-            onChange={app.handleGoalFormChange}
-            onSubmit={app.handleGoalSubmit}
-          />
-        </Suspense>
-      ) : null}
-
-      {app.importModalOpen ? (
-        <Suspense fallback={null}>
-          <ImportModal
-            open={app.importModalOpen}
-            source={app.importSource}
-            text={app.importText}
-            fileName={app.importFileName}
-            preview={app.importPreview}
-            summary={app.importPreviewSummary}
-            fileInputRef={app.importFileInputRef}
-            submitting={app.submitting}
-            onClose={app.closeImportFlow}
-            onSourceChange={app.handleImportSourceChange}
-            onTextChange={app.handleImportTextChange}
-            onFileChange={app.handleImportFileChange}
-            onActionChange={app.handleImportPreviewActionChange}
-            onMatchChange={app.handleImportPreviewMatchChange}
-            onGameChange={app.handleImportPreviewGameChange}
-            onRawgChange={app.handleImportPreviewRawgChange}
-            onApplySuggested={app.handleImportPreviewApplySuggested}
-            onAutoMergeSafe={app.handleImportPreviewAutoMergeSafe}
-            onIgnoreUnsafe={app.handleImportPreviewIgnoreUnsafe}
-            onSubmit={app.handleImportSubmit}
-          />
-        </Suspense>
-      ) : null}
-
-      {app.restoreModalOpen ? (
-        <Suspense fallback={null}>
-          <RestoreModal
-            open={app.restoreModalOpen}
-            mode={app.restoreMode}
-            text={app.restoreText}
-            fileName={app.restoreFileName}
-            preview={app.restorePreview}
-            totals={app.restorePreviewTotals}
-            fileInputRef={app.restoreFileInputRef}
-            submitting={app.submitting}
-            onClose={app.closeRestoreFlow}
-            onModeChange={app.handleRestoreModeChange}
-            onTextChange={app.handleRestoreTextChange}
-            onFileChange={app.handleRestoreFileChange}
-            onSubmit={app.handleRestoreSubmit}
-          />
-        </Suspense>
-      ) : null}
+      <AppShellModals app={app} />
     </div>
   );
 }

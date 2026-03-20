@@ -11,11 +11,6 @@ import {
   resolveStructuredPlatforms,
   resolveStructuredStores,
 } from "../core/structuredRelations";
-import {
-  buildStructuredEntryLookupAliases,
-  createStructuredEntryIdentity,
-} from "../core/structuredEntryIdentity";
-import { buildPlaySessionDedupKey } from "../core/playSessionIdentity";
 import { normalizeToken, splitCsvTokens } from "../core/utils";
 import type {
   Game as DbGameMetadata,
@@ -30,32 +25,17 @@ import type {
   SavedView as DbSavedView,
 } from "../core/types";
 import {
-  attachRawgCandidatesToPreview,
-  buildImportPreview,
-  buildRestorePreview,
-  composeLibraryRecords,
-  createDbGameFromForm,
-  createDbGameFromImport,
   downloadText,
-  gamesToCsv,
-  mergeImportedGame,
-  mergePlatformList,
-  normalizeGameTitle,
   normalizePreferencesDraft,
   onboardingGoalTemplates,
-  parseBackupText,
-  parseImportText,
   priorityToDbPriority,
   preferencesToSettingPairs,
-  recordToImportPayload,
   statusToDbStatus,
-  type BackupPayload,
   type BackupTables,
   type Game,
   type LibraryBatchEditState,
   type GameFormState,
   type GoalFormState,
-  type ImportPayload,
   type LibraryListFilter,
   type LibraryRecord,
   type ScreenKey,
@@ -67,11 +47,9 @@ import { settingsKeys } from "../modules/settings/utils/preferences";
 import type { CatalogAuditReport } from "../modules/settings/utils/catalogAudit";
 import { buildSavedViewPayload, type LibraryViewState } from "../modules/library/utils/savedViews";
 import {
-  applyRawgMetadataToImportPayload,
   fetchRawgMetadata,
   mergeRawgMetadataIntoGame,
   resolveBestRawgCandidate,
-  searchRawgCandidates,
 } from "../modules/import-export/utils/rawg";
 import type { useImportExportState } from "../modules/import-export/hooks/useImportExportState";
 import { deletePlaySession, savePlaySession } from "../modules/sessions/utils/sessionMutations";
@@ -82,51 +60,17 @@ import {
   mergeReviewRecords,
   type CatalogMaintenanceReport,
 } from "../modules/catalog-maintenance/utils/catalogMaintenance";
+import { normalizeStructuredEntry, saveGameFromForm } from "../services/gameCatalogService";
+import {
+  applyImportPreview,
+  applyRestorePreview,
+  exportBackupPayload,
+  exportLibraryCsv,
+  prepareImportPreview,
+  prepareRestorePreview,
+} from "../services/importExportService";
 
 type ImportExportState = ReturnType<typeof useImportExportState>;
-
-function buildStructuredEntryLookup(records: LibraryRecord[], args: {
-  storeNamesByEntryId: Map<number, string[]>;
-  platformNamesByGameId: Map<number, string[]>;
-}) {
-  const lookup = new Map<string, LibraryRecord[]>();
-
-  for (const record of records) {
-    const identity = createStructuredEntryIdentity({
-      title: record.game.title,
-      primaryPlatform: record.libraryEntry.platform,
-      primaryStore: record.libraryEntry.sourceStore,
-      platforms: resolveStructuredPlatforms(
-        record.game,
-        record.libraryEntry.platform,
-        args.platformNamesByGameId,
-      ),
-      stores: resolveStructuredStores(record.libraryEntry, args.storeNamesByEntryId),
-    });
-
-    for (const alias of buildStructuredEntryLookupAliases(identity)) {
-      const current = lookup.get(alias) ?? [];
-      current.push(record);
-      lookup.set(alias, current);
-    }
-  }
-
-  return lookup;
-}
-
-function findStructuredLibraryRecordMatch(
-  lookup: Map<string, LibraryRecord[]>,
-  identity: ReturnType<typeof createStructuredEntryIdentity>,
-) {
-  const matches = new Map<number, LibraryRecord>();
-  for (const alias of buildStructuredEntryLookupAliases(identity)) {
-    for (const record of lookup.get(alias) ?? []) {
-      if (record.libraryEntry.id == null) continue;
-      matches.set(record.libraryEntry.id, record);
-    }
-  }
-  return matches.size === 1 ? Array.from(matches.values())[0] ?? null : null;
-}
 
 type UseBacklogActionsArgs = {
   records: LibraryRecord[];
@@ -168,64 +112,6 @@ type UseBacklogActionsArgs = {
   setGoalModalMode: (value: "create" | "edit" | null) => void;
   setBatchEditModalOpen: (value: boolean) => void;
 };
-
-async function fetchRawgCandidateMap(
-  preview: Array<{ key: string; payload: { title: string } }>,
-  apiKey: string,
-) {
-  const candidateMap = new Map<string, Awaited<ReturnType<typeof searchRawgCandidates>>>();
-  const results = await Promise.allSettled(
-    preview.map(async (entry) => ({
-      key: entry.key,
-      candidates: await searchRawgCandidates(entry.payload.title, apiKey),
-    })),
-  );
-
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      candidateMap.set(result.value.key, result.value.candidates);
-    } else {
-      logRawgWarning("[RAWG] Falha ao buscar candidatos:", result.reason);
-    }
-  }
-
-  return candidateMap;
-}
-
-async function fetchSelectedRawgMetadata(
-  preview: Array<{ selectedRawgId: number | null }>,
-  apiKey: string,
-) {
-  const uniqueRawgIds = Array.from(
-    new Set(
-      preview
-        .map((entry) => entry.selectedRawgId)
-        .filter((rawgId): rawgId is number => typeof rawgId === "number" && rawgId > 0),
-    ),
-  );
-  const metadataMap = new Map<number, Awaited<ReturnType<typeof fetchRawgMetadata>>>();
-  const results = await Promise.allSettled(
-    uniqueRawgIds.map(async (rawgId) => ({
-      rawgId,
-      metadata: await fetchRawgMetadata(rawgId, apiKey),
-    })),
-  );
-
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      metadataMap.set(result.value.rawgId, result.value.metadata);
-    } else {
-      logRawgWarning("[RAWG] Falha ao buscar metadados:", result.reason);
-    }
-  }
-
-  return metadataMap;
-}
-
-function logRawgWarning(message: string, error: unknown) {
-  // eslint-disable-next-line no-console
-  console.warn(message, error);
-}
 
 function mergeTokenLists(current: string[], incoming: string[], mode: "merge" | "replace"): string[] {
   if (incoming.length === 0) return current;
@@ -287,48 +173,6 @@ export function useBacklogActions({
     return result;
   };
 
-  const normalizeStructuredEntry = async (libraryEntryId: number) => {
-    const entry = await db.libraryEntries.get(libraryEntryId);
-    if (!entry?.id) return false;
-    const game = await db.games.get(entry.gameId);
-    if (!game?.id) return false;
-
-    const [storeRows, libraryEntryStoreRows, platformRows, gamePlatformRows] = await Promise.all([
-      db.stores.toArray(),
-      db.libraryEntryStores.where("libraryEntryId").equals(entry.id).toArray(),
-      db.platforms.toArray(),
-      db.gamePlatforms.where("gameId").equals(game.id).toArray(),
-    ]);
-    const storeNamesByEntryId = buildStoreNamesByEntryId(storeRows, libraryEntryStoreRows);
-    const platformNamesByGameId = buildPlatformNamesByGameId(platformRows, gamePlatformRows);
-    const nextStores = resolveStructuredStores(entry, storeNamesByEntryId);
-    const nextPlatforms = resolveStructuredPlatforms(game, entry.platform, platformNamesByGameId);
-    const now = new Date().toISOString();
-
-    const nextEntry: DbLibraryEntry = {
-      ...entry,
-      sourceStore: derivePrimaryStore(nextStores, entry.sourceStore),
-      platform: derivePrimaryPlatform(nextPlatforms, entry.platform),
-      updatedAt: now,
-    };
-    const nextGame: DbGameMetadata = {
-      ...game,
-      platforms: nextPlatforms.join(", "),
-      updatedAt: now,
-    };
-
-    await db.libraryEntries.put(nextEntry);
-    await db.games.put(nextGame);
-    await syncStructuredRelationsForRecord({
-      game: nextGame,
-      libraryEntry: nextEntry,
-      extraStoreNames: nextStores,
-      extraPlatformNames: nextPlatforms,
-    });
-
-    return true;
-  };
-
   const handleGameSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!gameForm.title.trim()) {
@@ -338,94 +182,12 @@ export function useBacklogActions({
 
     setSubmitting(true);
     try {
-      const current = gameModalMode === "edit" ? selectedRecord : undefined;
-      let payload = createDbGameFromForm(gameForm, current);
-
-      if (preferences.rawgApiKey.trim() && !current?.game.rawgId) {
-        try {
-          const bestCandidate = await resolveBestRawgCandidate(
-            payload.game.title,
-            preferences.rawgApiKey.trim(),
-          );
-          if (bestCandidate) {
-            const metadata = await fetchRawgMetadata(bestCandidate.rawgId, preferences.rawgApiKey.trim());
-            if (metadata) {
-              payload = {
-                game: {
-                  ...payload.game,
-                  slug: payload.game.slug || metadata.slug,
-                  coverUrl: payload.game.coverUrl || metadata.coverUrl,
-                  rawgId: payload.game.rawgId ?? metadata.rawgId,
-                  genres: payload.game.genres || metadata.genres,
-                  releaseYear: payload.game.releaseYear ?? metadata.releaseYear,
-                  platforms: mergePlatformList(
-                    payload.game.platforms || metadata.platforms,
-                    payload.libraryEntry.platform,
-                  ),
-                  developer: payload.game.developer || metadata.developer,
-                  publisher: payload.game.publisher || metadata.publisher,
-                },
-                libraryEntry: payload.libraryEntry,
-              };
-            }
-          }
-        } catch (rawgError) {
-          logRawgWarning("[RAWG] Enriquecimento de metadados falhou:", rawgError);
-        }
-      }
-
-      let entryId = payload.libraryEntry.id;
-      await db.transaction(
-        "rw",
-        [
-          db.games,
-          db.libraryEntries,
-          db.stores,
-          db.libraryEntryStores,
-          db.platforms,
-          db.gamePlatforms,
-        ],
-        async () => {
-          let gameId = payload.game.id;
-          let persistedGame = payload.game;
-          if (gameId == null) {
-            const existingMetadata = await db.games
-              .where("normalizedTitle")
-              .equals(payload.game.normalizedTitle)
-              .first();
-
-            if (existingMetadata?.id != null) {
-              gameId = existingMetadata.id;
-              persistedGame = {
-                ...existingMetadata,
-                ...payload.game,
-                id: existingMetadata.id,
-                platforms: mergePlatformList(existingMetadata.platforms, payload.libraryEntry.platform),
-              };
-              await db.games.put(persistedGame);
-            } else {
-              gameId = Number(await db.games.add(payload.game));
-              persistedGame = { ...payload.game, id: gameId };
-            }
-          } else {
-            await db.games.put(payload.game);
-            persistedGame = payload.game;
-          }
-
-          entryId = Number(
-            await db.libraryEntries.put({
-              ...payload.libraryEntry,
-              gameId,
-            }),
-          );
-          await syncStructuredRelationsForRecord({
-            game: { ...persistedGame, id: gameId },
-            libraryEntry: { ...payload.libraryEntry, id: entryId },
-            extraStoreNames: gameForm.stores,
-            extraPlatformNames: gameForm.platforms,
-          });
-        },
-      );
+      const { entryId } = await saveGameFromForm({
+        mode: gameModalMode,
+        gameForm,
+        selectedRecord,
+        preferences,
+      });
 
       await refreshData();
       setGameModalMode(null);
@@ -445,47 +207,20 @@ export function useBacklogActions({
 
     try {
       if (!importState.importPreview) {
-        const parsed = parseImportText(importState.importSource, importState.importText, {
-          platform: preferences.primaryPlatforms[0],
-          sourceStore: preferences.defaultStores[0],
+        const preview = await prepareImportPreview({
+          importSource: importState.importSource,
+          importText: importState.importText,
+          preferences,
+          records,
         });
 
-        if (parsed.length === 0) {
+        if (importState.importText.trim() && preview.length === 0) {
           setNotice("Nenhum item válido foi encontrado na importação.");
           return;
         }
-
-        const [storeRows, libraryEntryStoreRows, platformRows, gamePlatformRows] = await Promise.all([
-          db.stores.toArray(),
-          db.libraryEntryStores.toArray(),
-          db.platforms.toArray(),
-          db.gamePlatforms.toArray(),
-        ]);
-        const storeNamesByEntryId = buildStoreNamesByEntryId(storeRows, libraryEntryStoreRows);
-        const platformNamesByGameId = buildPlatformNamesByGameId(platformRows, gamePlatformRows);
-        let preview = buildImportPreview(
-          parsed,
-          records.map((record) => ({
-            ...record,
-            structuredPlatforms: resolveStructuredPlatforms(
-              record.game,
-              record.libraryEntry.platform,
-              platformNamesByGameId,
-            ),
-            structuredStores: resolveStructuredStores(record.libraryEntry, storeNamesByEntryId),
-          })),
-        );
         if (preview.length === 0) {
           setNotice("Nenhum item novo ou atualizável foi encontrado.");
           return;
-        }
-
-        if (preferences.rawgApiKey.trim()) {
-          const candidateMap = await fetchRawgCandidateMap(
-            preview.filter((entry) => entry.status !== "existing" || !entry.payload.rawgId),
-            preferences.rawgApiKey.trim(),
-          );
-          preview = attachRawgCandidatesToPreview(preview, candidateMap);
         }
 
         importState.setImportPreview(preview);
@@ -493,117 +228,11 @@ export function useBacklogActions({
         return;
       }
 
-      const rawgMetadataMap = preferences.rawgApiKey.trim()
-        ? await fetchSelectedRawgMetadata(importState.importPreview, preferences.rawgApiKey.trim())
-        : new Map();
-      let created = 0;
-      let updated = 0;
-      let ignored = 0;
-
-      await db.transaction(
-        "rw",
-        [
-          db.games,
-          db.libraryEntries,
-          db.stores,
-          db.libraryEntryStores,
-          db.platforms,
-          db.gamePlatforms,
-        ],
-        async () => {
-          for (const previewEntry of importState.importPreview ?? []) {
-            if (previewEntry.action === "ignore") {
-              ignored += 1;
-              continue;
-            }
-
-            let payload: ImportPayload = previewEntry.payload;
-            if (previewEntry.selectedRawgId) {
-              payload = applyRawgMetadataToImportPayload(
-                payload,
-                rawgMetadataMap.get(previewEntry.selectedRawgId) ?? null,
-              );
-            }
-
-            const targetEntryId = previewEntry.selectedMatchId ?? previewEntry.existingId;
-            if (previewEntry.action === "create" || targetEntryId == null) {
-              const selectedGame =
-                previewEntry.selectedGameId != null ? await db.games.get(previewEntry.selectedGameId) : undefined;
-              const existingMetadata =
-                selectedGame ??
-                (await db.games
-                  .where("normalizedTitle")
-                  .equals(normalizeGameTitle(payload.title))
-                  .first());
-              const createdRecord = createDbGameFromImport(payload, existingMetadata);
-              let gameId = existingMetadata?.id;
-              let persistedGame = createdRecord.game;
-
-              if (gameId == null) {
-                gameId = Number(await db.games.add(createdRecord.game));
-                persistedGame = { ...createdRecord.game, id: gameId };
-              } else if (existingMetadata) {
-                persistedGame = {
-                  ...existingMetadata,
-                  ...createdRecord.game,
-                  id: existingMetadata.id,
-                  platforms: mergePlatformList(existingMetadata.platforms, createdRecord.libraryEntry.platform),
-                };
-                await db.games.put(persistedGame);
-              }
-
-              const libraryEntryId = Number(await db.libraryEntries.add({ ...createdRecord.libraryEntry, gameId }));
-              await syncStructuredRelationsForRecord({
-                game: { ...persistedGame, id: gameId },
-                libraryEntry: { ...createdRecord.libraryEntry, id: libraryEntryId },
-                extraStoreNames: payload.stores,
-                extraPlatformNames: payload.platforms,
-              });
-              created += 1;
-              continue;
-            }
-
-            const currentEntry = await db.libraryEntries.get(targetEntryId);
-            const currentGame = currentEntry ? await db.games.get(currentEntry.gameId) : undefined;
-            if (!currentEntry || !currentGame) {
-              ignored += 1;
-              continue;
-            }
-
-            const merged = mergeImportedGame({ game: currentGame, libraryEntry: currentEntry }, payload);
-            await db.games.put(merged.game);
-            const libraryEntryId = Number(
-              await db.libraryEntries.put({
-                ...merged.libraryEntry,
-                gameId: merged.game.id ?? currentEntry.gameId,
-              }),
-            );
-            await syncStructuredRelationsForRecord({
-              game: merged.game,
-              libraryEntry: { ...merged.libraryEntry, id: libraryEntryId },
-              extraStoreNames: payload.stores,
-              extraPlatformNames: payload.platforms,
-            });
-            updated += 1;
-          }
-        },
-      );
-
-      const now = new Date().toISOString();
-      const changeList = importState.importPreview
-        ?.filter((p) => p.action !== "ignore")
-        .map((p) => ({ title: p.payload.title, action: p.action }));
-
-      await db.importJobs.add({
-        source: importState.importSource,
-        status: "completed",
-        totalItems: importState.importPreview?.length ?? 0,
-        processedItems: created + updated,
-        summary: `Importação concluída: ${created} novos, ${updated} atualizados, ${ignored} ignorados.`,
-        changes: JSON.stringify(changeList || []),
-        createdAt: now,
-        updatedAt: now,
-      }).catch(() => {});
+      const { created, updated, ignored } = await applyImportPreview({
+        importSource: importState.importSource,
+        importPreview: importState.importPreview,
+        preferences,
+      });
 
       await refreshData();
       importState.closeImportFlow();
@@ -634,60 +263,24 @@ export function useBacklogActions({
       return;
     }
 
-    const tables = await readBackupTables();
-    const storeNamesByEntryId = buildStoreNamesByEntryId(tables.stores, tables.libraryEntryStores);
-    const platformNamesByGameId = buildPlatformNamesByGameId(tables.platforms, tables.gamePlatforms);
-    downloadText(
-      `arsenal-gamer-${new Date().toISOString().slice(0, 10)}.csv`,
-      gamesToCsv(
-        records.map((record) =>
-          recordToImportPayload(record, {
-            storeNamesByEntryId,
-            platformNamesByGameId,
-          }),
-        ),
-      ),
-      "text/csv;charset=utf-8",
-    );
+    const exportFile = exportLibraryCsv({
+      records,
+      tables: await readBackupTables(),
+    });
+    downloadText(exportFile.filename, exportFile.content, exportFile.mimeType);
     setNotice("Biblioteca exportada em CSV.");
   };
 
   const handleBackupExport = async () => {
-    const tables = await readBackupTables();
-    const totalRecords =
-      tables.games.length +
-      tables.libraryEntries.length +
-      tables.stores.length +
-      tables.libraryEntryStores.length +
-      tables.platforms.length +
-      tables.gamePlatforms.length +
-      tables.playSessions.length +
-      tables.reviews.length +
-      tables.lists.length +
-      tables.libraryEntryLists.length +
-      tables.tags.length +
-      tables.gameTags.length +
-      tables.goals.length +
-      tables.settings.length +
-      tables.savedViews.length;
-
-    if (totalRecords === 0) {
+    const exportFile = exportBackupPayload({
+      tables: await readBackupTables(),
+    });
+    if (exportFile.totalRecords === 0) {
       setNotice("A base local está vazia para backup.");
       return;
     }
 
-    const payload: BackupPayload = {
-      version: 6,
-      exportedAt: new Date().toISOString(),
-      source: "mybacklog",
-      ...tables,
-    };
-
-    downloadText(
-      `arsenal-gamer-backup-${payload.exportedAt.slice(0, 10)}.json`,
-      JSON.stringify(payload, null, 2),
-      "application/json;charset=utf-8",
-    );
+    downloadText(exportFile.filename, exportFile.content, exportFile.mimeType);
     setNotice("Backup JSON exportado.");
   };
 
@@ -697,15 +290,20 @@ export function useBacklogActions({
 
     try {
       if (!importState.restorePreview) {
-        const payload = parseBackupText(importState.restoreText);
-        if (!payload) {
+        const preview = prepareRestorePreview({
+          restoreText: importState.restoreText,
+          restoreMode: importState.restoreMode,
+          currentTables: await readBackupTables(),
+        });
+        if (!preview) {
           setNotice("Arquivo de backup inválido.");
           return;
         }
 
-        const preview = buildRestorePreview(payload, importState.restoreMode, await readBackupTables());
         importState.setRestorePreview(preview);
-        setNotice(`Preview de restore pronto para ${payload.libraryEntries.length} itens da biblioteca.`);
+        setNotice(
+          `Preview de restore pronto para ${preview.payload.libraryEntries.length} itens da biblioteca.`,
+        );
         return;
       }
 
@@ -716,392 +314,7 @@ export function useBacklogActions({
         if (!confirmed) return;
       }
 
-      const payload = importState.restorePreview.payload;
-
-      await db.transaction(
-        "rw",
-        [
-          db.games,
-          db.libraryEntries,
-          db.stores,
-          db.libraryEntryStores,
-          db.platforms,
-          db.gamePlatforms,
-          db.playSessions,
-          db.reviews,
-          db.lists,
-          db.libraryEntryLists,
-          db.tags,
-          db.gameTags,
-          db.goals,
-          db.settings,
-          db.savedViews,
-          db.importJobs,
-        ],
-        async () => {
-          if (importState.restorePreview?.mode === "replace") {
-            await db.gamePlatforms.clear();
-            await db.platforms.clear();
-            await db.libraryEntryStores.clear();
-            await db.stores.clear();
-            await db.libraryEntryLists.clear();
-            await db.gameTags.clear();
-            await db.reviews.clear();
-            await db.playSessions.clear();
-            await db.goals.clear();
-            await db.tags.clear();
-            await db.lists.clear();
-            await db.libraryEntries.clear();
-            await db.games.clear();
-            await db.settings.clear();
-            await db.savedViews.clear();
-            await db.importJobs.clear();
-
-            if (payload.games.length) await db.games.bulkPut(payload.games);
-            if (payload.libraryEntries.length) await db.libraryEntries.bulkPut(payload.libraryEntries);
-            if (payload.stores.length) await db.stores.bulkPut(payload.stores);
-            if (payload.libraryEntryStores.length) await db.libraryEntryStores.bulkPut(payload.libraryEntryStores);
-            if (payload.platforms.length) await db.platforms.bulkPut(payload.platforms);
-            if (payload.gamePlatforms.length) await db.gamePlatforms.bulkPut(payload.gamePlatforms);
-            if (payload.playSessions.length) await db.playSessions.bulkPut(payload.playSessions);
-            if (payload.reviews.length) await db.reviews.bulkPut(payload.reviews);
-            if (payload.lists.length) await db.lists.bulkPut(payload.lists);
-            if (payload.libraryEntryLists.length) await db.libraryEntryLists.bulkPut(payload.libraryEntryLists);
-            if (payload.tags.length) await db.tags.bulkPut(payload.tags);
-            if (payload.gameTags.length) await db.gameTags.bulkPut(payload.gameTags);
-            if (payload.goals.length) await db.goals.bulkPut(payload.goals);
-            if (payload.settings.length) await db.settings.bulkPut(payload.settings);
-            if (payload.savedViews.length) await db.savedViews.bulkPut(payload.savedViews);
-            return;
-          }
-
-          const [
-            existingGames,
-            existingEntries,
-            existingStores,
-            existingLibraryEntryStores,
-            existingPlatforms,
-            existingGamePlatforms,
-            existingTags,
-            existingLists,
-            existingLibraryEntryLists,
-            existingGoals,
-            existingReviews,
-            existingSessions,
-            existingGameTags,
-            existingSettings,
-            existingSavedViews,
-          ] = await Promise.all([
-            db.games.toArray(),
-            db.libraryEntries.toArray(),
-            db.stores.toArray(),
-            db.libraryEntryStores.toArray(),
-            db.platforms.toArray(),
-            db.gamePlatforms.toArray(),
-            db.tags.toArray(),
-            db.lists.toArray(),
-            db.libraryEntryLists.toArray(),
-            db.goals.toArray(),
-            db.reviews.toArray(),
-            db.playSessions.toArray(),
-            db.gameTags.toArray(),
-            db.settings.toArray(),
-            db.savedViews.toArray(),
-          ]);
-
-	          const existingGamesByTitle = new Map(
-	            existingGames.map((game) => [game.normalizedTitle || normalizeGameTitle(game.title), game] as const),
-	          );
-	          const existingStoreNamesByEntryId = buildStoreNamesByEntryId(
-	            existingStores,
-	            existingLibraryEntryStores,
-	          );
-	          const existingPlatformNamesByGameId = buildPlatformNamesByGameId(
-	            existingPlatforms,
-	            existingGamePlatforms,
-	          );
-	          const existingStoreMap = new Map(
-	            existingStores.map((store) => [store.name.trim().toLowerCase(), store] as const),
-	          );
-	          const existingPlatformMap = new Map(
-	            existingPlatforms.map((platform) => [platform.name.trim().toLowerCase(), platform] as const),
-	          );
-	          const existingEntryLookup = buildStructuredEntryLookup(
-	            composeLibraryRecords(existingGames, existingEntries),
-	            {
-	              storeNamesByEntryId: existingStoreNamesByEntryId,
-	              platformNamesByGameId: existingPlatformNamesByGameId,
-	            },
-	          );
-          const existingTagMap = new Map(existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag] as const));
-          const existingListMap = new Map(existingLists.map((list) => [list.name.trim().toLowerCase(), list] as const));
-          const libraryEntryListSet = new Set(existingLibraryEntryLists.map((entry) => `${entry.libraryEntryId}::${entry.listId}`));
-          const existingGoalMap = new Map<string, DbGoal>(
-            existingGoals.map((goal) => [`${goal.type}::${goal.period}`, goal] as const),
-          );
-          const existingReviewMap = new Map(existingReviews.map((review) => [review.libraryEntryId, review] as const));
-          const sessionSet = new Set(
-            existingSessions.map((session) => buildPlaySessionDedupKey(session.libraryEntryId, session)),
-          );
-          const gameTagSet = new Set(existingGameTags.map((entry) => `${entry.libraryEntryId}::${entry.tagId}`));
-          const libraryEntryStoreSet = new Set(
-            existingLibraryEntryStores.map((relation) => `${relation.libraryEntryId}::${relation.storeId}`),
-          );
-          const gamePlatformSet = new Set(
-            existingGamePlatforms.map((relation) => `${relation.gameId}::${relation.platformId}`),
-          );
-          const existingSettingMap = new Map(existingSettings.map((setting) => [setting.key, setting] as const));
-	          const existingSavedViewMap = new Map<string, DbSavedView>(
-	            existingSavedViews.map((view) => [`${view.scope}::${view.name.trim().toLowerCase()}`, view] as const),
-	          );
-	          const payloadGamesById = new Map(payload.games.map((game) => [game.id, game] as const));
-	          const payloadStoreNamesByEntryId = buildStoreNamesByEntryId(
-	            payload.stores,
-	            payload.libraryEntryStores,
-	          );
-	          const payloadPlatformNamesByGameId = buildPlatformNamesByGameId(
-	            payload.platforms,
-	            payload.gamePlatforms,
-	          );
-          const resolvedGameIdByPayloadId = new Map<number, number>();
-          const resolvedEntryIdByPayloadId = new Map<number, number>();
-          const resolvedStoreIdByPayloadId = new Map<number, number>();
-          const resolvedPlatformIdByPayloadId = new Map<number, number>();
-          const resolvedListIdByPayloadId = new Map<number, number>();
-          const resolvedTagIdByPayloadId = new Map<number, number>();
-
-          for (const game of payload.games) {
-            const normalized = game.normalizedTitle || normalizeGameTitle(game.title);
-            const existing = existingGamesByTitle.get(normalized);
-            if (existing?.id != null) {
-              if (game.id != null) resolvedGameIdByPayloadId.set(game.id, existing.id);
-              await db.games.put({
-                ...existing,
-                ...game,
-                id: existing.id,
-                normalizedTitle: normalized,
-                platforms: mergePlatformList(existing.platforms, game.platforms || ""),
-              });
-            } else {
-              const nextId = Number(await db.games.add({ ...game, normalizedTitle: normalized }));
-              if (game.id != null) resolvedGameIdByPayloadId.set(game.id, nextId);
-            }
-          }
-
-	          for (const entry of payload.libraryEntries) {
-	            const payloadGame = payloadGamesById.get(entry.gameId);
-	            if (!payloadGame) continue;
-	            const existing = findStructuredLibraryRecordMatch(
-	              existingEntryLookup,
-	              createStructuredEntryIdentity({
-	                title: payloadGame.title,
-	                primaryPlatform: entry.platform,
-	                primaryStore: entry.sourceStore,
-	                platforms: resolveStructuredPlatforms(
-	                  payloadGame,
-	                  entry.platform,
-	                  payloadPlatformNamesByGameId,
-	                ),
-	                stores: resolveStructuredStores(entry, payloadStoreNamesByEntryId),
-	              }),
-	            )?.libraryEntry;
-	            const gameId = resolvedGameIdByPayloadId.get(entry.gameId) ?? existing?.gameId;
-	            if (!gameId) continue;
-
-            if (existing?.id != null) {
-              if (entry.id != null) resolvedEntryIdByPayloadId.set(entry.id, existing.id);
-              await db.libraryEntries.put({ ...existing, ...entry, id: existing.id, gameId });
-            } else {
-              const nextId = Number(await db.libraryEntries.add({ ...entry, id: undefined, gameId }));
-              if (entry.id != null) resolvedEntryIdByPayloadId.set(entry.id, nextId);
-            }
-          }
-
-          for (const store of payload.stores) {
-            const key = store.name.trim().toLowerCase();
-            if (!key) continue;
-            const existing = existingStoreMap.get(key);
-            if (existing?.id != null) {
-              if (store.id != null) resolvedStoreIdByPayloadId.set(store.id, existing.id);
-              await db.stores.put({ ...existing, ...store, id: existing.id, normalizedName: key });
-            } else {
-              const nextId = Number(
-                await db.stores.add({ ...store, id: undefined, name: store.name.trim(), normalizedName: key }),
-              );
-              existingStoreMap.set(key, { ...store, id: nextId, name: store.name.trim(), normalizedName: key });
-              if (store.id != null) resolvedStoreIdByPayloadId.set(store.id, nextId);
-            }
-          }
-
-          for (const platform of payload.platforms) {
-            const key = platform.name.trim().toLowerCase();
-            if (!key) continue;
-            const existing = existingPlatformMap.get(key);
-            if (existing?.id != null) {
-              if (platform.id != null) resolvedPlatformIdByPayloadId.set(platform.id, existing.id);
-              await db.platforms.put({ ...existing, ...platform, id: existing.id, normalizedName: key });
-            } else {
-              const nextId = Number(
-                await db.platforms.add({
-                  ...platform,
-                  id: undefined,
-                  name: platform.name.trim(),
-                  normalizedName: key,
-                }),
-              );
-              existingPlatformMap.set(key, {
-                ...platform,
-                id: nextId,
-                name: platform.name.trim(),
-                normalizedName: key,
-              });
-              if (platform.id != null) resolvedPlatformIdByPayloadId.set(platform.id, nextId);
-            }
-          }
-
-          for (const relation of payload.libraryEntryStores) {
-            const libraryEntryId = resolvedEntryIdByPayloadId.get(relation.libraryEntryId);
-            const storeId = resolvedStoreIdByPayloadId.get(relation.storeId);
-            if (!libraryEntryId || !storeId) continue;
-            const key = `${libraryEntryId}::${storeId}`;
-            if (libraryEntryStoreSet.has(key)) {
-              if (relation.isPrimary) {
-                const existingPrimary = await db.libraryEntryStores.where("libraryEntryId").equals(libraryEntryId).toArray();
-                for (const item of existingPrimary) {
-                  if (item.id != null) {
-                    await db.libraryEntryStores.update(item.id, { isPrimary: item.storeId === storeId });
-                  }
-                }
-              }
-              continue;
-            }
-            if (relation.isPrimary) {
-              const existingPrimary = await db.libraryEntryStores.where("libraryEntryId").equals(libraryEntryId).toArray();
-              for (const item of existingPrimary) {
-                if (item.id != null && item.isPrimary) {
-                  await db.libraryEntryStores.update(item.id, { isPrimary: false });
-                }
-              }
-            }
-            libraryEntryStoreSet.add(key);
-            await db.libraryEntryStores.add({
-              libraryEntryId,
-              storeId,
-              isPrimary: relation.isPrimary,
-              createdAt: relation.createdAt || new Date().toISOString(),
-            });
-          }
-
-          for (const relation of payload.gamePlatforms) {
-            const gameId = resolvedGameIdByPayloadId.get(relation.gameId);
-            const platformId = resolvedPlatformIdByPayloadId.get(relation.platformId);
-            if (!gameId || !platformId) continue;
-            const key = `${gameId}::${platformId}`;
-            if (gamePlatformSet.has(key)) continue;
-            gamePlatformSet.add(key);
-            await db.gamePlatforms.add({
-              gameId,
-              platformId,
-              createdAt: relation.createdAt || new Date().toISOString(),
-            });
-          }
-
-          for (const list of payload.lists) {
-            const key = list.name.trim().toLowerCase();
-            if (!key) continue;
-            const existing = existingListMap.get(key);
-            if (existing?.id != null) {
-              if (list.id != null) resolvedListIdByPayloadId.set(list.id, existing.id);
-              await db.lists.put({ ...existing, ...list, id: existing.id });
-            } else {
-              const nextId = Number(await db.lists.add({ ...list, id: undefined, name: list.name.trim() }));
-              if (list.id != null) resolvedListIdByPayloadId.set(list.id, nextId);
-            }
-          }
-
-          for (const relation of payload.libraryEntryLists) {
-            const libraryEntryId = resolvedEntryIdByPayloadId.get(relation.libraryEntryId);
-            const listId = resolvedListIdByPayloadId.get(relation.listId);
-            if (!libraryEntryId || !listId) continue;
-            const key = `${libraryEntryId}::${listId}`;
-            if (libraryEntryListSet.has(key)) continue;
-            libraryEntryListSet.add(key);
-            await db.libraryEntryLists.add({ libraryEntryId, listId, createdAt: relation.createdAt || new Date().toISOString() });
-          }
-
-          for (const tag of payload.tags) {
-            const key = tag.name.trim().toLowerCase();
-            if (!key) continue;
-            const existing = existingTagMap.get(key);
-            if (existing?.id != null) {
-              if (tag.id != null) resolvedTagIdByPayloadId.set(tag.id, existing.id);
-            } else {
-              const nextId = Number(await db.tags.add({ ...tag, id: undefined, name: tag.name.trim() }));
-              if (tag.id != null) resolvedTagIdByPayloadId.set(tag.id, nextId);
-            }
-          }
-
-          for (const goal of payload.goals) {
-            const key = `${goal.type}::${goal.period}`;
-            const existing = existingGoalMap.get(key);
-            if (existing?.id != null) await db.goals.put({ ...existing, ...goal, id: existing.id });
-            else await db.goals.add({ ...goal, id: undefined });
-          }
-
-          const reviewSeen = new Set<number>();
-          for (const review of payload.reviews) {
-            const libraryEntryId = resolvedEntryIdByPayloadId.get(review.libraryEntryId);
-            if (!libraryEntryId || reviewSeen.has(libraryEntryId)) continue;
-            reviewSeen.add(libraryEntryId);
-            const existing = existingReviewMap.get(libraryEntryId);
-            if (existing?.id != null) await db.reviews.put({ ...existing, ...review, id: existing.id, libraryEntryId });
-            else await db.reviews.add({ ...review, id: undefined, libraryEntryId });
-          }
-
-          for (const session of payload.playSessions) {
-            const libraryEntryId = resolvedEntryIdByPayloadId.get(session.libraryEntryId);
-            if (!libraryEntryId) continue;
-            const signature = buildPlaySessionDedupKey(libraryEntryId, session);
-            if (sessionSet.has(signature)) continue;
-            sessionSet.add(signature);
-            const libraryEntry = await db.libraryEntries.get(libraryEntryId);
-            await db.playSessions.add({ ...session, id: undefined, libraryEntryId, platform: libraryEntry?.platform || session.platform });
-          }
-
-          for (const relation of payload.gameTags) {
-            const libraryEntryId = resolvedEntryIdByPayloadId.get(relation.libraryEntryId);
-            const tagId = resolvedTagIdByPayloadId.get(relation.tagId);
-            if (!libraryEntryId || !tagId) continue;
-            const key = `${libraryEntryId}::${tagId}`;
-            if (gameTagSet.has(key)) continue;
-            gameTagSet.add(key);
-            await db.gameTags.add({ libraryEntryId, tagId });
-          }
-
-          for (const setting of payload.settings) {
-            const existing = existingSettingMap.get(setting.key);
-            if (existing?.id != null) await db.settings.put({ ...existing, ...setting, id: existing.id });
-            else await db.settings.add({ ...setting, id: undefined });
-          }
-
-          for (const view of payload.savedViews) {
-            const key = `${view.scope}::${view.name.trim().toLowerCase()}`;
-            const existing = existingSavedViewMap.get(key);
-            if (existing?.id != null) {
-              await db.savedViews.put({
-                ...existing,
-                ...view,
-                id: existing.id,
-                createdAt: existing.createdAt || view.createdAt,
-                updatedAt: existing.updatedAt > view.updatedAt ? existing.updatedAt : view.updatedAt,
-              });
-            } else {
-              const nextId = Number(await db.savedViews.add({ ...view, id: undefined }));
-              existingSavedViewMap.set(key, { ...view, id: nextId });
-            }
-          }
-        },
-      );
+      await applyRestorePreview(importState.restorePreview);
 
       await refreshData();
       importState.closeRestoreFlow();

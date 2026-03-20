@@ -1,87 +1,45 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { db } from "../core/db";
 import {
   buildDynamicTacticalGoals,
-  composeLibraryRecords,
   createGameFormState,
-  createPreferencesDraft,
-  dbGameToUiGame,
-  onboardingGoalTemplates,
-  screenMeta,
-  suggestedStarterLists,
   systemRules,
-  type BackupTables,
-  type LibraryListFilter,
 } from "../backlog/shared";
 import { useBacklogActions } from "./useBacklogActions";
-import { useBacklogDataState } from "./useBacklogDataState";
-import { useBacklogUiState } from "./useBacklogUiState";
 import { useDashboardInsights } from "../modules/dashboard/hooks/useDashboardInsights";
 import { useSelectedGamePage } from "../modules/game-page/hooks/useSelectedGamePage";
-import { useImportExportState } from "../modules/import-export/hooks/useImportExportState";
 import { useLibraryState } from "../modules/library/hooks/useLibraryState";
 import { usePlannerInsights } from "../modules/planner/hooks/usePlannerInsights";
 import { useBuildSessionInsights } from "../modules/sessions/hooks/useBuildSessionInsights";
-import { useAppPreferences } from "../modules/settings/hooks/useAppPreferences";
 import { useCatalogMaintenanceState } from "../modules/catalog-maintenance/hooks/useCatalogMaintenanceState";
 import { guidedTourSteps } from "../modules/onboarding/utils/guidedTour";
-import {
-  buildPlatformNamesByGameId,
-  buildStoreNamesByEntryId,
-  resolveStructuredPlatforms,
-  resolveStructuredStores,
-} from "../core/structuredRelations";
+import { useBacklogContext } from "./useBacklogContext";
+import { useBacklogSelectors } from "./useBacklogSelectors";
+import { readBackupTables as readBackupTablesFromDb } from "../services/backlogRepository";
 
 export function useBacklogApp() {
-  const data = useBacklogDataState();
-  const importState = useImportExportState(data.setNotice);
-  const preferences = useAppPreferences(data.settingRows);
-  const ui = useBacklogUiState({ preferences });
+  const context = useBacklogContext();
+  const { data, importState, preferences, ui } = context;
+  const selectors = useBacklogSelectors(context);
   const hasAutoOpenedGuidedTour = useRef(false);
-
-  const effectiveSelectedListFilter = useMemo<LibraryListFilter>(() => {
-    if (ui.selectedListFilter === "all") return "all";
-    return data.listRows.some((list) => list.id === ui.selectedListFilter) ? ui.selectedListFilter : "all";
-  }, [data.listRows, ui.selectedListFilter]);
-
-  const records = useMemo(
-    () => composeLibraryRecords(data.gameRows, data.libraryEntryRows),
-    [data.gameRows, data.libraryEntryRows],
-  );
-  const recordsByEntryId = useMemo(
-    () => new Map(records.map((record) => [record.libraryEntry.id, record] as const)),
-    [records],
-  );
-  const reviewByEntryId = useMemo(
-    () => new Map(data.reviewRows.map((review) => [review.libraryEntryId, review] as const)),
-    [data.reviewRows],
-  );
-  const tagById = useMemo(
-    () => new Map(data.tagRows.map((tag) => [tag.id, tag] as const)),
-    [data.tagRows],
-  );
-  const listById = useMemo(
-    () => new Map(data.listRows.map((list) => [list.id, list] as const)),
-    [data.listRows],
-  );
-  const storeNamesByEntryId = useMemo(
-    () => buildStoreNamesByEntryId(data.storeRows, data.libraryEntryStoreRows),
-    [data.libraryEntryStoreRows, data.storeRows],
-  );
-  const platformNamesByGameId = useMemo(
-    () => buildPlatformNamesByGameId(data.platformRows, data.gamePlatformRows),
-    [data.gamePlatformRows, data.platformRows],
-  );
-  const games = useMemo(
-    () =>
-      records.map((record) =>
-        dbGameToUiGame(record, {
-          stores: resolveStructuredStores(record.libraryEntry, storeNamesByEntryId),
-          platforms: resolveStructuredPlatforms(record.game, record.libraryEntry.platform, platformNamesByGameId),
-        }),
-      ),
-    [platformNamesByGameId, records, storeNamesByEntryId],
-  );
+  const {
+    effectiveSelectedListFilter,
+    records,
+    recordsByEntryId,
+    reviewByEntryId,
+    tagById,
+    listById,
+    storeNamesByEntryId,
+    platformNamesByGameId,
+    games,
+    selectedBatchGames,
+    displayName,
+    hasCompletedOnboarding,
+    onboardingInitialDraft,
+    onboardingInitialLists,
+    onboardingInitialGoalIds,
+    heroCopy,
+    autoSyncWatchKey,
+  } = selectors;
 
   const {
     listOptions,
@@ -110,33 +68,7 @@ export function useBacklogApp() {
     selectedGameId: ui.selectedGameId,
   });
 
-  const displayName = preferences.operatorName;
-  const hasCompletedOnboarding = preferences.onboardingCompleted;
-  const onboardingInitialDraft = useMemo(() => createPreferencesDraft(preferences), [preferences]);
-  const onboardingInitialLists = useMemo(
-    () =>
-      data.listRows.length > 0
-        ? data.listRows.map((list) => list.name)
-        : Array.from(suggestedStarterLists.slice(0, 3)),
-    [data.listRows],
-  );
-  const onboardingInitialGoalIds = useMemo(() => {
-    const matchingTemplates = onboardingGoalTemplates
-      .filter((template) =>
-        data.goalRows.some((goal) => goal.type === template.type && goal.period === template.period),
-      )
-      .map((template) => template.id);
-
-    return matchingTemplates.length > 0
-      ? matchingTemplates
-      : onboardingGoalTemplates.slice(0, 2).map((template) => template.id);
-  }, [data.goalRows]);
-
   const findGame = useCallback((id: number) => games.find((game) => game.id === id), [games]);
-  const selectedBatchGames = useMemo(
-    () => games.filter((game) => ui.selectedLibraryIds.includes(game.id)),
-    [games, ui.selectedLibraryIds],
-  );
   const sessionInsights = useBuildSessionInsights({ sessionRows: data.sessionRows });
   const dynamicTacticalGoals = useMemo(
     () => buildDynamicTacticalGoals(games, data.sessionRows),
@@ -239,7 +171,6 @@ export function useBacklogApp() {
       entry.durationMinutes,
     ]);
   });
-  const heroCopy = screenMeta[ui.screen];
 
   const catalogMaintenanceReport = useCatalogMaintenanceState({
     gameRows: data.gameRows,
@@ -257,58 +188,7 @@ export function useBacklogApp() {
   });
   const catalogAuditReport = catalogMaintenanceReport.audit;
 
-  const readBackupTables = useCallback(async (): Promise<BackupTables> => {
-    const [
-      gamesRows,
-      libraryEntries,
-      stores,
-      libraryEntryStores,
-      platforms,
-      gamePlatforms,
-      playSessions,
-      reviews,
-      lists,
-      libraryEntryLists,
-      tags,
-      gameTags,
-      goals,
-      settings,
-      savedViews,
-    ] = await Promise.all([
-      db.games.toArray(),
-      db.libraryEntries.toArray(),
-      db.stores.toArray(),
-      db.libraryEntryStores.toArray(),
-      db.platforms.toArray(),
-      db.gamePlatforms.toArray(),
-      db.playSessions.toArray(),
-      db.reviews.toArray(),
-      db.lists.toArray(),
-      db.libraryEntryLists.toArray(),
-      db.tags.toArray(),
-      db.gameTags.toArray(),
-      db.goals.toArray(),
-      db.settings.toArray(),
-      db.savedViews.toArray(),
-    ]);
-    return {
-      games: gamesRows,
-      libraryEntries,
-      stores,
-      libraryEntryStores,
-      platforms,
-      gamePlatforms,
-      playSessions,
-      reviews,
-      lists,
-      libraryEntryLists,
-      tags,
-      gameTags,
-      goals,
-      settings,
-      savedViews,
-    };
-  }, []);
+  const readBackupTables = useCallback(() => readBackupTablesFromDb(), []);
 
   const actions = useBacklogActions({
     records,
@@ -412,6 +292,7 @@ export function useBacklogApp() {
     onboardingInitialDraft,
     onboardingInitialLists,
     onboardingInitialGoalIds,
+    autoSyncWatchKey,
     games,
     reviewRows: data.reviewRows,
     tagRows: data.tagRows,

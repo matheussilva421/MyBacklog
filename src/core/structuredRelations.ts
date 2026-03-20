@@ -12,51 +12,61 @@ function dedupeNames(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
-export function buildStoreNamesByEntryId(
-  storeRows: Store[],
-  libraryEntryStoreRows: LibraryEntryStore[],
+function buildRelationNamesByOwnerId<TRow extends { id?: number; name: string }, TRelation extends { createdAt?: string }>(
+  rows: TRow[],
+  relations: TRelation[],
+  options: {
+    getOwnerId: (relation: TRelation) => number;
+    getRowId: (relation: TRelation) => number;
+    getSortPriority?: (relation: TRelation) => number;
+  },
 ): Map<number, string[]> {
-  const storeNameById = new Map(storeRows.map((store) => [store.id, store.name] as const));
-  const grouped = new Map<number, Array<{ name: string; isPrimary: boolean }>>();
+  const nameById = new Map(rows.map((row) => [row.id, row.name] as const));
+  const grouped = new Map<number, Array<{ name: string; priority: number }>>();
 
-  for (const relation of libraryEntryStoreRows) {
-    const storeName = storeNameById.get(relation.storeId);
-    if (!storeName) continue;
-    const current = grouped.get(relation.libraryEntryId) ?? [];
-    current.push({ name: storeName, isPrimary: Boolean(relation.isPrimary) });
-    grouped.set(relation.libraryEntryId, current);
+  for (const relation of relations) {
+    const name = nameById.get(options.getRowId(relation));
+    if (!name) continue;
+    const ownerId = options.getOwnerId(relation);
+    const current = grouped.get(ownerId) ?? [];
+    current.push({ name, priority: options.getSortPriority?.(relation) ?? 0 });
+    grouped.set(ownerId, current);
   }
 
   return new Map(
-    Array.from(grouped.entries()).map(([entryId, rows]) => [
-      entryId,
+    Array.from(grouped.entries()).map(([ownerId, values]) => [
+      ownerId,
       dedupeNames(
-        rows
-          .sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary) || left.name.localeCompare(right.name, "pt-BR"))
+        values
+          .sort(
+            (left, right) =>
+              right.priority - left.priority || left.name.localeCompare(right.name, "pt-BR"),
+          )
           .map((row) => row.name),
       ),
     ]),
   );
 }
 
+export function buildStoreNamesByEntryId(
+  storeRows: Store[],
+  libraryEntryStoreRows: LibraryEntryStore[],
+): Map<number, string[]> {
+  return buildRelationNamesByOwnerId(storeRows, libraryEntryStoreRows, {
+    getOwnerId: (relation) => relation.libraryEntryId,
+    getRowId: (relation) => relation.storeId,
+    getSortPriority: (relation) => Number(Boolean(relation.isPrimary)),
+  });
+}
+
 export function buildPlatformNamesByGameId(
   platformRows: Platform[],
   gamePlatformRows: GamePlatform[],
 ): Map<number, string[]> {
-  const platformNameById = new Map(platformRows.map((platform) => [platform.id, platform.name] as const));
-  const grouped = new Map<number, string[]>();
-
-  for (const relation of gamePlatformRows) {
-    const platformName = platformNameById.get(relation.platformId);
-    if (!platformName) continue;
-    const current = grouped.get(relation.gameId) ?? [];
-    current.push(platformName);
-    grouped.set(relation.gameId, current);
-  }
-
-  return new Map(
-    Array.from(grouped.entries()).map(([gameId, names]) => [gameId, dedupeNames(names).sort((left, right) => left.localeCompare(right, "pt-BR"))]),
-  );
+  return buildRelationNamesByOwnerId(platformRows, gamePlatformRows, {
+    getOwnerId: (relation) => relation.gameId,
+    getRowId: (relation) => relation.platformId,
+  });
 }
 
 export function resolveStructuredStores(
