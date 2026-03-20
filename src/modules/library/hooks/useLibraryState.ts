@@ -56,45 +56,43 @@ export function useLibraryState({
   savedViews,
   selectedGameId,
 }: UseLibraryStateArgs) {
-  const tagNamesByEntryId = useMemo(() => {
-    const map = new Map<number, string>();
+  // Combinar todos os maps derivados em um único useMemo para evitar recálculos em cascata
+  const derivedMaps = useMemo(() => {
+    const tagNamesMap = new Map<number, string>();
+    const listIdsMap = new Map<number, number[]>();
+    const listCountsMap = new Map<number, number>();
+
+    // Processar tags
     for (const relation of gameTagRows) {
       const tag = tagById.get(relation.tagId);
       if (!tag) continue;
-      const current = map.get(relation.libraryEntryId) ?? "";
-      map.set(relation.libraryEntryId, current ? `${current}, ${tag.name}` : tag.name);
+      const current = tagNamesMap.get(relation.libraryEntryId) ?? "";
+      tagNamesMap.set(relation.libraryEntryId, current ? `${current}, ${tag.name}` : tag.name);
     }
-    return map;
-  }, [gameTagRows, tagById]);
 
-  const listIdsByEntryId = useMemo(() => {
-    const map = new Map<number, number[]>();
+    // Processar listas
     for (const relation of libraryEntryListRows) {
-      const current = map.get(relation.libraryEntryId) ?? [];
+      const current = listIdsMap.get(relation.libraryEntryId) ?? [];
       current.push(relation.listId);
-      map.set(relation.libraryEntryId, current);
-    }
-    return map;
-  }, [libraryEntryListRows]);
+      listIdsMap.set(relation.libraryEntryId, current);
 
-  const listNamesByEntryId = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const [entryId, listIds] of listIdsByEntryId.entries()) {
+      const count = listCountsMap.get(relation.listId) ?? 0;
+      listCountsMap.set(relation.listId, count + 1);
+    }
+
+    // Processar nomes das listas
+    const listNamesMap = new Map<number, string>();
+    for (const [entryId, listIds] of listIdsMap.entries()) {
       const names = listIds
         .map((listId) => listById.get(listId)?.name)
         .filter((value): value is string => Boolean(value));
-      map.set(entryId, names.join(", "));
+      listNamesMap.set(entryId, names.join(", "));
     }
-    return map;
-  }, [listById, listIdsByEntryId]);
 
-  const listCountsById = useMemo(() => {
-    const map = new Map<number, number>();
-    for (const relation of libraryEntryListRows) {
-      map.set(relation.listId, (map.get(relation.listId) ?? 0) + 1);
-    }
-    return map;
-  }, [libraryEntryListRows]);
+    return { tagNamesMap, listIdsMap, listNamesMap, listCountsMap };
+  }, [gameTagRows, libraryEntryListRows, tagById, listById]);
+
+  const { tagNamesMap, listIdsMap, listNamesMap, listCountsMap } = derivedMaps;
 
   const listOptions = useMemo(
     () =>
@@ -103,16 +101,22 @@ export function useLibraryState({
         .map((list) => ({
           id: list.id,
           name: list.name,
-          count: listCountsById.get(list.id) ?? 0,
+          count: listCountsMap.get(list.id) ?? 0,
         }))
         .sort((left, right) => left.name.localeCompare(right.name, "pt-BR")),
-    [listById, listCountsById],
+    [listById, listCountsMap],
   );
 
-  const searchedGames = useMemo(
-    () =>
-      games.filter((game) =>
-        matchesCollection(
+  // Combinar search e filter em um único useMemo
+  const filteredAndSearchedGames = useMemo(() => {
+    const hasSearchQuery = searchQuery.length > 0;
+    const hasStatusFilter = filter !== "Todos";
+    const hasListFilter = selectedListFilter !== "all";
+
+    return games.filter((game) => {
+      // Search
+      if (hasSearchQuery) {
+        const matchesSearch = matchesCollection(
           [
             game.title,
             game.platform,
@@ -122,37 +126,33 @@ export function useLibraryState({
             game.mood,
             game.notes,
             game.difficulty,
-            tagNamesByEntryId.get(game.id) ?? "",
-            listNamesByEntryId.get(game.id) ?? "",
+            tagNamesMap.get(game.id) ?? "",
+            listNamesMap.get(game.id) ?? "",
           ],
           searchQuery,
-        ),
-      ),
-    [games, listNamesByEntryId, searchQuery, tagNamesByEntryId],
-  );
+        );
+        if (!matchesSearch) return false;
+      }
 
-  const libraryGames = useMemo(
-    () =>
-      searchedGames.filter((game) => {
-        const matchesStatus = filter === "Todos" ? true : game.status === filter;
-        const matchesList =
-          selectedListFilter === "all"
-            ? true
-            : (listIdsByEntryId.get(game.id) ?? []).includes(selectedListFilter);
-        return matchesStatus && matchesList;
-      }),
-    [filter, listIdsByEntryId, searchedGames, selectedListFilter],
-  );
+      // Status filter
+      if (hasStatusFilter && game.status !== filter) return false;
 
-  const sortedLibraryGames = useMemo(
-    () => sortLibraryGames(libraryGames, recordsByEntryId, sortBy, sortDirection),
-    [libraryGames, recordsByEntryId, sortBy, sortDirection],
-  );
+      // List filter
+      if (hasListFilter) {
+        const gameListIds = listIdsMap.get(game.id) ?? [];
+        if (!gameListIds.includes(selectedListFilter)) return false;
+      }
 
-  const groupedLibraryGames = useMemo(
-    () => groupLibraryGames(sortedLibraryGames, recordsByEntryId, groupBy),
-    [groupBy, recordsByEntryId, sortedLibraryGames],
-  );
+      return true;
+    });
+  }, [games, searchQuery, filter, selectedListFilter, tagNamesMap, listNamesMap, listIdsMap]);
+
+  // Combinar sort e group em um único useMemo
+  const sortedAndGroupedGames = useMemo(() => {
+    const sorted = sortLibraryGames(filteredAndSearchedGames, recordsByEntryId, sortBy, sortDirection);
+    const grouped = groupLibraryGames(sorted, recordsByEntryId, groupBy);
+    return { sorted, grouped };
+  }, [filteredAndSearchedGames, recordsByEntryId, sortBy, sortDirection, groupBy]);
 
   const activeSavedView = useMemo(
     () =>
@@ -181,9 +181,11 @@ export function useLibraryState({
     [filter, groupBy, query, selectedListFilter, sortBy, sortDirection],
   );
 
+  const { sorted: sortedLibraryGames, grouped: groupedLibraryGames } = sortedAndGroupedGames;
+
   const selectedGame =
     sortedLibraryGames.find((game) => game.id === selectedGameId) ??
-    searchedGames.find((game) => game.id === selectedGameId) ??
+    filteredAndSearchedGames.find((game) => game.id === selectedGameId) ??
     games.find((game) => game.id === selectedGameId) ??
     games[0];
 
@@ -191,16 +193,13 @@ export function useLibraryState({
 
   const selectedGameLists = useMemo(() => {
     if (!selectedGame) return [];
-    return (listIdsByEntryId.get(selectedGame.id) ?? [])
+    return (listIdsMap.get(selectedGame.id) ?? [])
       .map((listId) => listById.get(listId))
       .filter((list): list is List => Boolean(list));
-  }, [listById, listIdsByEntryId, selectedGame]);
+  }, [listById, listIdsMap, selectedGame]);
 
   return {
-    tagNamesByEntryId,
-    listIdsByEntryId,
     listOptions,
-    searchedGames,
     libraryGames: sortedLibraryGames,
     groupedLibraryGames,
     selectedGame,

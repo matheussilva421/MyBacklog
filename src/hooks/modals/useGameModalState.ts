@@ -3,6 +3,7 @@ import {
   createGameFormState,
   type GameFormState,
 } from "../../backlog/shared";
+import type { Game } from "../../backlog/shared";
 
 export function useGameModalState(args: {
   defaultPlatform?: string;
@@ -21,6 +22,17 @@ export function useGameModalState(args: {
     setGameModalMode("create");
   };
 
+  const openEditGameModal = (game?: Game) => {
+    setGameForm(createGameFormState(game));
+    setGameModalMode("edit");
+  };
+
+  const openEditGameModalFor = (libraryEntryId: number) => {
+    setGameModalMode("edit");
+    // O form será preenchido pelo componente pai com os dados da entry
+    setGameForm((current) => ({ ...current, libraryEntryId }));
+  };
+
   const closeGameModal = () => setGameModalMode(null);
 
   const handleGameFormChange = <K extends keyof GameFormState>(
@@ -34,6 +46,8 @@ export function useGameModalState(args: {
     gameForm,
     setGameForm,
     openCreateGameModal,
+    openEditGameModal,
+    openEditGameModalFor,
     closeGameModal,
     handleGameFormChange,
   };

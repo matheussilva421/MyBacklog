@@ -59,5 +59,5 @@ Formato da resposta:
 - Se algo não puder ser validado completamente, diga isso explicitamente
 - Seja direto, técnico e sem enrolação
 
-Se estiver trabalhando em um repositório real, faça as correções diretamente no código em vez de só sugerir.
+faça as correções diretamente no código em vez de só sugerir.
 ```

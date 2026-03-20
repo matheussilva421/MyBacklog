@@ -3,10 +3,12 @@ import {
   useId,
   useRef,
   useState,
+  useMemo,
   type ButtonHTMLAttributes,
   type CSSProperties,
   type ReactNode,
 } from "react";
+import React from "react";
 import type { LucideIcon } from "lucide-react";
 import { cx } from "../backlog/shared";
 
@@ -68,7 +70,7 @@ export function useDocumentScrollLock(active = true) {
   }, [active]);
 }
 
-export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
+export const Panel = React.memo(function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <section className={cx("cp-panel", className)}>
       <span className="cp-panel__accent" aria-hidden="true" />
@@ -77,9 +79,9 @@ export function Panel({ children, className = "" }: { children: ReactNode; class
       <div className="cp-panel__content">{children}</div>
     </section>
   );
-}
+});
 
-export function Tag({
+export const Tag = React.memo(function Tag({
   children,
   tone = "yellow",
   className = "",
@@ -89,9 +91,9 @@ export function Tag({
   className?: string;
 }) {
   return <span className={cx("cp-tag", `cp-tag--${tone}`, className)}>{children}</span>;
-}
+});
 
-export function Pill({
+export const Pill = React.memo(function Pill({
   children,
   tone,
   className = "",
@@ -101,9 +103,9 @@ export function Pill({
   className?: string;
 }) {
   return <span className={cx("cp-pill", `cp-pill--${tone}`, className)}>{children}</span>;
-}
+});
 
-export function NotchButton({
+export const NotchButton = React.memo(function NotchButton({
   children,
   variant = "secondary",
   className = "",
@@ -116,9 +118,9 @@ export function NotchButton({
       {children}
     </button>
   );
-}
+});
 
-export function SidebarItem({
+export const SidebarItem = React.memo(function SidebarItem({
   label,
   icon: Icon,
   active,
@@ -141,9 +143,9 @@ export function SidebarItem({
       <span>{label}</span>
     </button>
   );
-}
+});
 
-export function ProgressBar({
+export const ProgressBar = React.memo(function ProgressBar({
   value,
   tone = "sunset",
   thin = false,
@@ -152,16 +154,16 @@ export function ProgressBar({
   tone?: "sunset" | "cyan" | "yellow" | "violet";
   thin?: boolean;
 }) {
-  const style = { width: `${Math.max(0, Math.min(100, value))}%` } as CSSProperties;
+  const style = useMemo(() => ({ width: `${Math.max(0, Math.min(100, value))}%` }) as CSSProperties, [value]);
 
   return (
     <div className={cx("progress-track", `progress-track--${tone}`, thin && "progress-track--thin")}>
       <span className="progress-track__fill" style={style} />
     </div>
   );
-}
+});
 
-export function SectionHeader({
+export const SectionHeader = React.memo(function SectionHeader({
   icon: Icon,
   title,
   description,
@@ -184,9 +186,9 @@ export function SectionHeader({
       {action ? <div className="section-header__action">{action}</div> : null}
     </div>
   );
-}
+});
 
-export function MetricCard({
+export const MetricCard = React.memo(function MetricCard({
   title,
   value,
   hint,
@@ -215,16 +217,16 @@ export function MetricCard({
       </div>
     </Panel>
   );
-}
+});
 
-export function EmptyState({ message }: { message: string }) {
+export const EmptyState = React.memo(function EmptyState({ message }: { message: string }) {
   return (
     <div className="empty-state">
       <span className="empty-state__eyebrow">Sem dados</span>
       <p>{message}</p>
     </div>
   );
-}
+});
 
 export function ChartFrame({
   className = "",

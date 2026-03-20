@@ -1,21 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
-  buildDynamicTacticalGoals,
-  createGameFormState,
   systemRules,
 } from "../backlog/shared";
+import type { List } from "../core/types";
 import { useBacklogActions } from "./useBacklogActions";
-import { useDashboardInsights } from "../modules/dashboard/hooks/useDashboardInsights";
-import { useSelectedGamePage } from "../modules/game-page/hooks/useSelectedGamePage";
-import { useLibraryState } from "../modules/library/hooks/useLibraryState";
-import { usePlannerInsights } from "../modules/planner/hooks/usePlannerInsights";
-import { useBuildSessionInsights } from "../modules/sessions/hooks/useBuildSessionInsights";
 import { useCatalogMaintenanceState } from "../modules/catalog-maintenance/hooks/useCatalogMaintenanceState";
 import { guidedTourSteps } from "../modules/onboarding/utils/guidedTour";
 import { useBacklogContext } from "./useBacklogContext";
 import { useBacklogSelectors } from "./useBacklogSelectors";
 import { readBackupTables as readBackupTablesFromDb } from "../services/backlogRepository";
 
+/**
+ * Hook centralizado que fornece apenas dados básicos e ações globais.
+ *
+ * Nota: Os hooks de feature foram movidos para dentro de cada componente de tela
+ * para prevenir re-renderizações em cascata e cálculos desnecessários.
+ *
+ * - DashboardScreen usa useDashboardInsights diretamente
+ * - LibraryScreen usa useLibraryState diretamente
+ * - PlannerScreen usa usePlannerInsights diretamente
+ * - GamePageScreen usa useSelectedGamePage diretamente
+ * - SessionsScreen usa useBuildSessionInsights diretamente
+ */
 export function useBacklogApp() {
   const context = useBacklogContext();
   const { data, importState, preferences, ui } = context;
@@ -50,147 +56,12 @@ export function useBacklogApp() {
     autoSyncWatchKey,
   } = selectors;
 
-  const {
-    listOptions,
-    libraryGames,
-    groupedLibraryGames,
-    selectedGame,
-    selectedRecord,
-    selectedGameLists,
-    activeSavedView,
-    currentViewDraft,
-  } = useLibraryState({
-    games,
-    recordsByEntryId,
-    tagById,
-    listById,
-    gameTagRows: data.gameTagRows,
-    libraryEntryListRows: data.libraryEntryListRows,
-    query: ui.query,
-    searchQuery: ui.deferredQuery,
-    filter: ui.filter,
-    selectedListFilter: effectiveSelectedListFilter,
-    sortBy: ui.librarySortBy,
-    sortDirection: ui.librarySortDirection,
-    groupBy: ui.libraryGroupBy,
-    savedViews: data.savedViewRows,
-    selectedGameId: ui.selectedGameId,
-  });
-
   const findGame = useCallback((id: number) => games.find((game) => game.id === id), [games]);
-  const sessionInsights = useBuildSessionInsights({ sessionRows: data.sessionRows });
-  const dynamicTacticalGoals = useMemo(
-    () => buildDynamicTacticalGoals(games, data.sessionRows),
-    [games, data.sessionRows],
-  );
-
-  const {
-    resolvedGoalRows,
-    plannerGoalSignals,
-    computedPlannerQueue,
-    goalProgress,
-  } = usePlannerInsights({
-    games,
-    libraryEntryRows: data.libraryEntryRows,
-    sessionRows: data.sessionRows,
-    goalRows: data.goalRows,
-    fallbackGoalProgress: dynamicTacticalGoals,
-    preferences,
-    sessionCadenceMap: sessionInsights.sessionCadenceMap,
-  });
-
-  const {
-    monthlyProgress,
-    platformData,
-    storeData,
-    durationBuckets,
-    stats,
-    personalBadges,
-    monthlyRecap,
-    continuePlayingGames,
-  } = useDashboardInsights({
-    games,
-    libraryEntryRows: data.libraryEntryRows,
-    sessionRows: data.sessionRows,
-    plannerGoalSignals,
-    preferences,
-    query: ui.deferredQuery,
-  });
-
   const matchesQuery = useCallback(
     (values: Array<string | number>) =>
       !ui.deferredQuery ||
       values.some((value) => String(value).toLowerCase().includes(ui.deferredQuery)),
     [ui.deferredQuery],
-  );
-
-  const resolvedSelectedGameId = selectedGame?.id ?? 0;
-
-  const selectedGamePage = useSelectedGamePage({
-    selectedGame,
-    selectedRecord,
-    sessionRows: data.sessionRows,
-    storeNamesByEntryId,
-    platformNamesByGameId,
-    gameTagRows: data.gameTagRows,
-    libraryEntryListRows: data.libraryEntryListRows,
-    tagById,
-    listById,
-    reviewByEntryId,
-    goalRows: resolvedGoalRows,
-    plannerGoalSignals,
-    preferences,
-  });
-
-  const openEditGameModal = () => {
-    if (!selectedGame) return;
-    ui.setGameForm(createGameFormState(selectedGame));
-    ui.setGameModalMode("edit");
-  };
-
-  const openEditGameModalFor = (gameId: number) => {
-    const targetGame = findGame(gameId);
-    if (!targetGame) return;
-    ui.setSelectedGameId(gameId);
-    ui.setGameForm(createGameFormState(targetGame));
-    ui.setGameModalMode("edit");
-  };
-
-  const openGamePage = (gameId?: number) => {
-    const nextGameId = typeof gameId === "number" ? gameId : selectedGame?.id;
-    if (typeof nextGameId === "number" && nextGameId > 0) {
-      ui.setSelectedGameId(nextGameId);
-      ui.setScreen("game");
-      return;
-    }
-    ui.setScreen("library");
-  };
-
-  const openLibraryGame = (gameId?: number) => {
-    if (typeof gameId === "number" && gameId > 0) ui.setSelectedGameId(gameId);
-    ui.setScreen("library");
-  };
-
-  const visiblePlannerQueue = useMemo(
-    () =>
-      computedPlannerQueue.filter((entry) => {
-        const game = findGame(entry.gameId);
-        return matchesQuery([game?.title ?? "", entry.reason, entry.fit, entry.eta]);
-      }),
-    [computedPlannerQueue, findGame, matchesQuery],
-  );
-  const visibleSessions = useMemo(
-    () =>
-      data.sessionRows.filter((entry) => {
-        const game = findGame(entry.libraryEntryId);
-        return matchesQuery([
-          game?.title ?? "",
-          game?.platform ?? "",
-          entry.note ?? "",
-          entry.durationMinutes,
-        ]);
-      }),
-    [data.sessionRows, findGame, matchesQuery],
   );
 
   const catalogMaintenanceReport = useCatalogMaintenanceState({
@@ -216,11 +87,18 @@ export function useBacklogApp() {
     libraryEntryRows: data.libraryEntryRows,
     listRows: data.listRows,
     savedViewRows: data.savedViewRows,
-    selectedRecord,
-    selectedGame,
+    selectedRecord: ui.selectedGameId ? records.find((r) => r.libraryEntry.id === ui.selectedGameId) : undefined,
+    selectedGame: ui.selectedGameId ? games.find((g) => g.id === ui.selectedGameId) : undefined,
     selectedListFilter: effectiveSelectedListFilter,
     selectedLibraryIds: ui.selectedLibraryIds,
-    currentLibraryView: currentViewDraft,
+    currentLibraryView: {
+      query: ui.query,
+      filter: ui.filter,
+      selectedListFilter: effectiveSelectedListFilter,
+      sortBy: ui.librarySortBy,
+      sortDirection: ui.librarySortDirection,
+      groupBy: ui.libraryGroupBy,
+    },
     gameModalMode: ui.gameModalMode,
     gameForm: ui.gameForm,
     batchEditForm: ui.batchEditForm,
@@ -295,6 +173,7 @@ export function useBacklogApp() {
   };
 
   return {
+    // Estado global e navegação
     screen: ui.screen,
     setScreen: ui.setScreen,
     query: ui.query,
@@ -310,52 +189,68 @@ export function useBacklogApp() {
     setLibrarySortDirection: ui.setLibrarySortDirection,
     libraryGroupBy: ui.libraryGroupBy,
     setLibraryGroupBy: ui.setLibraryGroupBy,
-    selectedGameId: resolvedSelectedGameId,
+    selectedGameId: ui.selectedGameId,
     setSelectedGameId: ui.setSelectedGameId,
     selectedLibraryIds: ui.selectedLibraryIds,
+    selectedGame: games.find((game) => game.id === ui.selectedGameId),
+
+    // Estado de dados
     loading: data.loading,
     notice: data.notice,
     setNotice: data.setNotice,
     refreshData: data.refreshData,
     readBackupTables,
     submitting: data.submitting,
-    heroCopy,
-    preferences,
-    displayName,
-    hasCompletedOnboarding,
-    guidedTourOpen: ui.guidedTourOpen,
-    guidedTourStep,
-    guidedTourStepIndex: ui.guidedTourStepIndex,
-    guidedTourStepCount: guidedTourSteps.length,
-    guidedTourTarget,
-    onboardingInitialDraft,
-    onboardingInitialLists,
-    onboardingInitialGoalIds,
-    autoSyncWatchKey,
     games,
+    sessionRows: data.sessionRows,
+    libraryEntryRows: data.libraryEntryRows,
+    gameRows: data.gameRows,
     reviewRows: data.reviewRows,
     tagRows: data.tagRows,
     gameTagRows: data.gameTagRows,
     libraryEntryListRows: data.libraryEntryListRows,
     libraryEntryStoreRows: data.libraryEntryStoreRows,
-    sessionRows: data.sessionRows,
-    libraryGames,
-    selectedGame,
-    selectedGamePage,
-    monthlyProgress,
-    platformData,
-    storeData,
-    monthlyHours: sessionInsights.monthlyHours,
-    durationBuckets,
-    visibleSessions,
-    visiblePlannerQueue,
-    continuePlayingGames,
-    stats,
-    goalProgress,
-    personalBadges,
-    monthlyRecap,
-    systemRules,
-    findGame,
+    storeRows: data.storeRows,
+    platformRows: data.platformRows,
+    gamePlatformRows: data.gamePlatformRows,
+    listRows: data.listRows,
+    savedViewRows: data.savedViewRows,
+    goalRows: data.goalRows,
+    importJobRows: data.importJobRows,
+
+    // Dados derivados básicos
+    records,
+    recordsByEntryId,
+    tagById,
+    listById,
+    reviewByEntryId,
+    storeNamesByEntryId,
+    platformNamesByGameId,
+    selectedBatchGames,
+    platforms: data.platformRows,
+    listOptions: Array.from(data.listRows)
+      .filter((list): list is List => list.id != null)
+      .map((list) => ({ id: list.id, name: list.name }))
+      .sort((left, right) => left.name.localeCompare(right.name, "pt-BR")),
+
+    // Preferências e onboarding
+    preferences,
+    displayName,
+    hasCompletedOnboarding,
+    onboardingInitialDraft,
+    onboardingInitialLists,
+    onboardingInitialGoalIds,
+    heroCopy,
+    autoSyncWatchKey,
+
+    // Guided tour
+    guidedTourOpen: ui.guidedTourOpen,
+    guidedTourStep,
+    guidedTourStepIndex: ui.guidedTourStepIndex,
+    guidedTourStepCount: guidedTourSteps.length,
+    guidedTourTarget,
+
+    // Estado de modais e formulários
     gameModalMode: ui.gameModalMode,
     gameForm: ui.gameForm,
     batchEditModalOpen: ui.batchEditModalOpen,
@@ -363,17 +258,10 @@ export function useBacklogApp() {
     sessionModalOpen: ui.sessionModalOpen,
     sessionForm: ui.sessionForm,
     sessionEditId: ui.sessionEditId,
-    goalRows: resolvedGoalRows,
-    listRows: data.listRows,
-    savedViewRows: data.savedViewRows,
-    listOptions,
-    groupedLibraryGames,
-    activeSavedView,
-    selectedGameLists,
-    selectedBatchGames,
     goalModalMode: ui.goalModalMode,
     goalForm: ui.goalForm,
-    storeRows: data.storeRows,
+
+    // Estado de import/export
     importModalOpen: importState.importModalOpen,
     importSource: importState.importSource,
     importText: importState.importText,
@@ -388,24 +276,8 @@ export function useBacklogApp() {
     restorePreview: importState.restorePreview,
     restorePreviewTotals: importState.restorePreviewTotals,
     restoreFileInputRef: importState.restoreFileInputRef,
-    catalogMaintenanceReport,
-    catalogAuditReport,
-    openCreateGameModal: ui.openCreateGameModal,
-    openGuidedTour: ui.openGuidedTour,
-    openEditGameModal,
-    openEditGameModalFor,
-    closeGameModal: ui.closeGameModal,
-    openBatchEditModal: ui.openBatchEditModal,
-    closeBatchEditModal: ui.closeBatchEditModal,
-    openSessionModal: ui.openSessionModal,
-    closeSessionModal: ui.closeSessionModal,
-    openEditSessionModal: ui.openEditSessionModal,
-    openImportFlow: importState.openImportFlow,
-    closeImportFlow: importState.closeImportFlow,
-    resetImportPreview: importState.resetImportPreview,
-    openRestoreFlow: importState.openRestoreFlow,
-    closeRestoreFlow: importState.closeRestoreFlow,
-    resetRestorePreview: importState.resetRestorePreview,
+
+    // Handlers de formulário
     handleGameFormChange: ui.handleGameFormChange,
     handleBatchEditFormChange: ui.handleBatchEditFormChange,
     handleSessionFormChange: ui.handleSessionFormChange,
@@ -413,6 +285,8 @@ export function useBacklogApp() {
     toggleLibrarySelection: ui.toggleLibrarySelection,
     clearLibrarySelection: ui.clearLibrarySelection,
     selectVisibleLibraryGames: ui.selectVisibleLibraryGames,
+
+    // Handlers de import/export
     handleImportSourceChange: importState.handleImportSourceChange,
     handleImportTextChange: importState.handleImportTextChange,
     handleRestoreModeChange: importState.handleRestoreModeChange,
@@ -426,18 +300,59 @@ export function useBacklogApp() {
     handleImportPreviewIgnoreUnsafe: importState.handleImportPreviewIgnoreUnsafe,
     handleImportFileChange: importState.handleImportFileChange,
     handleRestoreFileChange: importState.handleRestoreFileChange,
-    openLibraryGame,
-    openGamePage,
+
+    // Handlers de modal
+    openCreateGameModal: ui.openCreateGameModal,
+    openEditGameModal: ui.openEditGameModal,
+    openEditGameModalFor: ui.openEditGameModalFor,
+    openGuidedTour: ui.openGuidedTour,
+    closeGameModal: ui.closeGameModal,
+    openBatchEditModal: ui.openBatchEditModal,
+    closeBatchEditModal: ui.closeBatchEditModal,
+    openSessionModal: ui.openSessionModal,
+    closeSessionModal: ui.closeSessionModal,
+    openEditSessionModal: ui.openEditSessionModal,
+    openImportFlow: importState.openImportFlow,
+    closeImportFlow: importState.closeImportFlow,
+    resetImportPreview: importState.resetImportPreview,
+    openRestoreFlow: importState.openRestoreFlow,
+    closeRestoreFlow: importState.closeRestoreFlow,
+    resetRestorePreview: importState.resetRestorePreview,
     openCreateGoalModal: ui.openCreateGoalModal,
     openEditGoalModal: ui.openEditGoalModal,
     closeGoalModal: ui.closeGoalModal,
+
+    // Handlers de navegação
+    openLibraryGame: (gameId?: number) => {
+      if (typeof gameId === "number" && gameId > 0) ui.setSelectedGameId(gameId);
+      ui.setScreen("library");
+    },
+    openGamePage: (gameId?: number) => {
+      const nextGameId = typeof gameId === "number" ? gameId : undefined;
+      if (typeof nextGameId === "number" && nextGameId > 0) {
+        ui.setSelectedGameId(nextGameId);
+        ui.setScreen("game");
+        return;
+      }
+      ui.setScreen("library");
+    },
+
+    // Handlers de guided tour
     closeGuidedTour,
     finishGuidedTour,
     nextGuidedTourStep: () => ui.nextGuidedTourStep(guidedTourSteps.length),
     previousGuidedTourStep: ui.previousGuidedTourStep,
-    importJobRows: data.importJobRows,
-    platforms: data.platformRows,
-    gamePlatformRows: data.gamePlatformRows,
+
+    // Utils
+    findGame,
+    matchesQuery,
+    systemRules,
+
+    // Catalog maintenance
+    catalogMaintenanceReport,
+    catalogAuditReport,
+
+    // Todas as actions do useBacklogActions
     ...actions,
   };
 }

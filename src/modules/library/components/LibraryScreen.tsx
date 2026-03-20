@@ -1,4 +1,4 @@
-import { ArrowUpRight, Download, FolderKanban, Gamepad2, Heart, ImageIcon, Library, ListChecks, Plus, Upload } from "lucide-react";
+import { ArrowUpRight, Download, FolderKanban, Gamepad2, Heart, Library, ListChecks, Plus, Upload } from "lucide-react";
 import {
   cx,
   filterOptions,
@@ -18,6 +18,7 @@ import type {
 import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
 import { formatDatePtBr, formatCurrency } from "../../../core/utils";
 import type { GroupedLibraryGames } from "../utils/savedViews";
+import { LibraryCard } from "./LibraryCard";
 
 type ListOption = {
   id: number;
@@ -106,88 +107,6 @@ export function LibraryScreen({
 }: LibraryScreenProps) {
   const visibleLibraryIds = libraryGames.map((game) => game.id);
   const selectedCount = selectedLibraryIds.length;
-
-  const renderLibraryCard = (game: Game) => {
-    const isSelected = selectedLibraryIds.includes(game.id);
-
-    return (
-      <article
-        key={game.id}
-        className={cx(
-          "library-card-shell",
-          selectedGame?.id === game.id && "library-card-shell--active",
-          isSelected && "library-card-shell--selected",
-        )}
-      >
-        <div className="library-card__toolbar">
-          <button
-            type="button"
-            className={cx("library-card__select", isSelected && "library-card__select--active")}
-            onClick={() => onToggleLibrarySelection(game.id)}
-            aria-pressed={isSelected}
-            aria-label={isSelected ? `Remover ${game.title} da seleção` : `Selecionar ${game.title}`}
-          >
-            {isSelected ? "Selecionado" : "Selecionar"}
-          </button>
-          <span className="library-card__toolbar-meta">
-            {(game.platforms ?? [game.platform]).slice(0, 2).join(" • ")}
-          </span>
-        </div>
-
-        <button
-          type="button"
-          className="library-card"
-          onClick={() => onSelectGame(game.id)}
-          aria-label={`Abrir ficha de ${game.title}`}
-        >
-          <div className="library-card__cover">
-            {game.coverUrl ? (
-              <img src={game.coverUrl} alt={`Capa de ${game.title}`} />
-            ) : (
-              <div className="library-card__cover-placeholder">
-                <ImageIcon size={18} />
-                <span>Sem capa</span>
-              </div>
-            )}
-          </div>
-
-          <div className="library-card__content">
-            <div className="library-card__platform">
-              <span>{game.platform}</span>
-              <ArrowUpRight size={15} />
-            </div>
-            <h3>{game.title}</h3>
-            <p className="library-card__genre">{game.genre}</p>
-            <div className="library-card__chips">
-              <Pill tone={statusTone[game.status]}>{game.status}</Pill>
-              <Pill tone={priorityTone[game.priority]}>{game.priority}</Pill>
-            </div>
-            <div className="library-card__progress">
-              <div className="library-card__progress-head">
-                <span>Progresso</span>
-                <strong>{game.progress}%</strong>
-              </div>
-              <ProgressBar value={game.progress} tone="cyan" thin />
-            </div>
-            <div className="library-card__metrics">
-              <div>
-                <span>Nota</span>
-                <strong>{game.score.toFixed(1)}</strong>
-              </div>
-              <div>
-                <span>Horas</span>
-                <strong>{game.hours}h</strong>
-              </div>
-              <div>
-                <span>ETA</span>
-                <strong>{game.eta}</strong>
-              </div>
-            </div>
-          </div>
-        </button>
-      </article>
-    );
-  };
 
   return (
     <div className="library-layout">
@@ -358,7 +277,18 @@ export function LibraryScreen({
             {groupedLibraryGames.map((group) => (
               <section key={group.key} className="library-group-block">
                 {groupBy !== "none" ? <h3 className="library-group-title">{group.label}</h3> : null}
-                <div className="library-grid">{group.games.map(renderLibraryCard)}</div>
+                <div className="library-grid">
+                  {group.games.map((game) => (
+                    <LibraryCard
+                      key={game.id}
+                      game={game}
+                      isSelected={selectedLibraryIds.includes(game.id)}
+                      isActive={selectedGame?.id === game.id}
+                      onSelectGame={onSelectGame}
+                      onToggleSelection={onToggleLibrarySelection}
+                    />
+                  ))}
+                </div>
               </section>
             ))}
           </div>
