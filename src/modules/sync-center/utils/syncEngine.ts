@@ -414,6 +414,10 @@ export function buildSyncComparison(
     if (localHash === cloudHash) state = "same";
     else if (localCount > 0 && cloudCount === 0) state = "local-only";
     else if (cloudCount > 0 && localCount === 0) state = "cloud-only";
+    else if (localCount === cloudCount && decision === "auto-merge") {
+      // Contagens iguais + auto-merge = blocos compatíveis (não mostrar como divergente)
+      state = "same";
+    }
 
     return {
       key,
