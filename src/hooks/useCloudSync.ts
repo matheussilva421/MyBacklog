@@ -57,10 +57,15 @@ function createHistoryEntry(
   };
 }
 
+function getErrorTextField(error: unknown, field: "code" | "message") {
+  if (!error || typeof error !== "object") return "";
+  const value = (error as Record<string, unknown>)[field];
+  return typeof value === "string" ? value : "";
+}
+
 function isCloudPermissionError(error: unknown) {
-  if (!error || typeof error !== "object") return false;
-  const code = "code" in error ? String(error.code) : "";
-  const message = "message" in error ? String(error.message) : "";
+  const code = getErrorTextField(error, "code");
+  const message = getErrorTextField(error, "message");
   return code === "permission-denied" || message.includes("Missing or insufficient permissions");
 }
 
@@ -150,7 +155,7 @@ export function useCloudSync({
   const lastSuccessfulSyncAtRef = useRef<string | null>(null);
   const previousFingerprintRef = useRef<string | null>(null);
   const cloudSnapshotRef = useRef<BackupPayload | null>(null);
-  const syncingRef = useRef(false);
+  const syncLockRef = useRef<symbol | null>(null);
 
   useEffect(() => {
     historyRef.current = syncHistory;
@@ -238,6 +243,20 @@ export function useCloudSync({
     [persistSyncMeta, refreshData],
   );
 
+  const acquireSyncLock = useCallback(() => {
+    if (syncLockRef.current) return null;
+    const token = Symbol("cloud-sync");
+    syncLockRef.current = token;
+    setIsSyncing(true);
+    return token;
+  }, []);
+
+  const releaseSyncLock = useCallback((token: symbol | null) => {
+    if (!token || syncLockRef.current !== token) return;
+    syncLockRef.current = null;
+    setIsSyncing(false);
+  }, []);
+
   const finalizeMatchState = useCallback((localTables: SyncTables, cloudData: BackupPayload | null) => {
     const nextComparison = buildSyncComparison(localTables, cloudData);
     setComparison(nextComparison);
@@ -251,89 +270,93 @@ export function useCloudSync({
     let active = true;
 
     void (async () => {
-      const localTables = await readBackupTables();
-      if (!active) return;
-
-      hydrateLocalSyncState(localTables);
-
-      if (!isAuthEnabled) {
-        setComparison(null);
-        setIsWorkingLocal(false);
-        cloudSnapshotRef.current = null;
-        return;
-      }
-
-      if (!user || !isOnline) {
-        setComparison(null);
-        return;
-      }
-
       try {
-        if (syncingRef.current) return;
-        syncingRef.current = true;
-        setIsSyncing(true);
-        const cloudData = await pullFromCloud(user.uid);
+        const localTables = await readBackupTables();
         if (!active) return;
 
-        const nextComparison = buildSyncComparison(localTables, cloudData);
-        setComparison(nextComparison);
-        cloudSnapshotRef.current = cloudData;
+        hydrateLocalSyncState(localTables);
 
-        if (nextComparison.decision === "idle" || nextComparison.decision === "match") {
-          previousFingerprintRef.current = nextComparison.localFingerprint;
+        if (!isAuthEnabled) {
+          setComparison(null);
           setIsWorkingLocal(false);
+          cloudSnapshotRef.current = null;
           return;
         }
 
-        if (
-          (nextComparison.decision === "push-local" || nextComparison.decision === "pull-cloud") &&
-          !autoSyncEnabled
-        ) {
-          setIsWorkingLocal(true);
+        if (!user || !isOnline) {
+          setComparison(null);
           return;
         }
 
-        if (nextComparison.decision === "push-local") {
-          const payload = buildBackupPayload(localTables);
-          await pushToCloud(user.uid, payload);
+        const syncToken = acquireSyncLock();
+        if (!syncToken) return;
+
+        try {
+          const cloudData = await pullFromCloud(user.uid);
           if (!active) return;
-          const successAt = payload.exportedAt;
-          cloudSnapshotRef.current = payload;
-          commitLastSuccessfulSyncAt(successAt);
-          finalizeMatchState(localTables, payload);
-          await pushHistory(
-            "auto-push",
-            "success",
-            "Backup local enviado automaticamente para a nuvem.",
-            successAt,
-          );
-          return;
-        }
 
-        if (nextComparison.decision === "pull-cloud" && cloudData) {
-          const cloudTables = stripBackupMeta(cloudData);
-          await applySnapshotLocally(cloudTables, cloudData.exportedAt);
-          if (!active) return;
-          commitLastSuccessfulSyncAt(cloudData.exportedAt);
-          finalizeMatchState(cloudTables, cloudData);
-          await pushHistory(
-            "auto-pull",
-            "success",
-            "Snapshot remoto aplicado automaticamente na base local.",
-            cloudData.exportedAt,
-          );
-          return;
-        }
+          const nextComparison = buildSyncComparison(localTables, cloudData);
+          setComparison(nextComparison);
+          cloudSnapshotRef.current = cloudData;
 
-        setIsWorkingLocal(false);
-        await pushHistory(
-          "conflict",
-          "conflict",
-          "Conflito detectado entre base local e nuvem. Revise as diferenças antes de manter local, puxar nuvem, mesclar ou seguir só local.",
-        );
-        setNotice(
-          "Conflito detectado entre base local e nuvem. Abra a Central de Sync e escolha conscientemente como resolver.",
-        );
+          if (nextComparison.decision === "idle" || nextComparison.decision === "match") {
+            previousFingerprintRef.current = nextComparison.localFingerprint;
+            setIsWorkingLocal(false);
+            return;
+          }
+
+          if (
+            (nextComparison.decision === "push-local" || nextComparison.decision === "pull-cloud") &&
+            !autoSyncEnabled
+          ) {
+            setIsWorkingLocal(true);
+            return;
+          }
+
+          if (nextComparison.decision === "push-local") {
+            const payload = buildBackupPayload(localTables);
+            await pushToCloud(user.uid, payload);
+            if (!active) return;
+            const successAt = payload.exportedAt;
+            cloudSnapshotRef.current = payload;
+            commitLastSuccessfulSyncAt(successAt);
+            finalizeMatchState(localTables, payload);
+            await pushHistory(
+              "auto-push",
+              "success",
+              "Backup local enviado automaticamente para a nuvem.",
+              successAt,
+            );
+            return;
+          }
+
+          if (nextComparison.decision === "pull-cloud" && cloudData) {
+            const cloudTables = stripBackupMeta(cloudData);
+            await applySnapshotLocally(cloudTables, cloudData.exportedAt);
+            if (!active) return;
+            commitLastSuccessfulSyncAt(cloudData.exportedAt);
+            finalizeMatchState(cloudTables, cloudData);
+            await pushHistory(
+              "auto-pull",
+              "success",
+              "Snapshot remoto aplicado automaticamente na base local.",
+              cloudData.exportedAt,
+            );
+            return;
+          }
+
+          setIsWorkingLocal(false);
+          await pushHistory(
+            "conflict",
+            "conflict",
+            "Conflito detectado entre base local e nuvem. Revise as diferenças antes de manter local, puxar nuvem, mesclar ou seguir só local.",
+          );
+          setNotice(
+            "Conflito detectado entre base local e nuvem. Abra a Central de Sync e escolha conscientemente como resolver.",
+          );
+        } finally {
+          releaseSyncLock(syncToken);
+        }
       } catch (error) {
         if (isCloudPermissionError(error)) {
           if (!active) return;
@@ -350,11 +373,6 @@ export function useCloudSync({
         if (!active) return;
         await pushHistory("error", "error", "Falha ao inicializar a sincronização com a nuvem.");
         setNotice("Falha ao sincronizar com a nuvem.");
-      } finally {
-        if (active) {
-          syncingRef.current = false;
-          setIsSyncing(false);
-        }
       }
     })();
 
@@ -362,6 +380,7 @@ export function useCloudSync({
       active = false;
     };
   }, [
+    acquireSyncLock,
     applySnapshotLocally,
     autoSyncEnabled,
     commitLastSuccessfulSyncAt,
@@ -371,6 +390,7 @@ export function useCloudSync({
     isOnline,
     pushHistory,
     readBackupTables,
+    releaseSyncLock,
     setNotice,
     user,
   ]);
@@ -385,14 +405,23 @@ export function useCloudSync({
   }, [comparison?.decision, isAuthEnabled, isOnline, isWorkingLocal, user]);
 
   const runPushFlow = useCallback(
-    async (action: "auto-push" | "manual-push") => {
+    async (
+      action: "auto-push" | "manual-push",
+      options: {
+        lockToken?: symbol;
+        cloudData?: BackupPayload | null;
+        localTables?: SyncTables;
+      } = {},
+    ) => {
       if (!user || !isAuthEnabled || !isOnline) return;
-      if (syncingRef.current) return;
+      const syncToken = options.lockToken ?? acquireSyncLock();
+      if (!syncToken) return;
 
-      syncingRef.current = true;
-      setIsSyncing(true);
       try {
-        const [localTables, cloudData] = await Promise.all([readBackupTables(), pullFromCloud(user.uid)]);
+        const [localTables, cloudData] = await Promise.all([
+          options.localTables ? Promise.resolve(options.localTables) : readBackupTables(),
+          options.cloudData !== undefined ? Promise.resolve(options.cloudData) : pullFromCloud(user.uid),
+        ]);
         const nextComparison = buildSyncComparison(localTables, cloudData);
         setComparison(nextComparison);
         cloudSnapshotRef.current = cloudData;
@@ -441,17 +470,20 @@ export function useCloudSync({
         await pushHistory(action, "error", "Falha ao enviar o snapshot local para a nuvem.");
         setNotice("Falha ao enviar backup para a nuvem.");
       } finally {
-        syncingRef.current = false;
-        setIsSyncing(false);
+        if (!options.lockToken) {
+          releaseSyncLock(syncToken);
+        }
       }
     },
     [
+      acquireSyncLock,
       commitLastSuccessfulSyncAt,
       finalizeMatchState,
       isAuthEnabled,
       isOnline,
       pushHistory,
       readBackupTables,
+      releaseSyncLock,
       setNotice,
       user,
     ],
@@ -463,10 +495,8 @@ export function useCloudSync({
       setNotice("Você está offline. Reconecte para puxar o snapshot remoto.");
       return;
     }
-    if (syncingRef.current) return;
-
-    syncingRef.current = true;
-    setIsSyncing(true);
+    const syncToken = acquireSyncLock();
+    if (!syncToken) return;
     try {
       const cloudData = await pullFromCloud(user.uid);
       if (!cloudData) {
@@ -497,16 +527,17 @@ export function useCloudSync({
       await pushHistory("manual-pull", "error", "Falha ao puxar o snapshot remoto.");
       setNotice("Falha ao puxar a nuvem.");
     } finally {
-      syncingRef.current = false;
-      setIsSyncing(false);
+      releaseSyncLock(syncToken);
     }
   }, [
+    acquireSyncLock,
     applySnapshotLocally,
     commitLastSuccessfulSyncAt,
     finalizeMatchState,
     isAuthEnabled,
     isOnline,
     pushHistory,
+    releaseSyncLock,
     setNotice,
     user,
   ]);
@@ -517,16 +548,16 @@ export function useCloudSync({
       setNotice("Você está offline. Reconecte para mesclar snapshots.");
       return;
     }
-    if (syncingRef.current) return;
-
-    syncingRef.current = true;
-    setIsSyncing(true);
+    const syncToken = acquireSyncLock();
+    if (!syncToken) return;
     try {
       const [localTables, cloudData] = await Promise.all([readBackupTables(), pullFromCloud(user.uid)]);
       if (!cloudData) {
-        syncingRef.current = false;
-        setIsSyncing(false);
-        await runPushFlow("manual-push");
+        await runPushFlow("manual-push", {
+          lockToken: syncToken,
+          cloudData: null,
+          localTables,
+        });
         return;
       }
 
@@ -556,10 +587,10 @@ export function useCloudSync({
       await pushHistory("manual-merge", "error", "Falha ao mesclar snapshots local e remoto.");
       setNotice("Falha ao mesclar os dados de sync.");
     } finally {
-      syncingRef.current = false;
-      setIsSyncing(false);
+      releaseSyncLock(syncToken);
     }
   }, [
+    acquireSyncLock,
     applySnapshotLocally,
     commitLastSuccessfulSyncAt,
     finalizeMatchState,
@@ -567,6 +598,7 @@ export function useCloudSync({
     isOnline,
     pushHistory,
     readBackupTables,
+    releaseSyncLock,
     runPushFlow,
     setNotice,
     user,

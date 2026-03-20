@@ -11,6 +11,57 @@ import type {
 } from "./types";
 import { normalizeToken, splitCsvTokens } from "./utils";
 
+function getStructuredSyncErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function insertStoreRow(storeName: string, normalizedName: string, now: string): Promise<Store> {
+  const draft = {
+    name: storeName,
+    normalizedName,
+    sourceKey: classifyAccessSource(storeName),
+    createdAt: now,
+    updatedAt: now,
+  } satisfies Omit<Store, "id">;
+
+  try {
+    const nextId = Number(await db.stores.add(draft));
+    return { id: nextId, ...draft };
+  } catch (error) {
+    const existing = await db.stores.where("normalizedName").equals(normalizedName).first();
+    if (existing) return existing;
+
+    throw new Error(
+      `Falha ao persistir a store estruturada "${storeName}": ${getStructuredSyncErrorMessage(error)}`,
+    );
+  }
+}
+
+async function insertPlatformRow(
+  platformName: string,
+  normalizedName: string,
+  now: string,
+): Promise<Platform> {
+  const draft = {
+    name: platformName,
+    normalizedName,
+    createdAt: now,
+    updatedAt: now,
+  } satisfies Omit<Platform, "id">;
+
+  try {
+    const nextId = Number(await db.platforms.add(draft));
+    return { id: nextId, ...draft };
+  } catch (error) {
+    const existing = await db.platforms.where("normalizedName").equals(normalizedName).first();
+    if (existing) return existing;
+
+    throw new Error(
+      `Falha ao persistir a plataforma estruturada "${platformName}": ${getStructuredSyncErrorMessage(error)}`,
+    );
+  }
+}
+
 async function ensureStores(storeNames: string[]): Promise<Map<string, Store>> {
   const normalizedNames = Array.from(new Set(storeNames.map(normalizeToken).filter(Boolean)));
   if (normalizedNames.length === 0) return new Map();
@@ -24,23 +75,8 @@ async function ensureStores(storeNames: string[]): Promise<Map<string, Store>> {
   for (const storeName of storeNames) {
     const normalizedName = normalizeToken(storeName);
     if (!normalizedName || existingByNormalizedName.has(normalizedName)) continue;
-    const nextId = Number(
-      await db.stores.add({
-        name: storeName,
-        normalizedName,
-        sourceKey: classifyAccessSource(storeName),
-        createdAt: now,
-        updatedAt: now,
-      }),
-    );
-    existingByNormalizedName.set(normalizedName, {
-      id: nextId,
-      name: storeName,
-      normalizedName,
-      sourceKey: classifyAccessSource(storeName),
-      createdAt: now,
-      updatedAt: now,
-    });
+    const store = await insertStoreRow(storeName, normalizedName, now);
+    existingByNormalizedName.set(normalizedName, store);
   }
 
   return existingByNormalizedName;
@@ -59,21 +95,8 @@ async function ensurePlatforms(platformNames: string[]): Promise<Map<string, Pla
   for (const platformName of platformNames) {
     const normalizedName = normalizeToken(platformName);
     if (!normalizedName || existingByNormalizedName.has(normalizedName)) continue;
-    const nextId = Number(
-      await db.platforms.add({
-        name: platformName,
-        normalizedName,
-        createdAt: now,
-        updatedAt: now,
-      }),
-    );
-    existingByNormalizedName.set(normalizedName, {
-      id: nextId,
-      name: platformName,
-      normalizedName,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const platform = await insertPlatformRow(platformName, normalizedName, now);
+    existingByNormalizedName.set(normalizedName, platform);
   }
 
   return existingByNormalizedName;

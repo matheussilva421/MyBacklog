@@ -15,6 +15,7 @@ import {
   buildStructuredEntryLookupAliases,
   createStructuredEntryIdentity,
 } from "../core/structuredEntryIdentity";
+import { buildPlaySessionDedupKey } from "../core/playSessionIdentity";
 import { normalizeToken, splitCsvTokens } from "../core/utils";
 import type {
   Game as DbGameMetadata,
@@ -840,10 +841,7 @@ export function useBacklogActions({
           );
           const existingReviewMap = new Map(existingReviews.map((review) => [review.libraryEntryId, review] as const));
           const sessionSet = new Set(
-            existingSessions.map(
-              (session) =>
-                `${session.libraryEntryId}::${session.date}::${session.durationMinutes}::${(session.note || "").trim().toLowerCase()}::${session.completionPercent ?? ""}`,
-            ),
+            existingSessions.map((session) => buildPlaySessionDedupKey(session.libraryEntryId, session)),
           );
           const gameTagSet = new Set(existingGameTags.map((entry) => `${entry.libraryEntryId}::${entry.tagId}`));
           const libraryEntryStoreSet = new Set(
@@ -1063,7 +1061,7 @@ export function useBacklogActions({
           for (const session of payload.playSessions) {
             const libraryEntryId = resolvedEntryIdByPayloadId.get(session.libraryEntryId);
             if (!libraryEntryId) continue;
-            const signature = `${libraryEntryId}::${session.date}::${session.durationMinutes}::${(session.note || "").trim().toLowerCase()}::${session.completionPercent ?? ""}`;
+            const signature = buildPlaySessionDedupKey(libraryEntryId, session);
             if (sessionSet.has(signature)) continue;
             sessionSet.add(signature);
             const libraryEntry = await db.libraryEntries.get(libraryEntryId);

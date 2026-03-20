@@ -234,4 +234,61 @@ describe("syncEngine helpers", () => {
     expect(merged.gamePlatforms).toHaveLength(2);
     expect(merged.libraryEntries[0]?.platform).toBe("Steam Deck");
   });
+
+  it("preserva sessoes com mesma assinatura basica quando a plataforma diverge", () => {
+    const merged = mergeSyncTables(
+      {
+        ...baseTables,
+        playSessions: [
+          {
+            id: 1,
+            libraryEntryId: 1,
+            date: "2026-03-18",
+            platform: "PC",
+            durationMinutes: 90,
+            note: "Boss fight",
+            completionPercent: 62,
+          },
+        ],
+      },
+      {
+        ...baseTables,
+        games: [{ ...baseTables.games[0], id: 9 }],
+        libraryEntries: [{ ...baseTables.libraryEntries[0], id: 9, gameId: 9 }],
+        stores: [{ ...baseTables.stores[0], id: 9 }],
+        libraryEntryStores: [
+          {
+            ...baseTables.libraryEntryStores[0],
+            id: 9,
+            libraryEntryId: 9,
+            storeId: 9,
+          },
+        ],
+        platforms: [{ ...baseTables.platforms[0], id: 9 }],
+        gamePlatforms: [
+          {
+            ...baseTables.gamePlatforms[0],
+            id: 9,
+            gameId: 9,
+            platformId: 9,
+          },
+        ],
+        playSessions: [
+          {
+            id: 9,
+            libraryEntryId: 9,
+            date: "2026-03-18",
+            platform: "Steam Deck",
+            durationMinutes: 90,
+            note: "Boss fight",
+            completionPercent: 62,
+          },
+        ],
+      },
+    );
+
+    expect(merged.libraryEntries).toHaveLength(1);
+    expect(merged.playSessions).toHaveLength(2);
+    expect(merged.playSessions.map((session) => session.platform)).toEqual(["PC", "Steam Deck"]);
+  });
 });

@@ -18,6 +18,7 @@ import type {
   ProgressStatus,
 } from "../../../core/types";
 import { deriveCompletionDate } from "../../../core/catalogIntegrity";
+import { buildPlaySessionDedupKey } from "../../../core/playSessionIdentity";
 import {
   getPrimaryCsvToken,
   mergePlatformList,
@@ -1071,10 +1072,7 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
   } = tables;
 
   const currentSessions = new Set(
-    playSessions.map(
-      (session) =>
-        `${session.libraryEntryId}::${session.date}::${session.durationMinutes}::${(session.note || "").trim().toLowerCase()}::${session.completionPercent ?? ""}`,
-    ),
+    playSessions.map((session) => buildPlaySessionDedupKey(session.libraryEntryId, session)),
   );
   const currentReviewsByEntry = new Map(reviews.map((review) => [review.libraryEntryId, review]));
   const currentStoresByName = new Map(stores.map((store) => [store.name.trim().toLowerCase(), store]));
@@ -1179,8 +1177,7 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
       sessionSkip += 1;
       continue;
     }
-    const signature =
-      `${targetEntryId}::${session.date}::${session.durationMinutes}::${(session.note || "").trim().toLowerCase()}::${session.completionPercent ?? ""}`;
+    const signature = buildPlaySessionDedupKey(targetEntryId, session);
     if (currentSessions.has(signature)) sessionSkip += 1;
     else sessionCreate += 1;
   }

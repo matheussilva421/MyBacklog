@@ -27,6 +27,7 @@ import {
   resolveStructuredPlatforms,
   resolveStructuredStores,
 } from "../../../core/structuredRelations";
+import { buildPlaySessionDedupKey } from "../../../core/playSessionIdentity";
 import { normalizeGameTitle } from "../../../core/utils";
 import {
   mergeGameMetadata,
@@ -642,13 +643,16 @@ function mergeEntryRows(args: {
       const primaryScoped = ordered[0];
       const duplicateScoped = ordered.slice(1);
 
-      const sourceSessions = group.flatMap(
-        (entry) => scopedSessions.get(`${entry.scope}:${entry.row.id}`) ?? [],
+      const sourceSessions = group.flatMap((entry) =>
+        (scopedSessions.get(`${entry.scope}:${entry.row.id}`) ?? []).map((session) => ({
+          entry,
+          session,
+        })),
       );
-      const normalizedSessions = sourceSessions.map((session) => ({
+      const normalizedSessions = sourceSessions.map(({ entry, session }) => ({
         ...session.row,
         libraryEntryId: nextId,
-        platform: primaryScoped.row.platform,
+        platform: session.row.platform || entry.row.platform || primaryScoped.row.platform,
       }));
 
       const mergedEntry = mergeLibraryEntries(
@@ -797,11 +801,7 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
     (left, right) => left[0] - right[0],
   )) {
     for (const session of sessions) {
-      const signature = `${entryId}::${session.date}::${session.durationMinutes}::${(
-        session.note || ""
-      )
-        .trim()
-        .toLowerCase()}::${session.completionPercent ?? ""}`;
+      const signature = buildPlaySessionDedupKey(entryId, session);
       if (sessionSignatures.has(signature)) continue;
       sessionSignatures.add(signature);
       mergedSessions.push({
