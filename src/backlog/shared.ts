@@ -91,6 +91,12 @@ export type ImportPayload = {
   developer?: string;
   publisher?: string;
   description?: string;
+  startedAt?: string;
+  purchaseDate?: string;
+  pricePaid?: number;
+  targetPrice?: number;
+  currency?: string;
+  storeLink?: string;
 };
 
 export type ScreenKey =
@@ -149,6 +155,12 @@ export type Game = {
   rawgId?: number;
   developer?: string;
   publisher?: string;
+  startedAt?: string;
+  purchaseDate?: string;
+  pricePaid?: number;
+  targetPrice?: number;
+  currency?: string;
+  storeLink?: string;
 };
 
 export type LibraryRecord = {
@@ -255,6 +267,12 @@ export type GameFormState = {
   publisher: string;
   description: string;
   notes: string;
+  startedAt: string;
+  purchaseDate: string;
+  pricePaid: string;
+  targetPrice: string;
+  currency: string;
+  storeLink: string;
 };
 
 export type SessionFormState = {

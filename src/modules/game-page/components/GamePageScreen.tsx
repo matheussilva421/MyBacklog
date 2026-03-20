@@ -175,6 +175,10 @@ export function GamePageScreen({
                 <strong>{data.game.eta}</strong>
               </div>
               <div className="detail-stat">
+                <span>Começou a jogar</span>
+                <strong>{data.inferredStartedAt ? formatDatePtBr(data.inferredStartedAt) : "--"}</strong>
+              </div>
+              <div className="detail-stat">
                 <span>Última sessão</span>
                 <strong>{data.lastSession ? formatDatePtBr(data.lastSession.date) : "--"}</strong>
               </div>

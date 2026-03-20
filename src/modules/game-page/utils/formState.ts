@@ -30,6 +30,12 @@ export function createGameFormState(game?: Game, defaults?: GameFormDefaults): G
     publisher: game?.publisher ?? "",
     description: game?.description ?? "",
     notes: game?.notes ?? "",
+    startedAt: game?.startedAt ?? "",
+    purchaseDate: game?.purchaseDate ?? "",
+    pricePaid: game?.pricePaid != null ? String(game.pricePaid) : "",
+    targetPrice: game?.targetPrice != null ? String(game.targetPrice) : "",
+    currency: game?.currency ?? "BRL",
+    storeLink: game?.storeLink ?? "",
   };
 }
 
@@ -74,8 +80,12 @@ export function createDbGameFromForm(
       format: current?.libraryEntry.format || "digital",
       ownershipStatus: form.status === "Wishlist" ? "wishlist" : "owned",
       progressStatus,
-      purchaseDate: current?.libraryEntry.purchaseDate,
-      pricePaid: current?.libraryEntry.pricePaid,
+      purchaseDate: form.purchaseDate.trim() || current?.libraryEntry.purchaseDate,
+      pricePaid: form.pricePaid ? Number(form.pricePaid) : current?.libraryEntry.pricePaid,
+      targetPrice: form.targetPrice ? Number(form.targetPrice) : current?.libraryEntry.targetPrice,
+      currency: form.currency.trim() || current?.libraryEntry.currency,
+      storeLink: form.storeLink.trim() || current?.libraryEntry.storeLink,
+      startedAt: form.startedAt.trim() || current?.libraryEntry.startedAt,
       playtimeMinutes: Math.round(hours * 60),
       completionPercent,
       priority: priorityToDbPriority(form.priority),

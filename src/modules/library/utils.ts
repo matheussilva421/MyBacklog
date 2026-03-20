@@ -56,5 +56,11 @@ export function dbGameToUiGame(record: LibraryRecord): Game {
     rawgId: game.rawgId,
     developer,
     publisher,
+    startedAt: libraryEntry.startedAt,
+    purchaseDate: libraryEntry.purchaseDate,
+    pricePaid: libraryEntry.pricePaid,
+    targetPrice: libraryEntry.targetPrice,
+    currency: libraryEntry.currency,
+    storeLink: libraryEntry.storeLink,
   };
 }

@@ -71,8 +71,12 @@ export interface LibraryEntry {
   format: GameFormat;
   ownershipStatus: OwnershipStatus;
   progressStatus: ProgressStatus;
+  startedAt?: string;
   purchaseDate?: string;
   pricePaid?: number;
+  targetPrice?: number;
+  currency?: string;
+  storeLink?: string;
   playtimeMinutes: number;
   completionPercent: number;
   priority: Priority;

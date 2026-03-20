@@ -333,6 +333,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
         monthlyHours={app.monthlyHours}
         platformData={app.platformData}
         visibleSessions={app.visibleSessions}
+        games={app.games}
         findGame={app.findGame}
         onEditSession={app.openEditSessionModal}
         onDeleteSession={app.handleSessionDelete}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PlatformDashboard } from "./PlatformDashboard";
 import { Activity, BarChart3, CalendarDays, Clock3, Monitor, Pencil, Trash2, Trophy } from "lucide-react";
 import { DonutChart, VerticalBarChart } from "../../../charts";
 import { formatDuration, pieColors, type BarPoint, type Game, type PiePoint } from "../../../backlog/shared";
@@ -19,6 +20,7 @@ type StatsScreenProps = {
   monthlyHours: BarPoint[];
   platformData: PiePoint[];
   visibleSessions: PlaySession[];
+  games: Game[];
   findGame: (id: number) => Game | undefined;
   onEditSession: (session: PlaySession) => void;
   onDeleteSession: (sessionId: number) => Promise<void>;
@@ -29,13 +31,25 @@ export function StatsScreen({
   monthlyHours,
   platformData,
   visibleSessions,
+  games,
   findGame,
   onEditSession,
   onDeleteSession,
 }: StatsScreenProps) {
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(SESSION_PAGE_SIZE);
   const displayedSessions = visibleSessions.slice(0, visibleCount);
   const hasMore = visibleCount < visibleSessions.length;
+
+  if (selectedPlatform) {
+    return (
+      <PlatformDashboard
+        platform={selectedPlatform}
+        games={games}
+        onBack={() => setSelectedPlatform(null)}
+      />
+    );
+  }
 
   return (
     <div className="stats-layout">
@@ -71,7 +85,12 @@ export function StatsScreen({
                   className="legend-item__dot"
                   style={{ backgroundColor: pieColors[index % pieColors.length] }}
                 />
-                <span>{entry.name}</span>
+                <span 
+                  style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted" }}
+                  onClick={() => setSelectedPlatform(entry.name)}
+                >
+                  {entry.name}
+                </span>
                 <strong>{entry.value}%</strong>
               </div>
             ))}

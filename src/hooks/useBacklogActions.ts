@@ -447,6 +447,22 @@ export function useBacklogActions({
         },
       );
 
+      const now = new Date().toISOString();
+      const changeList = importState.importPreview
+        ?.filter((p) => p.action !== "ignore")
+        .map((p) => ({ title: p.payload.title, action: p.action }));
+
+      await db.importJobs.add({
+        source: importState.importSource,
+        status: "completed",
+        totalItems: importState.importPreview?.length ?? 0,
+        processedItems: created + updated,
+        summary: `Importação concluída: ${created} novos, ${updated} atualizados, ${ignored} ignorados.`,
+        changes: JSON.stringify(changeList || []),
+        createdAt: now,
+        updatedAt: now,
+      }).catch(() => {});
+
       await refreshData();
       importState.closeImportFlow();
       setScreen("library");

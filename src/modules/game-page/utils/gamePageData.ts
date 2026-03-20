@@ -34,6 +34,7 @@ export type GamePageData = {
   hoursThisMonthLabel: string;
   hoursPerMonth: BarPoint[];
   notedSessions: PlaySession[];
+  inferredStartedAt?: string;
 };
 
 function clampPercent(value: number): number {
@@ -85,6 +86,8 @@ export function buildGamePageData(input: {
   const plannerReason = buildPlannerReason(input.game, input.goalSignals, input.preferences, cadence);
   const plannerFit = buildPlannerFit(input.game, input.goalSignals, input.preferences, cadence);
   const notedSessions = sessions.filter((session) => Boolean(session.note?.trim())).slice(0, 5);
+  const oldestSession = sessions.length > 0 ? sessions[sessions.length - 1] : undefined;
+  const inferredStartedAt = input.game.startedAt || oldestSession?.date;
 
   return {
     game: input.game,
@@ -116,5 +119,6 @@ export function buildGamePageData(input: {
     hoursThisMonthLabel: formatDurationHours(cadence.minutesThisMonth),
     hoursPerMonth,
     notedSessions,
+    inferredStartedAt,
   };
 }

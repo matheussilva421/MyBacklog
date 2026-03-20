@@ -201,11 +201,17 @@ function fromCsvRows(rows: Array<Record<string, string>>, source: ImportSource, 
       payload.estimatedTime = row.estimatedtime || row.eta || row.estimativa || undefined;
       payload.difficulty = row.difficulty || row.dificuldade || undefined;
       payload.releaseYear = Number(row.releaseyear || row.year || row.ano || 0) || undefined;
-      payload.completionDate = parseOptionalDate(row.completiondate || row.dataconclusao || row.finishedat || row.conclusão);
+      payload.completionDate = parseOptionalDate(row.completiondate || row.dataconclusao || row.finishedat || row.conclusão || row['date finished'] || row['finished on'] || row['finalizado em']);
       payload.coverUrl = row.coverurl || row.cover || row.capa || undefined;
       payload.developer = row.developer || row.studio || row.desenvolvedora || undefined;
       payload.publisher = row.publisher || row.publishers || row.publicadora || undefined;
       payload.description = row.description || row.descricao || row.descrição || undefined;
+      payload.startedAt = parseOptionalDate(row.startedat || row.comecou || row.começou || row.comeco || row.início || row.inicio || row['date started'] || row['started on'] || row['começou em']);
+      payload.purchaseDate = parseOptionalDate(row.purchasedate || row.dataaquisicao || row.data_aquisicao || row.data_compra || row.datacompra || row['date purchased'] || row['purchase date']);
+      payload.pricePaid = Number(row.pricepaid || row.valorpago || row.valor_pago || row.price || row.amount || row.valor || 0) || undefined;
+      payload.targetPrice = Number(row.targetprice || row.valordesejado || row.valor_desejado || row.target || 0) || undefined;
+      payload.currency = row.currency || row.moeda || undefined;
+      payload.storeLink = row.storelink || row.link || row.linkloja || row.link_loja || row.url || row['store link'] || undefined;
       return applyImportDefaults(payload, defaults);
     })
     .filter((value): value is ImportPayload => Boolean(value));
@@ -269,6 +275,12 @@ export function parseImportText(source: ImportSource, text: string, defaults?: I
         payload.developer = String(item.developer ?? item.Developer ?? "") || undefined;
         payload.publisher = String(item.publisher ?? item.Publisher ?? "") || undefined;
         payload.description = String(item.description ?? item.description_raw ?? item.Description ?? "") || undefined;
+        payload.startedAt = parseOptionalDate(String(item.startedAt ?? item.StartedAt ?? ""));
+        payload.purchaseDate = parseOptionalDate(String(item.purchaseDate ?? item.PurchaseDate ?? ""));
+        payload.pricePaid = Number(item.pricePaid ?? item.PricePaid ?? 0) || undefined;
+        payload.targetPrice = Number(item.targetPrice ?? item.TargetPrice ?? 0) || undefined;
+        payload.currency = String(item.currency ?? item.Currency ?? "") || undefined;
+        payload.storeLink = String(item.storeLink ?? item.StoreLink ?? "") || undefined;
         return applyImportDefaults(payload, defaults);
       })
       .filter((value): value is ImportPayload => Boolean(value));
@@ -609,8 +621,12 @@ export function createDbGameFromImport(
       format: item.format || currentEntry?.format || "digital",
       ownershipStatus: item.ownershipStatus || currentEntry?.ownershipStatus || "owned",
       progressStatus,
-      purchaseDate: currentEntry?.purchaseDate,
-      pricePaid: currentEntry?.pricePaid,
+      purchaseDate: item.purchaseDate || currentEntry?.purchaseDate,
+      pricePaid: item.pricePaid ?? currentEntry?.pricePaid,
+      targetPrice: item.targetPrice ?? currentEntry?.targetPrice,
+      currency: item.currency || currentEntry?.currency,
+      storeLink: item.storeLink || currentEntry?.storeLink,
+      startedAt: item.startedAt || currentEntry?.startedAt,
       playtimeMinutes: Math.max(item.playtimeMinutes || 0, currentEntry?.playtimeMinutes || 0),
       completionPercent,
       priority: item.priority || currentEntry?.priority || "medium",

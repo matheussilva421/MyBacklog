@@ -258,6 +258,30 @@ export function GameModal(props: {
             </select>
           </label>
           <label className="field">
+            <span>Começou a jogar</span>
+            <input type="date" value={form.startedAt?.split("T")[0] || ""} onChange={(event) => onChange("startedAt", event.target.value)} />
+          </label>
+          <label className="field">
+            <span>Data da aquisição</span>
+            <input type="date" value={form.purchaseDate?.split("T")[0] || ""} onChange={(event) => onChange("purchaseDate", event.target.value)} />
+          </label>
+          <label className="field">
+            <span>Valor pago</span>
+            <input type="number" min="0" step="0.01" value={form.pricePaid} onChange={(event) => onChange("pricePaid", event.target.value)} />
+          </label>
+          <label className="field">
+            <span>Valor desejado</span>
+            <input type="number" min="0" step="0.01" value={form.targetPrice} onChange={(event) => onChange("targetPrice", event.target.value)} />
+          </label>
+          <label className="field">
+            <span>Moeda (Ex: BRL)</span>
+            <input value={form.currency} onChange={(event) => onChange("currency", event.target.value)} />
+          </label>
+          <label className="field">
+            <span>Link da loja/promoção</span>
+            <input value={form.storeLink} onChange={(event) => onChange("storeLink", event.target.value)} />
+          </label>
+          <label className="field">
             <span>Progresso %</span>
             <input type="number" min="0" max="100" value={form.progress} onChange={(event) => onChange("progress", event.target.value)} />
           </label>
