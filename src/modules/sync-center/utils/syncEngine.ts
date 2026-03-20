@@ -16,6 +16,17 @@ import type {
   Store,
   Tag,
 } from "../../../core/types";
+import {
+  createStructuredEntryIdentity,
+  hasStructuredEntryIdentityOverlap,
+  type StructuredEntryIdentity,
+} from "../../../core/structuredEntryIdentity";
+import {
+  buildPlatformNamesByGameId,
+  buildStoreNamesByEntryId,
+  resolveStructuredPlatforms,
+  resolveStructuredStores,
+} from "../../../core/structuredRelations";
 import { normalizeGameTitle } from "../../../core/utils";
 import {
   mergeGameMetadata,
@@ -128,6 +139,10 @@ type ScopedGameTag = Scoped<GameTag>;
 type ScopedLibraryEntryStore = Scoped<LibraryEntryStore>;
 type ScopedGamePlatform = Scoped<GamePlatform>;
 type ScopedSavedView = Scoped<SavedView>;
+
+type ScopedStructuredLibraryEntry = ScopedLibraryEntry & {
+  identity: StructuredEntryIdentity;
+};
 
 export function sanitizeSyncTables(tables: SyncTables): SyncTables {
   return {
@@ -507,19 +522,49 @@ function mergeEntryRows(args: {
   cloudTables: SyncTables;
   gameIdMap: Map<string, number>;
 }) {
-  const groups = new Map<string, Array<ScopedLibraryEntry>>();
+  const groups = new Map<string, Array<ScopedStructuredLibraryEntry>>();
   const scopedSessions = new Map<string, ScopedSession[]>();
   const scopedReviews = new Map<string, ScopedReview[]>();
 
   const localGamesById = new Map(args.localTables.games.map((game) => [game.id, game] as const));
   const cloudGamesById = new Map(args.cloudTables.games.map((game) => [game.id, game] as const));
+  const localStoreNamesByEntryId = buildStoreNamesByEntryId(
+    args.localTables.stores,
+    args.localTables.libraryEntryStores,
+  );
+  const cloudStoreNamesByEntryId = buildStoreNamesByEntryId(
+    args.cloudTables.stores,
+    args.cloudTables.libraryEntryStores,
+  );
+  const localPlatformNamesByGameId = buildPlatformNamesByGameId(
+    args.localTables.platforms,
+    args.localTables.gamePlatforms,
+  );
+  const cloudPlatformNamesByGameId = buildPlatformNamesByGameId(
+    args.cloudTables.platforms,
+    args.cloudTables.gamePlatforms,
+  );
 
   const collectEntry = (scope: "local" | "cloud", entry: LibraryEntry, game?: Game) => {
     const normalizedTitle = game?.normalizedTitle || normalizeGameTitle(game?.title || "");
-    const key = `${normalizedTitle}::${entry.platform.trim().toLowerCase()}`;
-    const current = groups.get(key) ?? [];
-    current.push({ scope, row: entry, normalizedTitle });
-    groups.set(key, current);
+    const storeNamesByEntryId = scope === "local" ? localStoreNamesByEntryId : cloudStoreNamesByEntryId;
+    const platformNamesByGameId = scope === "local" ? localPlatformNamesByGameId : cloudPlatformNamesByGameId;
+    const scopedEntry = {
+      scope,
+      row: entry,
+      normalizedTitle,
+      identity: createStructuredEntryIdentity({
+        title: game?.title || normalizedTitle,
+        primaryPlatform: entry.platform,
+        primaryStore: entry.sourceStore,
+        platforms: game ? resolveStructuredPlatforms(game, entry.platform, platformNamesByGameId) : [entry.platform],
+        stores: resolveStructuredStores(entry, storeNamesByEntryId),
+      }),
+    } satisfies ScopedStructuredLibraryEntry;
+
+    const current = groups.get(scopedEntry.identity.normalizedTitle) ?? [];
+    current.push(scopedEntry);
+    groups.set(scopedEntry.identity.normalizedTitle, current);
   };
 
   for (const entry of args.localTables.libraryEntries) {
@@ -553,86 +598,112 @@ function mergeEntryRows(args: {
   const mergedReviewsByEntryId = new Map<number, Review | undefined>();
   let nextId = 1;
 
-  for (const [, group] of Array.from(groups.entries()).sort((left, right) =>
+  for (const [, groupedEntries] of Array.from(groups.entries()).sort((left, right) =>
     left[0].localeCompare(right[0]),
   )) {
-    const ordered = [...group].sort((left, right) => {
-      if (Boolean(left.row.favorite) !== Boolean(right.row.favorite)) {
-        return Number(Boolean(right.row.favorite)) - Number(Boolean(left.row.favorite));
-      }
-      if (left.row.playtimeMinutes !== right.row.playtimeMinutes) {
-        return right.row.playtimeMinutes - left.row.playtimeMinutes;
-      }
-      if (left.row.completionPercent !== right.row.completionPercent) {
-        return right.row.completionPercent - left.row.completionPercent;
-      }
-      return right.row.updatedAt.localeCompare(left.row.updatedAt);
-    });
+    const clusters: Array<ScopedStructuredLibraryEntry[]> = [];
+    for (const entry of groupedEntries) {
+      const matchingIndexes = clusters
+        .map((cluster, index) =>
+          cluster.some((candidate) => hasStructuredEntryIdentityOverlap(candidate.identity, entry.identity))
+            ? index
+            : -1,
+        )
+        .filter((index) => index >= 0);
 
-    const primaryScoped = ordered[0];
-    const duplicateScoped = ordered.slice(1);
+      if (matchingIndexes.length === 0) {
+        clusters.push([entry]);
+        continue;
+      }
 
-    const sourceSessions = group.flatMap(
-      (entry) => scopedSessions.get(`${entry.scope}:${entry.row.id}`) ?? [],
-    );
-    const normalizedSessions = sourceSessions.map((session) => ({
-      ...session.row,
-      libraryEntryId: nextId,
-      platform: primaryScoped.row.platform,
-    }));
+      const [firstIndex, ...otherIndexes] = matchingIndexes;
+      const targetCluster = [...clusters[firstIndex], entry];
+      for (const index of [...otherIndexes].sort((left, right) => right - left)) {
+        targetCluster.push(...clusters[index]);
+        clusters.splice(index, 1);
+      }
+      clusters[firstIndex] = targetCluster;
+    }
 
-    const mergedEntry = mergeLibraryEntries(
-      {
-        ...primaryScoped.row,
+    for (const group of clusters) {
+      const ordered = [...group].sort((left, right) => {
+        if (Boolean(left.row.favorite) !== Boolean(right.row.favorite)) {
+          return Number(Boolean(right.row.favorite)) - Number(Boolean(left.row.favorite));
+        }
+        if (left.row.playtimeMinutes !== right.row.playtimeMinutes) {
+          return right.row.playtimeMinutes - left.row.playtimeMinutes;
+        }
+        if (left.row.completionPercent !== right.row.completionPercent) {
+          return right.row.completionPercent - left.row.completionPercent;
+        }
+        return right.row.updatedAt.localeCompare(left.row.updatedAt);
+      });
+
+      const primaryScoped = ordered[0];
+      const duplicateScoped = ordered.slice(1);
+
+      const sourceSessions = group.flatMap(
+        (entry) => scopedSessions.get(`${entry.scope}:${entry.row.id}`) ?? [],
+      );
+      const normalizedSessions = sourceSessions.map((session) => ({
+        ...session.row,
+        libraryEntryId: nextId,
+        platform: primaryScoped.row.platform,
+      }));
+
+      const mergedEntry = mergeLibraryEntries(
+        {
+          ...primaryScoped.row,
+          id: nextId,
+          gameId:
+            args.gameIdMap.get(`${primaryScoped.scope}:${primaryScoped.row.gameId}`) ??
+            primaryScoped.row.gameId,
+        },
+        duplicateScoped.map((entry) => ({
+          ...entry.row,
+          gameId: args.gameIdMap.get(`${entry.scope}:${entry.row.gameId}`) ?? entry.row.gameId,
+        })),
+        normalizedSessions,
+      );
+
+      mergedRows.push({
+        ...mergedEntry,
         id: nextId,
         gameId:
           args.gameIdMap.get(`${primaryScoped.scope}:${primaryScoped.row.gameId}`) ??
-          primaryScoped.row.gameId,
-      },
-      duplicateScoped.map((entry) => ({
-        ...entry.row,
-        gameId: args.gameIdMap.get(`${entry.scope}:${entry.row.gameId}`) ?? entry.row.gameId,
-      })),
-      normalizedSessions,
-    );
+          mergedEntry.gameId,
+      });
+      mergedSessionsByEntryId.set(nextId, normalizedSessions);
 
-    mergedRows.push({
-      ...mergedEntry,
-      id: nextId,
-      gameId:
-        args.gameIdMap.get(`${primaryScoped.scope}:${primaryScoped.row.gameId}`) ??
-        mergedEntry.gameId,
-    });
-    mergedSessionsByEntryId.set(nextId, normalizedSessions);
+      const sourceReviews = group.flatMap(
+        (entry) => scopedReviews.get(`${entry.scope}:${entry.row.id}`) ?? [],
+      );
+      const mergedReview = sourceReviews.reduce<Review | undefined>(
+        (current, review) =>
+          mergeReviewRecords(
+            current,
+            current
+              ? review.row
+              : {
+                  ...review.row,
+                  libraryEntryId: nextId,
+                },
+          ),
+        undefined,
+      );
+      mergedReviewsByEntryId.set(
+        nextId,
+        mergedReview ? { ...mergedReview, libraryEntryId: nextId } : undefined,
+      );
 
-    const sourceReviews = group.flatMap(
-      (entry) => scopedReviews.get(`${entry.scope}:${entry.row.id}`) ?? [],
-    );
-    const mergedReview = sourceReviews.reduce<Review | undefined>(
-      (current, review) =>
-        mergeReviewRecords(
-          current,
-          current
-            ? review.row
-            : {
-                ...review.row,
-                libraryEntryId: nextId,
-              },
-        ),
-      undefined,
-    );
-    mergedReviewsByEntryId.set(
-      nextId,
-      mergedReview ? { ...mergedReview, libraryEntryId: nextId } : undefined,
-    );
-
-    for (const item of group) {
-      if (item.row.id != null) {
-        entryIdMap.set(`${item.scope}:${item.row.id}`, nextId);
+      for (const item of group) {
+        if (item.row.id != null) {
+          entryIdMap.set(`${item.scope}:${item.row.id}`, nextId);
+        }
       }
-    }
 
-    nextId += 1;
+      nextId += 1;
+    }
   }
 
   return {

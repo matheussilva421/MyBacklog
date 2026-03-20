@@ -160,14 +160,51 @@ describe("importExport", () => {
     );
 
     expect(preview).toHaveLength(1);
-    expect(preview[0]?.status).toBe("review");
+    expect(preview[0]?.status).toBe("existing");
     expect(preview[0]?.suggestedAction).toBe("update");
     expect(preview[0]?.action).toBe("update");
     expect(preview[0]?.selectedMatchId).toBe(41);
-    expect(preview[0]?.confidenceScore).toBeGreaterThanOrEqual(78);
+    expect(preview[0]?.confidenceScore).toBe(100);
     expect(preview[0]?.overlapPlatforms).toContain("PC");
     expect(preview[0]?.overlapStores).toContain("Steam");
-    expect(preview[0]?.reviewReasons).toContain("Um merge assistido foi pré-selecionado com alta confiança.");
+  });
+
+  it("treats structured platform overlap as exact entry match during preview", () => {
+    const preview = buildImportPreview(
+      [
+        {
+          title: "Hades",
+          platform: "Steam Deck",
+          platforms: ["Steam Deck", "PC"],
+          sourceStore: "Steam",
+          stores: ["Steam"],
+          format: "digital",
+          ownershipStatus: "owned",
+          progressStatus: "playing",
+          playtimeMinutes: 180,
+          completionPercent: 25,
+          priority: "medium",
+        },
+      ],
+      [
+        {
+          game: createGame({
+            id: 7,
+            title: "Hades",
+            normalizedTitle: "hades",
+            platforms: "PC",
+          }),
+          libraryEntry: createEntry({ id: 70, gameId: 7, platform: "PC", sourceStore: "Steam" }),
+          structuredPlatforms: ["PC", "Steam Deck"],
+          structuredStores: ["Steam"],
+        },
+      ],
+    );
+
+    expect(preview[0]?.status).toBe("existing");
+    expect(preview[0]?.action).toBe("update");
+    expect(preview[0]?.selectedMatchId).toBe(70);
+    expect(preview[0]?.confidenceScore).toBe(100);
   });
 
   it("counts settings, stores and list relations in restore preview", () => {
@@ -265,6 +302,119 @@ describe("importExport", () => {
     expect(settingsRow).toEqual({ label: "Configurações", create: 0, update: 1, skip: 0 });
     expect(listRelationRow).toEqual({ label: "Relações de lista", create: 1, update: 0, skip: 0 });
     expect(storeRow).toEqual({ label: "Stores", create: 0, update: 1, skip: 0 });
+  });
+
+  it("counts restore entry as update when structured platform overlap identifies the same record", () => {
+    const payload: BackupPayload = {
+      version: 6,
+      exportedAt: "2026-03-01T00:00:00.000Z",
+      source: "mybacklog",
+      games: [createGame({ id: 10, title: "Hades", normalizedTitle: "hades", platforms: "PC" })],
+      libraryEntries: [createEntry({ id: 20, gameId: 10, platform: "Steam Deck", sourceStore: "Steam" })],
+      stores: [
+        {
+          id: 21,
+          name: "Steam",
+          normalizedName: "steam",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        },
+      ],
+      libraryEntryStores: [
+        {
+          id: 22,
+          libraryEntryId: 20,
+          storeId: 21,
+          isPrimary: true,
+          createdAt: "2026-03-01T00:00:00.000Z",
+        },
+      ],
+      platforms: [
+        {
+          id: 23,
+          name: "PC",
+          normalizedName: "pc",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        },
+        {
+          id: 24,
+          name: "Steam Deck",
+          normalizedName: "steam deck",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        },
+      ],
+      gamePlatforms: [
+        { id: 25, gameId: 10, platformId: 23, createdAt: "2026-03-01T00:00:00.000Z" },
+        { id: 26, gameId: 10, platformId: 24, createdAt: "2026-03-01T00:00:00.000Z" },
+      ],
+      playSessions: [],
+      reviews: [],
+      lists: [],
+      libraryEntryLists: [],
+      tags: [],
+      gameTags: [],
+      goals: [],
+      settings: [],
+      savedViews: [],
+    };
+
+    const preview = buildRestorePreview(payload, "merge", {
+      games: [createGame({ id: 1, title: "Hades", normalizedTitle: "hades", platforms: "" })],
+      libraryEntries: [createEntry({ id: 2, gameId: 1, platform: "PC", sourceStore: "Steam" })],
+      stores: [
+        {
+          id: 4,
+          name: "Steam",
+          normalizedName: "steam",
+          createdAt: "2026-02-01T00:00:00.000Z",
+          updatedAt: "2026-02-01T00:00:00.000Z",
+        },
+      ],
+      libraryEntryStores: [
+        {
+          id: 6,
+          libraryEntryId: 2,
+          storeId: 4,
+          isPrimary: true,
+          createdAt: "2026-02-01T00:00:00.000Z",
+        },
+      ],
+      platforms: [
+        {
+          id: 7,
+          name: "PC",
+          normalizedName: "pc",
+          createdAt: "2026-02-01T00:00:00.000Z",
+          updatedAt: "2026-02-01T00:00:00.000Z",
+        },
+        {
+          id: 8,
+          name: "Steam Deck",
+          normalizedName: "steam deck",
+          createdAt: "2026-02-01T00:00:00.000Z",
+          updatedAt: "2026-02-01T00:00:00.000Z",
+        },
+      ],
+      gamePlatforms: [
+        { id: 9, gameId: 1, platformId: 7, createdAt: "2026-02-01T00:00:00.000Z" },
+        { id: 10, gameId: 1, platformId: 8, createdAt: "2026-02-01T00:00:00.000Z" },
+      ],
+      playSessions: [],
+      reviews: [],
+      lists: [],
+      libraryEntryLists: [],
+      tags: [],
+      gameTags: [],
+      goals: [],
+      settings: [],
+      savedViews: [],
+    });
+
+    const entryRow = preview.items.find((item) => item.label === "Biblioteca");
+
+    expect(entryRow).toEqual({ label: "Biblioteca", create: 0, update: 1, skip: 0 });
   });
 
   it("exports structured store and platform relations when available", () => {

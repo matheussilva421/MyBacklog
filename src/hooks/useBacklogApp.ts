@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { db } from "../core/db";
 import {
   buildDynamicTacticalGoals,
@@ -132,7 +132,7 @@ export function useBacklogApp() {
       : onboardingGoalTemplates.slice(0, 2).map((template) => template.id);
   }, [data.goalRows]);
 
-  const findGame = (id: number) => games.find((game) => game.id === id);
+  const findGame = useCallback((id: number) => games.find((game) => game.id === id), [games]);
   const selectedBatchGames = useMemo(
     () => games.filter((game) => ui.selectedLibraryIds.includes(game.id)),
     [games, ui.selectedLibraryIds],
@@ -257,7 +257,7 @@ export function useBacklogApp() {
   });
   const catalogAuditReport = catalogMaintenanceReport.audit;
 
-  const readBackupTables = async (): Promise<BackupTables> => {
+  const readBackupTables = useCallback(async (): Promise<BackupTables> => {
     const [
       gamesRows,
       libraryEntries,
@@ -308,7 +308,7 @@ export function useBacklogApp() {
       settings,
       savedViews,
     };
-  };
+  }, []);
 
   const actions = useBacklogActions({
     records,

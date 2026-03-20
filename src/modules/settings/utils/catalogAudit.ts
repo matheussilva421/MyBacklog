@@ -1,5 +1,6 @@
 import { deriveProgressStatus, recalculateLibraryEntryFromSessions } from "../../../core/catalogIntegrity";
-import type { Game, LibraryEntry, PlaySession } from "../../../core/types";
+import { buildPlatformNamesByGameId, resolveStructuredPlatforms } from "../../../core/structuredRelations";
+import type { Game, GamePlatform, LibraryEntry, Platform, PlaySession } from "../../../core/types";
 
 export type CatalogAuditIssueKind =
   | "progress_status_mismatch"
@@ -56,7 +57,7 @@ const metadataLabels: Record<string, string> = {
   releaseYear: "ano",
 };
 
-function summarizeMetadataGaps(game: Game): string[] {
+function summarizeMetadataGaps(game: Game, structuredPlatforms: string[] = []): string[] {
   return [
     "coverUrl",
     "genres",
@@ -66,14 +67,21 @@ function summarizeMetadataGaps(game: Game): string[] {
     "publisher",
     "releaseYear",
   ].filter((field) => {
+    if (field === "platforms") {
+      return structuredPlatforms.length === 0;
+    }
     const value = game[field as keyof Game];
     if (typeof value === "number") return !Number.isFinite(value);
     return !String(value || "").trim();
   });
 }
 
-function buildMetadataIssue(game: Game, libraryEntryId?: number): CatalogAuditIssue | null {
-  const missingFields = summarizeMetadataGaps(game);
+function buildMetadataIssue(
+  game: Game,
+  structuredPlatforms: string[],
+  libraryEntryId?: number,
+): CatalogAuditIssue | null {
+  const missingFields = summarizeMetadataGaps(game, structuredPlatforms);
   if (missingFields.length === 0 || game.id == null) return null;
 
   const labels = missingFields.map((field) => metadataLabels[field] || field);
@@ -94,11 +102,14 @@ export function buildCatalogAuditReport(args: {
   games: Game[];
   libraryEntries: LibraryEntry[];
   sessions: PlaySession[];
+  platformRows?: Platform[];
+  gamePlatformRows?: GamePlatform[];
 }): CatalogAuditReport {
-  const { games, libraryEntries, sessions } = args;
+  const { games, libraryEntries, sessions, platformRows = [], gamePlatformRows = [] } = args;
   const issues: CatalogAuditIssue[] = [];
   const gameById = new Map(games.map((game) => [game.id, game] as const));
   const entryById = new Map(libraryEntries.map((entry) => [entry.id, entry] as const));
+  const platformNamesByGameId = buildPlatformNamesByGameId(platformRows, gamePlatformRows);
   const sessionsByEntryId = new Map<number, PlaySession[]>();
   const repairPlan: CatalogRepairPlan = {
     entryUpdates: [],
@@ -178,7 +189,13 @@ export function buildCatalogAuditReport(args: {
       });
     }
 
-    const metadataIssue = game ? buildMetadataIssue(game, entry.id) : null;
+    const metadataIssue = game
+      ? buildMetadataIssue(
+          game,
+          resolveStructuredPlatforms(game, entry.platform, platformNamesByGameId),
+          entry.id,
+        )
+      : null;
     if (metadataIssue) issues.push(metadataIssue);
 
     const updates: Partial<LibraryEntry> = {};

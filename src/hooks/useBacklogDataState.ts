@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type {
   Game as DbGameMetadata,
   GamePlatform as DbGamePlatform,
@@ -76,7 +76,7 @@ export function useBacklogDataState() {
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const refreshData = async (seed = false) => {
+  const refreshData = useCallback(async (seed = false) => {
     let storedEntries = await db.libraryEntries.orderBy("updatedAt").reverse().toArray();
     if (seed && storedEntries.length === 0) {
       await seedDefaultLibrary();
@@ -133,7 +133,7 @@ export function useBacklogDataState() {
     setStoreRows(storedStores);
     setPlatformRows(storedPlatforms);
     setGamePlatformRows(storedGamePlatforms);
-  };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -151,7 +151,7 @@ export function useBacklogDataState() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [refreshData]);
 
   useEffect(() => {
     if (!notice) return;

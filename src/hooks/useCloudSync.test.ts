@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BackupPayload } from "../backlog/shared";
 import {
   buildSyncFingerprint,
+  mergeSyncTables,
   resolveInitialSyncDecision,
   stripBackupMeta,
 } from "../modules/sync-center/utils/syncEngine";
@@ -162,5 +163,75 @@ describe("syncEngine helpers", () => {
     );
 
     expect(conflict.decision).toBe("conflict");
+  });
+
+  it("mescla entradas com overlap estrutural de plataforma mesmo com plataforma principal diferente", () => {
+    const merged = mergeSyncTables(
+      {
+        ...baseTables,
+        games: [{ ...baseTables.games[0], platforms: "PC, Steam Deck" }],
+        libraryEntries: [
+          {
+            ...baseTables.libraryEntries[0],
+            platform: "Steam Deck",
+            updatedAt: "2026-03-12T10:00:00.000Z",
+          },
+        ],
+        platforms: [
+          ...baseTables.platforms,
+          {
+            id: 2,
+            name: "Steam Deck",
+            normalizedName: "steam deck",
+            createdAt: "2026-03-01T10:00:00.000Z",
+            updatedAt: "2026-03-01T10:00:00.000Z",
+          },
+        ],
+        gamePlatforms: [
+          ...baseTables.gamePlatforms,
+          {
+            id: 2,
+            gameId: 1,
+            platformId: 2,
+            createdAt: "2026-03-01T10:00:00.000Z",
+          },
+        ],
+      },
+      {
+        ...baseTables,
+        games: [{ ...baseTables.games[0], id: 9, platforms: "PC" }],
+        libraryEntries: [
+          {
+            ...baseTables.libraryEntries[0],
+            id: 9,
+            gameId: 9,
+            platform: "PC",
+            updatedAt: "2026-03-11T10:00:00.000Z",
+          },
+        ],
+        stores: [{ ...baseTables.stores[0], id: 9 }],
+        libraryEntryStores: [
+          {
+            ...baseTables.libraryEntryStores[0],
+            id: 9,
+            libraryEntryId: 9,
+            storeId: 9,
+          },
+        ],
+        platforms: [{ ...baseTables.platforms[0], id: 9 }],
+        gamePlatforms: [
+          {
+            ...baseTables.gamePlatforms[0],
+            id: 9,
+            gameId: 9,
+            platformId: 9,
+          },
+        ],
+      },
+    );
+
+    expect(merged.libraryEntries).toHaveLength(1);
+    expect(merged.gamePlatforms).toHaveLength(2);
+    expect(merged.libraryEntries[0]?.platform).toBe("Steam Deck");
   });
 });

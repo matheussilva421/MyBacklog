@@ -75,6 +75,10 @@ async function replaceLocalTables(tables: SyncTables) {
     [
       db.games,
       db.libraryEntries,
+      db.stores,
+      db.libraryEntryStores,
+      db.platforms,
+      db.gamePlatforms,
       db.playSessions,
       db.reviews,
       db.lists,
@@ -83,8 +87,14 @@ async function replaceLocalTables(tables: SyncTables) {
       db.gameTags,
       db.goals,
       db.settings,
+      db.savedViews,
     ],
     async () => {
+      await db.savedViews.clear();
+      await db.gamePlatforms.clear();
+      await db.platforms.clear();
+      await db.libraryEntryStores.clear();
+      await db.stores.clear();
       await db.libraryEntryLists.clear();
       await db.gameTags.clear();
       await db.reviews.clear();
@@ -98,6 +108,12 @@ async function replaceLocalTables(tables: SyncTables) {
 
       if (tables.games.length > 0) await db.games.bulkPut(tables.games);
       if (tables.libraryEntries.length > 0) await db.libraryEntries.bulkPut(tables.libraryEntries);
+      if (tables.stores.length > 0) await db.stores.bulkPut(tables.stores);
+      if (tables.libraryEntryStores.length > 0) {
+        await db.libraryEntryStores.bulkPut(tables.libraryEntryStores);
+      }
+      if (tables.platforms.length > 0) await db.platforms.bulkPut(tables.platforms);
+      if (tables.gamePlatforms.length > 0) await db.gamePlatforms.bulkPut(tables.gamePlatforms);
       if (tables.playSessions.length > 0) await db.playSessions.bulkPut(tables.playSessions);
       if (tables.reviews.length > 0) await db.reviews.bulkPut(tables.reviews);
       if (tables.lists.length > 0) await db.lists.bulkPut(tables.lists);
@@ -108,6 +124,7 @@ async function replaceLocalTables(tables: SyncTables) {
       if (tables.gameTags.length > 0) await db.gameTags.bulkPut(tables.gameTags);
       if (tables.goals.length > 0) await db.goals.bulkPut(tables.goals);
       if (tables.settings.length > 0) await db.settings.bulkPut(tables.settings);
+      if (tables.savedViews.length > 0) await db.savedViews.bulkPut(tables.savedViews);
     },
   );
 }
@@ -130,12 +147,18 @@ export function useCloudSync({
   );
 
   const historyRef = useRef<SyncHistoryEntry[]>([]);
+  const lastSuccessfulSyncAtRef = useRef<string | null>(null);
   const previousFingerprintRef = useRef<string | null>(null);
   const cloudSnapshotRef = useRef<BackupPayload | null>(null);
+  const syncingRef = useRef(false);
 
   useEffect(() => {
     historyRef.current = syncHistory;
   }, [syncHistory]);
+
+  useEffect(() => {
+    lastSuccessfulSyncAtRef.current = lastSuccessfulSyncAt;
+  }, [lastSuccessfulSyncAt]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -170,12 +193,17 @@ export function useCloudSync({
     [],
   );
 
+  const commitLastSuccessfulSyncAt = useCallback((value: string | null) => {
+    lastSuccessfulSyncAtRef.current = value;
+    setLastSuccessfulSyncAt(value);
+  }, []);
+
   const pushHistory = useCallback(
     async (
       action: SyncHistoryEntry["action"],
       result: SyncHistoryEntry["result"],
       message: string,
-      nextLastSuccessfulSyncAt = lastSuccessfulSyncAt,
+      nextLastSuccessfulSyncAt = lastSuccessfulSyncAtRef.current,
     ) => {
       const nextHistory = normalizeSyncHistory([
         createHistoryEntry(action, result, message),
@@ -183,12 +211,12 @@ export function useCloudSync({
       ]);
       historyRef.current = nextHistory;
       setSyncHistory(nextHistory);
-      if (nextLastSuccessfulSyncAt !== lastSuccessfulSyncAt) {
-        setLastSuccessfulSyncAt(nextLastSuccessfulSyncAt);
+      if (nextLastSuccessfulSyncAt !== lastSuccessfulSyncAtRef.current) {
+        commitLastSuccessfulSyncAt(nextLastSuccessfulSyncAt);
       }
       await persistSyncMeta(nextHistory, nextLastSuccessfulSyncAt);
     },
-    [lastSuccessfulSyncAt, persistSyncMeta],
+    [commitLastSuccessfulSyncAt, persistSyncMeta],
   );
 
   const hydrateLocalSyncState = useCallback((localTables: SyncTables) => {
@@ -196,9 +224,9 @@ export function useCloudSync({
     const nextLastSuccessfulSyncAt = parseLastSuccessfulSyncAt(localTables.settings);
     historyRef.current = nextHistory;
     setSyncHistory(nextHistory);
-    setLastSuccessfulSyncAt(nextLastSuccessfulSyncAt);
+    commitLastSuccessfulSyncAt(nextLastSuccessfulSyncAt);
     previousFingerprintRef.current = buildSyncFingerprint(localTables);
-  }, []);
+  }, [commitLastSuccessfulSyncAt]);
 
   const applySnapshotLocally = useCallback(
     async (tables: SyncTables, nextLastSyncAt: string | null) => {
@@ -241,6 +269,8 @@ export function useCloudSync({
       }
 
       try {
+        if (syncingRef.current) return;
+        syncingRef.current = true;
         setIsSyncing(true);
         const cloudData = await pullFromCloud(user.uid);
         if (!active) return;
@@ -269,7 +299,7 @@ export function useCloudSync({
           if (!active) return;
           const successAt = payload.exportedAt;
           cloudSnapshotRef.current = payload;
-          setLastSuccessfulSyncAt(successAt);
+          commitLastSuccessfulSyncAt(successAt);
           finalizeMatchState(localTables, payload);
           await pushHistory(
             "auto-push",
@@ -284,7 +314,7 @@ export function useCloudSync({
           const cloudTables = stripBackupMeta(cloudData);
           await applySnapshotLocally(cloudTables, cloudData.exportedAt);
           if (!active) return;
-          setLastSuccessfulSyncAt(cloudData.exportedAt);
+          commitLastSuccessfulSyncAt(cloudData.exportedAt);
           finalizeMatchState(cloudTables, cloudData);
           await pushHistory(
             "auto-pull",
@@ -322,6 +352,7 @@ export function useCloudSync({
         setNotice("Falha ao sincronizar com a nuvem.");
       } finally {
         if (active) {
+          syncingRef.current = false;
           setIsSyncing(false);
         }
       }
@@ -333,6 +364,7 @@ export function useCloudSync({
   }, [
     applySnapshotLocally,
     autoSyncEnabled,
+    commitLastSuccessfulSyncAt,
     finalizeMatchState,
     hydrateLocalSyncState,
     isAuthEnabled,
@@ -355,7 +387,9 @@ export function useCloudSync({
   const runPushFlow = useCallback(
     async (action: "auto-push" | "manual-push") => {
       if (!user || !isAuthEnabled || !isOnline) return;
+      if (syncingRef.current) return;
 
+      syncingRef.current = true;
       setIsSyncing(true);
       try {
         const [localTables, cloudData] = await Promise.all([readBackupTables(), pullFromCloud(user.uid)]);
@@ -386,7 +420,7 @@ export function useCloudSync({
         await pushToCloud(user.uid, payload);
 
         const successAt = payload.exportedAt;
-        setLastSuccessfulSyncAt(successAt);
+        commitLastSuccessfulSyncAt(successAt);
         finalizeMatchState(localTables, payload);
         await pushHistory(
           action,
@@ -407,10 +441,12 @@ export function useCloudSync({
         await pushHistory(action, "error", "Falha ao enviar o snapshot local para a nuvem.");
         setNotice("Falha ao enviar backup para a nuvem.");
       } finally {
+        syncingRef.current = false;
         setIsSyncing(false);
       }
     },
     [
+      commitLastSuccessfulSyncAt,
       finalizeMatchState,
       isAuthEnabled,
       isOnline,
@@ -427,7 +463,9 @@ export function useCloudSync({
       setNotice("Você está offline. Reconecte para puxar o snapshot remoto.");
       return;
     }
+    if (syncingRef.current) return;
 
+    syncingRef.current = true;
     setIsSyncing(true);
     try {
       const cloudData = await pullFromCloud(user.uid);
@@ -439,7 +477,7 @@ export function useCloudSync({
 
       const cloudTables = stripBackupMeta(cloudData);
       await applySnapshotLocally(cloudTables, cloudData.exportedAt);
-      setLastSuccessfulSyncAt(cloudData.exportedAt);
+      commitLastSuccessfulSyncAt(cloudData.exportedAt);
       finalizeMatchState(cloudTables, cloudData);
       await pushHistory(
         "manual-pull",
@@ -459,10 +497,12 @@ export function useCloudSync({
       await pushHistory("manual-pull", "error", "Falha ao puxar o snapshot remoto.");
       setNotice("Falha ao puxar a nuvem.");
     } finally {
+      syncingRef.current = false;
       setIsSyncing(false);
     }
   }, [
     applySnapshotLocally,
+    commitLastSuccessfulSyncAt,
     finalizeMatchState,
     isAuthEnabled,
     isOnline,
@@ -477,11 +517,15 @@ export function useCloudSync({
       setNotice("Você está offline. Reconecte para mesclar snapshots.");
       return;
     }
+    if (syncingRef.current) return;
 
+    syncingRef.current = true;
     setIsSyncing(true);
     try {
       const [localTables, cloudData] = await Promise.all([readBackupTables(), pullFromCloud(user.uid)]);
       if (!cloudData) {
+        syncingRef.current = false;
+        setIsSyncing(false);
         await runPushFlow("manual-push");
         return;
       }
@@ -491,7 +535,7 @@ export function useCloudSync({
 
       await pushToCloud(user.uid, mergedPayload);
       await applySnapshotLocally(mergedTables, mergedPayload.exportedAt);
-      setLastSuccessfulSyncAt(mergedPayload.exportedAt);
+      commitLastSuccessfulSyncAt(mergedPayload.exportedAt);
       setIsWorkingLocal(false);
       finalizeMatchState(mergedTables, mergedPayload);
       await pushHistory(
@@ -512,10 +556,12 @@ export function useCloudSync({
       await pushHistory("manual-merge", "error", "Falha ao mesclar snapshots local e remoto.");
       setNotice("Falha ao mesclar os dados de sync.");
     } finally {
+      syncingRef.current = false;
       setIsSyncing(false);
     }
   }, [
     applySnapshotLocally,
+    commitLastSuccessfulSyncAt,
     finalizeMatchState,
     isAuthEnabled,
     isOnline,

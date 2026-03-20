@@ -72,4 +72,32 @@ describe("buildCatalogAuditReport", () => {
     expect(report.summary.metadataIssues).toBe(1);
     expect(report.repairPlan.orphanSessionIds).toEqual([99]);
   });
+
+  it("does not flag platform metadata as missing when structured platform relations exist", () => {
+    const report = buildCatalogAuditReport({
+      games: [
+        createGame({
+          platforms: "",
+          coverUrl: "https://example.com/hades.jpg",
+          developer: "Supergiant Games",
+          publisher: "Supergiant Games",
+          releaseYear: 2020,
+        }),
+      ],
+      libraryEntries: [createEntry({ id: 1, platform: "PC" })],
+      sessions: [],
+      platformRows: [
+        {
+          id: 1,
+          name: "PC",
+          normalizedName: "pc",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        },
+      ],
+      gamePlatformRows: [{ id: 1, gameId: 1, platformId: 1, createdAt: "2026-03-01T00:00:00.000Z" }],
+    });
+
+    expect(report.summary.metadataIssues).toBe(0);
+  });
 });

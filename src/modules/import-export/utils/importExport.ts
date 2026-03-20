@@ -32,6 +32,11 @@ import {
   resolveStructuredPlatforms,
   resolveStructuredStores,
 } from "../../../core/structuredRelations";
+import {
+  buildStructuredEntryLookupAliases,
+  createStructuredEntryIdentity,
+  type StructuredEntryIdentity,
+} from "../../../core/structuredEntryIdentity";
 import { composeLibraryRecords } from "../../library/utils";
 import { buildStructuredTablesFromLegacy } from "../../../core/structuredTables";
 import type {
@@ -67,6 +72,60 @@ export function normalizeImportValue(value: string): string {
 
 export function createImportKey(title: string, platform: string): string {
   return `${normalizeImportValue(title)}::${normalizeImportValue(platform)}`;
+}
+
+type StructuredImportRecord = {
+  game: DbGameMetadata;
+  libraryEntry: DbLibraryEntry;
+  structuredPlatforms?: string[];
+  structuredStores?: string[];
+};
+
+function createRecordIdentity(record: StructuredImportRecord): StructuredEntryIdentity {
+  return createStructuredEntryIdentity({
+    title: record.game.title,
+    primaryPlatform: record.libraryEntry.platform,
+    primaryStore: record.libraryEntry.sourceStore,
+    platforms: record.structuredPlatforms,
+    stores: record.structuredStores,
+  });
+}
+
+function createPayloadIdentity(payload: ImportPayload): StructuredEntryIdentity {
+  return createStructuredEntryIdentity({
+    title: payload.title,
+    primaryPlatform: payload.platform,
+    primaryStore: payload.sourceStore,
+    platforms: payload.platforms,
+    stores: payload.stores,
+  });
+}
+
+function indexRecordsByStructuredLookup(records: StructuredImportRecord[]) {
+  const byAlias = new Map<string, StructuredImportRecord[]>();
+  for (const record of records) {
+    const identity = createRecordIdentity(record);
+    for (const alias of buildStructuredEntryLookupAliases(identity)) {
+      const current = byAlias.get(alias) ?? [];
+      current.push(record);
+      byAlias.set(alias, current);
+    }
+  }
+  return byAlias;
+}
+
+function findStructuredRecordMatch(
+  recordIndex: Map<string, StructuredImportRecord[]>,
+  identity: StructuredEntryIdentity,
+): StructuredImportRecord | null {
+  const matches = new Map<number, StructuredImportRecord>();
+  for (const alias of buildStructuredEntryLookupAliases(identity)) {
+    for (const record of recordIndex.get(alias) ?? []) {
+      if (record.libraryEntry.id == null) continue;
+      matches.set(record.libraryEntry.id, record);
+    }
+  }
+  return matches.size === 1 ? Array.from(matches.values())[0] ?? null : null;
 }
 
 function splitCsvLine(line: string): string[] {
@@ -603,17 +662,17 @@ function hasUsefulImportMetadata(payload: ImportPayload): boolean {
 }
 
 function createMatchCandidate(
-  record: { game: DbGameMetadata; libraryEntry: DbLibraryEntry },
+  record: StructuredImportRecord,
   payload: ImportPayload,
   confidence: "exact" | "title",
 ): ImportMatchCandidate {
   const incomingPlatforms = splitCsvTokens([...(payload.platforms ?? []), payload.platform]);
   const incomingStores = splitCsvTokens([...(payload.stores ?? []), payload.sourceStore]);
-  const overlapPlatforms = buildTokenIntersection(
-    incomingPlatforms,
-    splitCsvTokens([record.libraryEntry.platform, record.game.platforms]),
-  );
-  const overlapStores = buildTokenIntersection(incomingStores, splitCsvTokens(record.libraryEntry.sourceStore));
+  const recordPlatforms =
+    record.structuredPlatforms ?? splitCsvTokens([record.libraryEntry.platform, record.game.platforms]);
+  const recordStores = record.structuredStores ?? splitCsvTokens(record.libraryEntry.sourceStore);
+  const overlapPlatforms = buildTokenIntersection(incomingPlatforms, recordPlatforms);
+  const overlapStores = buildTokenIntersection(incomingStores, recordStores);
   const metadataMatches = countSharedMetadataSignals(payload, record);
   const score = computeAssistedScore({
     exact: confidence === "exact",
@@ -647,15 +706,14 @@ function createMatchCandidate(
 }
 
 function createGameCandidate(
-  record: { game: DbGameMetadata; libraryEntry: DbLibraryEntry },
+  record: StructuredImportRecord,
   payload: ImportPayload,
   confidence: "exact" | "metadata",
 ): ImportGameCandidate {
   const incomingPlatforms = splitCsvTokens([...(payload.platforms ?? []), payload.platform]);
-  const overlapPlatforms = buildTokenIntersection(
-    incomingPlatforms,
-    splitCsvTokens([record.libraryEntry.platform, record.game.platforms]),
-  );
+  const recordPlatforms =
+    record.structuredPlatforms ?? splitCsvTokens([record.libraryEntry.platform, record.game.platforms]);
+  const overlapPlatforms = buildTokenIntersection(incomingPlatforms, recordPlatforms);
   const metadataMatches = countSharedMetadataSignals(payload, record);
   const score = computeAssistedScore({
     exact: confidence === "exact",
@@ -678,10 +736,7 @@ function createGameCandidate(
     gameId: record.game.id ?? 0,
     title: record.game.title,
     releaseYear: record.game.releaseYear,
-    platforms: String(record.game.platforms || "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean),
+    platforms: recordPlatforms,
     overlapPlatforms,
     maintenanceSignals:
       fillableMetadata.length > 0
@@ -698,15 +753,13 @@ function createGameCandidate(
 
 export function buildImportPreview(
   parsed: ImportPayload[],
-  existingRecords: Array<{ game: DbGameMetadata; libraryEntry: DbLibraryEntry }>,
+  existingRecords: StructuredImportRecord[],
 ): ImportPreviewEntry[] {
-  const existingExactMap = new Map(
-    existingRecords.map((record) => [createImportKey(record.game.title, record.libraryEntry.platform), record] as const),
-  );
-  const existingByTitle = new Map<string, Array<{ game: DbGameMetadata; libraryEntry: DbLibraryEntry }>>();
+  const existingExactMap = indexRecordsByStructuredLookup(existingRecords);
+  const existingByTitle = new Map<string, StructuredImportRecord[]>();
   const uniqueGamesByTitle = new Map<
     string,
-    Map<number, { game: DbGameMetadata; libraryEntry: DbLibraryEntry }>
+    Map<number, StructuredImportRecord>
   >();
   for (const record of existingRecords) {
     const normalizedTitle = normalizeGameTitle(record.game.title);
@@ -715,7 +768,7 @@ export function buildImportPreview(
     existingByTitle.set(normalizedTitle, current);
 
     const currentGames =
-      uniqueGamesByTitle.get(normalizedTitle) ?? new Map<number, { game: DbGameMetadata; libraryEntry: DbLibraryEntry }>();
+      uniqueGamesByTitle.get(normalizedTitle) ?? new Map<number, StructuredImportRecord>();
     if ((record.game.id ?? 0) > 0 && !currentGames.has(record.game.id!)) {
       currentGames.set(record.game.id!, record);
     }
@@ -733,7 +786,7 @@ export function buildImportPreview(
       continue;
     }
 
-    const exactRecord = existingExactMap.get(key);
+    const exactRecord = findStructuredRecordMatch(existingExactMap, createPayloadIdentity(item));
     const normalizedTitle = normalizeGameTitle(item.title);
     const titleCandidates = (existingByTitle.get(normalizedTitle) ?? [])
       .map((record) =>
@@ -765,7 +818,7 @@ export function buildImportPreview(
       gameCandidates.length === 1 &&
       (bestGameCandidate?.score ?? 0) >= 72;
     const reviewReasons: string[] = [];
-    if (hasExactMatch) reviewReasons.push("Já existe uma entrada com o mesmo título e plataforma.");
+    if (hasExactMatch) reviewReasons.push("Já existe uma entrada compatível com o mesmo título e plataforma estruturada.");
     if (!hasExactMatch && titleCandidates.length > 0) {
       reviewReasons.push("Há entradas parecidas na biblioteca que podem ser atualizadas.");
     }
@@ -1026,6 +1079,8 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
   const currentReviewsByEntry = new Map(reviews.map((review) => [review.libraryEntryId, review]));
   const currentStoresByName = new Map(stores.map((store) => [store.name.trim().toLowerCase(), store]));
   const currentPlatformsByName = new Map(platforms.map((platform) => [platform.name.trim().toLowerCase(), platform]));
+  const currentStoreNamesByEntryId = buildStoreNamesByEntryId(stores, currentLibraryEntryStores);
+  const currentPlatformNamesByGameId = buildPlatformNamesByGameId(platforms, currentGamePlatforms);
   const currentLibraryEntryStoreSet = new Set(
     currentLibraryEntryStores.map((relation) => `${relation.libraryEntryId}::${relation.storeId}`),
   );
@@ -1041,14 +1096,21 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
   const currentSavedViewsByKey = new Map(
     savedViews.map((view) => [`${view.scope}::${view.name.trim().toLowerCase()}`, view]),
   );
-  const currentEntryByKey = new Map(
-    composeLibraryRecords(games, libraryEntries).map((record) => [
-      createImportKey(record.game.title, record.libraryEntry.platform),
-      record.libraryEntry,
-    ]),
+  const currentEntryLookup = indexRecordsByStructuredLookup(
+    composeLibraryRecords(games, libraryEntries).map((record) => ({
+      ...record,
+      structuredPlatforms: resolveStructuredPlatforms(
+        record.game,
+        record.libraryEntry.platform,
+        currentPlatformNamesByGameId,
+      ),
+      structuredStores: resolveStructuredStores(record.libraryEntry, currentStoreNamesByEntryId),
+    })),
   );
 
   const payloadGamesById = new Map(payload.games.map((game) => [game.id, game]));
+  const payloadStoreNamesByEntryId = buildStoreNamesByEntryId(payload.stores, payload.libraryEntryStores);
+  const payloadPlatformNamesByGameId = buildPlatformNamesByGameId(payload.platforms, payload.gamePlatforms);
   const resolvedEntryIdByPayloadId = new Map<number, number>();
   const resolvedGameIdByPayloadId = new Map<number, number>();
   const resolvedStoreIdByPayloadId = new Map<number, number>();
@@ -1087,7 +1149,20 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
       continue;
     }
     seenEntryKeys.add(key);
-    const existing = currentEntryByKey.get(key);
+    const existing = title
+      ? findStructuredRecordMatch(
+          currentEntryLookup,
+          createStructuredEntryIdentity({
+            title,
+            primaryPlatform: entry.platform,
+            primaryStore: entry.sourceStore,
+            platforms: payloadGame
+              ? resolveStructuredPlatforms(payloadGame, entry.platform, payloadPlatformNamesByGameId)
+              : [entry.platform],
+            stores: resolveStructuredStores(entry, payloadStoreNamesByEntryId),
+          }),
+        )?.libraryEntry
+      : null;
     if (existing?.id != null && entry.id != null) resolvedEntryIdByPayloadId.set(entry.id, existing.id);
     if (existing) entryUpdate += 1;
     else {

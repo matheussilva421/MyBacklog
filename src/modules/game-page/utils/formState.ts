@@ -9,6 +9,18 @@ type GameFormDefaults = {
   sourceStore?: string;
 };
 
+function parseOptionalFiniteNumber(value: string, fallback?: number): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseOptionalFiniteInteger(value: string, fallback?: number): number | undefined {
+  const parsed = parseOptionalFiniteNumber(value, fallback);
+  return typeof parsed === "number" ? Math.trunc(parsed) : parsed;
+}
+
 export function createGameFormState(game?: Game, defaults?: GameFormDefaults): GameFormState {
   const platforms = splitCsvTokens(game?.platforms ?? game?.catalogPlatforms ?? game?.platform ?? defaults?.platform ?? "PC");
   const stores = splitCsvTokens(game?.stores ?? game?.sourceStore ?? defaults?.sourceStore ?? "Manual");
@@ -51,6 +63,11 @@ export function createDbGameFromForm(
 ): { game: DbGameMetadata; libraryEntry: DbLibraryEntry } {
   const progress = Math.max(0, Math.min(100, Math.round(Number(form.progress) || 0)));
   const hours = Math.max(0, Number(form.hours) || 0);
+  const rawgId = parseOptionalFiniteInteger(form.rawgId, current?.game.rawgId);
+  const releaseYear = parseOptionalFiniteInteger(form.year, current?.game.releaseYear);
+  const pricePaid = parseOptionalFiniteNumber(form.pricePaid, current?.libraryEntry.pricePaid);
+  const targetPrice = parseOptionalFiniteNumber(form.targetPrice, current?.libraryEntry.targetPrice);
+  const personalRating = parseOptionalFiniteNumber(form.score, current?.libraryEntry.personalRating);
   const title = form.title.trim();
   const structuredPlatforms = splitCsvTokens([form.platform, ...(form.platforms ?? []), form.catalogPlatforms]);
   const platform = getPrimaryCsvToken(structuredPlatforms, form.platform.trim() || "PC");
@@ -66,12 +83,12 @@ export function createDbGameFromForm(
       normalizedTitle: normalizeGameTitle(title),
       slug: current?.game.slug,
       coverUrl: form.coverUrl.trim() || current?.game.coverUrl,
-      rawgId: form.rawgId ? Number(form.rawgId) : current?.game.rawgId,
+      rawgId,
       description: form.description.trim() || current?.game.description,
       genres: form.genre.trim() || undefined,
       estimatedTime: form.eta.trim() || undefined,
       difficulty: form.difficulty.trim() || undefined,
-      releaseYear: form.year ? Number(form.year) : undefined,
+      releaseYear,
       platforms: mergePlatformList(current?.game.platforms, structuredPlatforms.join(", ")),
       developer: form.developer.trim() || current?.game.developer,
       publisher: form.publisher.trim() || current?.game.publisher,
@@ -88,15 +105,15 @@ export function createDbGameFromForm(
       ownershipStatus: form.status === "Wishlist" ? "wishlist" : "owned",
       progressStatus,
       purchaseDate: form.purchaseDate.trim() || current?.libraryEntry.purchaseDate,
-      pricePaid: form.pricePaid ? Number(form.pricePaid) : current?.libraryEntry.pricePaid,
-      targetPrice: form.targetPrice ? Number(form.targetPrice) : current?.libraryEntry.targetPrice,
+      pricePaid,
+      targetPrice,
       currency: form.currency.trim() || current?.libraryEntry.currency,
       storeLink: form.storeLink.trim() || current?.libraryEntry.storeLink,
       startedAt: form.startedAt.trim() || current?.libraryEntry.startedAt,
       playtimeMinutes: Math.round(hours * 60),
       completionPercent,
       priority: priorityToDbPriority(form.priority),
-      personalRating: form.score ? Number(form.score) : undefined,
+      personalRating,
       notes: form.notes.trim() || undefined,
       checklist: current?.libraryEntry.checklist,
       mood: form.mood.trim() || undefined,

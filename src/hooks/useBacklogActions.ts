@@ -11,6 +11,10 @@ import {
   resolveStructuredPlatforms,
   resolveStructuredStores,
 } from "../core/structuredRelations";
+import {
+  buildStructuredEntryLookupAliases,
+  createStructuredEntryIdentity,
+} from "../core/structuredEntryIdentity";
 import { normalizeToken, splitCsvTokens } from "../core/utils";
 import type {
   Game as DbGameMetadata,
@@ -28,6 +32,7 @@ import {
   attachRawgCandidatesToPreview,
   buildImportPreview,
   buildRestorePreview,
+  composeLibraryRecords,
   createDbGameFromForm,
   createDbGameFromImport,
   downloadText,
@@ -78,6 +83,49 @@ import {
 } from "../modules/catalog-maintenance/utils/catalogMaintenance";
 
 type ImportExportState = ReturnType<typeof useImportExportState>;
+
+function buildStructuredEntryLookup(records: LibraryRecord[], args: {
+  storeNamesByEntryId: Map<number, string[]>;
+  platformNamesByGameId: Map<number, string[]>;
+}) {
+  const lookup = new Map<string, LibraryRecord[]>();
+
+  for (const record of records) {
+    const identity = createStructuredEntryIdentity({
+      title: record.game.title,
+      primaryPlatform: record.libraryEntry.platform,
+      primaryStore: record.libraryEntry.sourceStore,
+      platforms: resolveStructuredPlatforms(
+        record.game,
+        record.libraryEntry.platform,
+        args.platformNamesByGameId,
+      ),
+      stores: resolveStructuredStores(record.libraryEntry, args.storeNamesByEntryId),
+    });
+
+    for (const alias of buildStructuredEntryLookupAliases(identity)) {
+      const current = lookup.get(alias) ?? [];
+      current.push(record);
+      lookup.set(alias, current);
+    }
+  }
+
+  return lookup;
+}
+
+function findStructuredLibraryRecordMatch(
+  lookup: Map<string, LibraryRecord[]>,
+  identity: ReturnType<typeof createStructuredEntryIdentity>,
+) {
+  const matches = new Map<number, LibraryRecord>();
+  for (const alias of buildStructuredEntryLookupAliases(identity)) {
+    for (const record of lookup.get(alias) ?? []) {
+      if (record.libraryEntry.id == null) continue;
+      matches.set(record.libraryEntry.id, record);
+    }
+  }
+  return matches.size === 1 ? Array.from(matches.values())[0] ?? null : null;
+}
 
 type UseBacklogActionsArgs = {
   records: LibraryRecord[];
@@ -406,7 +454,26 @@ export function useBacklogActions({
           return;
         }
 
-        let preview = buildImportPreview(parsed, records);
+        const [storeRows, libraryEntryStoreRows, platformRows, gamePlatformRows] = await Promise.all([
+          db.stores.toArray(),
+          db.libraryEntryStores.toArray(),
+          db.platforms.toArray(),
+          db.gamePlatforms.toArray(),
+        ]);
+        const storeNamesByEntryId = buildStoreNamesByEntryId(storeRows, libraryEntryStoreRows);
+        const platformNamesByGameId = buildPlatformNamesByGameId(platformRows, gamePlatformRows);
+        let preview = buildImportPreview(
+          parsed,
+          records.map((record) => ({
+            ...record,
+            structuredPlatforms: resolveStructuredPlatforms(
+              record.game,
+              record.libraryEntry.platform,
+              platformNamesByGameId,
+            ),
+            structuredStores: resolveStructuredStores(record.libraryEntry, storeNamesByEntryId),
+          })),
+        );
         if (preview.length === 0) {
           setNotice("Nenhum item novo ou atualizável foi encontrado.");
           return;
@@ -741,22 +808,30 @@ export function useBacklogActions({
             db.savedViews.toArray(),
           ]);
 
-          const existingGamesByTitle = new Map(
-            existingGames.map((game) => [game.normalizedTitle || normalizeGameTitle(game.title), game] as const),
-          );
-          const existingGamesById = new Map(existingGames.map((game) => [game.id, game] as const));
-          const existingStoreMap = new Map(
-            existingStores.map((store) => [store.name.trim().toLowerCase(), store] as const),
-          );
-          const existingPlatformMap = new Map(
-            existingPlatforms.map((platform) => [platform.name.trim().toLowerCase(), platform] as const),
-          );
-          const existingEntryByKey = new Map(
-            existingEntries.map((entry) => {
-              const game = existingGamesById.get(entry.gameId);
-              return [`${game?.title.trim().toLowerCase() || ""}::${entry.platform.trim().toLowerCase()}`, entry] as const;
-            }),
-          );
+	          const existingGamesByTitle = new Map(
+	            existingGames.map((game) => [game.normalizedTitle || normalizeGameTitle(game.title), game] as const),
+	          );
+	          const existingStoreNamesByEntryId = buildStoreNamesByEntryId(
+	            existingStores,
+	            existingLibraryEntryStores,
+	          );
+	          const existingPlatformNamesByGameId = buildPlatformNamesByGameId(
+	            existingPlatforms,
+	            existingGamePlatforms,
+	          );
+	          const existingStoreMap = new Map(
+	            existingStores.map((store) => [store.name.trim().toLowerCase(), store] as const),
+	          );
+	          const existingPlatformMap = new Map(
+	            existingPlatforms.map((platform) => [platform.name.trim().toLowerCase(), platform] as const),
+	          );
+	          const existingEntryLookup = buildStructuredEntryLookup(
+	            composeLibraryRecords(existingGames, existingEntries),
+	            {
+	              storeNamesByEntryId: existingStoreNamesByEntryId,
+	              platformNamesByGameId: existingPlatformNamesByGameId,
+	            },
+	          );
           const existingTagMap = new Map(existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag] as const));
           const existingListMap = new Map(existingLists.map((list) => [list.name.trim().toLowerCase(), list] as const));
           const libraryEntryListSet = new Set(existingLibraryEntryLists.map((entry) => `${entry.libraryEntryId}::${entry.listId}`));
@@ -778,10 +853,18 @@ export function useBacklogActions({
             existingGamePlatforms.map((relation) => `${relation.gameId}::${relation.platformId}`),
           );
           const existingSettingMap = new Map(existingSettings.map((setting) => [setting.key, setting] as const));
-          const existingSavedViewMap = new Map<string, DbSavedView>(
-            existingSavedViews.map((view) => [`${view.scope}::${view.name.trim().toLowerCase()}`, view] as const),
-          );
-          const payloadGamesById = new Map(payload.games.map((game) => [game.id, game] as const));
+	          const existingSavedViewMap = new Map<string, DbSavedView>(
+	            existingSavedViews.map((view) => [`${view.scope}::${view.name.trim().toLowerCase()}`, view] as const),
+	          );
+	          const payloadGamesById = new Map(payload.games.map((game) => [game.id, game] as const));
+	          const payloadStoreNamesByEntryId = buildStoreNamesByEntryId(
+	            payload.stores,
+	            payload.libraryEntryStores,
+	          );
+	          const payloadPlatformNamesByGameId = buildPlatformNamesByGameId(
+	            payload.platforms,
+	            payload.gamePlatforms,
+	          );
           const resolvedGameIdByPayloadId = new Map<number, number>();
           const resolvedEntryIdByPayloadId = new Map<number, number>();
           const resolvedStoreIdByPayloadId = new Map<number, number>();
@@ -807,13 +890,25 @@ export function useBacklogActions({
             }
           }
 
-          for (const entry of payload.libraryEntries) {
-            const payloadGame = payloadGamesById.get(entry.gameId);
-            if (!payloadGame) continue;
-            const key = `${payloadGame.title.trim().toLowerCase()}::${entry.platform.trim().toLowerCase()}` as `${string}::${string}`;
-            const existing = existingEntryByKey.get(key);
-            const gameId = resolvedGameIdByPayloadId.get(entry.gameId) ?? existing?.gameId;
-            if (!gameId) continue;
+	          for (const entry of payload.libraryEntries) {
+	            const payloadGame = payloadGamesById.get(entry.gameId);
+	            if (!payloadGame) continue;
+	            const existing = findStructuredLibraryRecordMatch(
+	              existingEntryLookup,
+	              createStructuredEntryIdentity({
+	                title: payloadGame.title,
+	                primaryPlatform: entry.platform,
+	                primaryStore: entry.sourceStore,
+	                platforms: resolveStructuredPlatforms(
+	                  payloadGame,
+	                  entry.platform,
+	                  payloadPlatformNamesByGameId,
+	                ),
+	                stores: resolveStructuredStores(entry, payloadStoreNamesByEntryId),
+	              }),
+	            )?.libraryEntry;
+	            const gameId = resolvedGameIdByPayloadId.get(entry.gameId) ?? existing?.gameId;
+	            if (!gameId) continue;
 
             if (existing?.id != null) {
               if (entry.id != null) resolvedEntryIdByPayloadId.set(entry.id, existing.id);

@@ -152,9 +152,12 @@ function summarizeMetadataGaps(game: Game): string[] {
 function buildMetadataQueue(args: {
   games: Game[];
   libraryEntries: LibraryEntry[];
+  platforms: Platform[];
+  gamePlatforms: GamePlatform[];
 }): CatalogMetadataQueueItem[] {
-  const { games, libraryEntries } = args;
+  const { games, libraryEntries, platforms, gamePlatforms } = args;
   const entriesByGameId = new Map<number, LibraryEntry[]>();
+  const platformNamesByGameId = buildPlatformNamesByGameId(platforms, gamePlatforms);
 
   for (const entry of libraryEntries) {
     const current = entriesByGameId.get(entry.gameId);
@@ -165,11 +168,19 @@ function buildMetadataQueue(args: {
   const items: CatalogMetadataQueueItem[] = [];
   for (const game of games) {
     if (game.id == null) continue;
-    const missingFields = summarizeMetadataGaps(game);
-    if (missingFields.length === 0) continue;
     const linkedEntries = entriesByGameId.get(game.id) ?? [];
     const representative = [...linkedEntries].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
     if (!representative?.id) continue;
+    const structuredPlatforms = resolveStructuredPlatforms(
+      game,
+      representative.platform,
+      platformNamesByGameId,
+    );
+    const missingFields = summarizeMetadataGaps({
+      ...game,
+      platforms: structuredPlatforms.join(", "),
+    });
+    if (missingFields.length === 0) continue;
 
     items.push({
       id: `metadata-${game.id}`,
@@ -181,10 +192,7 @@ function buildMetadataQueue(args: {
       missingFields: missingFields.map((field) => metadataLabels[field] || field),
       rawgId: game.rawgId,
       coverUrl: game.coverUrl,
-      platforms: String(game.platforms || "")
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean),
+      platforms: structuredPlatforms,
       developer: game.developer,
       publisher: game.publisher,
     });
@@ -527,6 +535,8 @@ export function buildCatalogMaintenanceReport(args: {
     games: args.games,
     libraryEntries: args.libraryEntries,
     sessions: args.sessions,
+    platformRows: args.platforms,
+    gamePlatformRows: args.gamePlatforms,
   });
 
   const duplicateGroups = buildDuplicateGroups({
@@ -544,6 +554,8 @@ export function buildCatalogMaintenanceReport(args: {
   const metadataQueue = buildMetadataQueue({
     games: args.games,
     libraryEntries: args.libraryEntries,
+    platforms: args.platforms,
+    gamePlatforms: args.gamePlatforms,
   });
   const normalizationQueue = buildNormalizationQueue({
     games: args.games,
