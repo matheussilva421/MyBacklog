@@ -53,11 +53,9 @@ function getEntityDocRef(uid: string, collectionName: string, uuid: string) {
  * Push de uma única entidade para o Firestore.
  * Usa setDoc com merge para criar ou atualizar.
  */
-export async function pushEntityToCloud<T extends { uuid: string; version: number; updatedAt: string; deletedAt?: string | null }>(
-  uid: string,
-  tableName: string,
-  entity: T,
-): Promise<void> {
+export async function pushEntityToCloud<
+  T extends { uuid: string; version: number; updatedAt: string; deletedAt?: string | null },
+>(uid: string, tableName: string, entity: T): Promise<void> {
   const firestore = cloudDb;
   if (!firestore) {
     throw new Error("Firestore não configurado");
@@ -74,8 +72,8 @@ export async function pushEntityToCloud<T extends { uuid: string; version: numbe
   const entityWithTimestamp = {
     ...entity,
     updatedAt: Timestamp.fromDate(new Date(entity.updatedAt)),
-    createdAt: entity.hasOwnProperty("createdAt")
-      ? Timestamp.fromDate(new Date((entity as any).createdAt))
+    createdAt: Object.hasOwn(entity, "createdAt")
+      ? Timestamp.fromDate(new Date((entity as { createdAt: string }).createdAt))
       : Timestamp.now(),
   };
 
@@ -156,11 +154,7 @@ export async function deleteEntityInCloud(
  * Delete permanente de uma entidade do Firestore.
  * Usar apenas para cleanup de tombstones antigos.
  */
-export async function hardDeleteEntityInCloud(
-  uid: string,
-  tableName: string,
-  uuid: string,
-): Promise<void> {
+export async function hardDeleteEntityInCloud(uid: string, tableName: string, uuid: string): Promise<void> {
   const firestore = cloudDb;
   if (!firestore) {
     throw new Error("Firestore não configurado");
@@ -180,13 +174,8 @@ export async function hardDeleteEntityInCloud(
  * Nota: Firestore não tem bulkWrite, então fazemos múltiplos setDoc em paralelo.
  */
 export async function batchPushEntitiesToCloud<
-  T extends { uuid: string; version: number; updatedAt: string; deletedAt?: string | null }
->(
-  uid: string,
-  tableName: string,
-  entities: T[],
-  concurrencyLimit: number = 10,
-): Promise<void> {
+  T extends { uuid: string; version: number; updatedAt: string; deletedAt?: string | null },
+>(uid: string, tableName: string, entities: T[], concurrencyLimit: number = 10): Promise<void> {
   // Executar pushes com limite de concorrência para evitar rate limiting
   const chunks: T[][] = [];
   for (let i = 0; i < entities.length; i += concurrencyLimit) {

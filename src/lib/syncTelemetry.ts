@@ -128,9 +128,7 @@ export async function purgeOldSyncFailureEvents(olderThanDays: number = 30): Pro
   const currentEvents: SyncFailureEvent[] = JSON.parse(events.value);
   const cutoff = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
 
-  const filteredEvents = currentEvents.filter(
-    (event) => new Date(event.timestamp).getTime() > cutoff,
-  );
+  const filteredEvents = currentEvents.filter((event) => new Date(event.timestamp).getTime() > cutoff);
 
   if (filteredEvents.length === currentEvents.length) return 0;
 

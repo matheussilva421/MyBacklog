@@ -455,10 +455,9 @@ class MyBacklogDB extends Dexie {
         }
       });
 
-    this.version(8)
-      .stores({
-        pendingMutations: "++id, uuid, [uuid+entityType], syncedAt, createdAt, retryCount",
-      });
+    this.version(8).stores({
+      pendingMutations: "++id, uuid, [uuid+entityType], syncedAt, createdAt, retryCount",
+    });
   }
 }
 

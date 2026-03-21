@@ -113,8 +113,24 @@ describe("usePendingMutationsState", () => {
   it("deve chamar retryAll ao chamar handleRetryAll", async () => {
     vi.spyOn(mockMutationQueue, "bulkResetMutationRetry").mockResolvedValue();
     vi.spyOn(mockMutationQueue, "getPermanentFailures").mockResolvedValue([
-      { id: 1, uuid: "uuid-1", entityType: "game", mutationType: "create", payload: "{}", createdAt: "2026-03-21", retryCount: 5 } as any,
-      { id: 2, uuid: "uuid-2", entityType: "review", mutationType: "update", payload: "{}", createdAt: "2026-03-20", retryCount: 5 } as any,
+      {
+        id: 1,
+        uuid: "uuid-1",
+        entityType: "game",
+        mutationType: "create",
+        payload: "{}",
+        createdAt: "2026-03-21",
+        retryCount: 5,
+      } as any,
+      {
+        id: 2,
+        uuid: "uuid-2",
+        entityType: "review",
+        mutationType: "update",
+        payload: "{}",
+        createdAt: "2026-03-20",
+        retryCount: 5,
+      } as any,
     ]);
     vi.spyOn(mockMutationQueue, "getPendingMutations").mockResolvedValue([]);
     vi.spyOn(mockMutationQueue, "getTemporaryFailures").mockResolvedValue([]);
@@ -156,7 +172,15 @@ describe("usePendingMutationsState", () => {
   it("deve chamar deleteAll ao chamar handleDeleteAll", async () => {
     vi.spyOn(mockMutationQueue, "bulkDeletePendingMutations").mockResolvedValue();
     vi.spyOn(mockMutationQueue, "getPermanentFailures").mockResolvedValue([
-      { id: 1, uuid: "uuid-1", entityType: "game", mutationType: "create", payload: "{}", createdAt: "2026-03-21", retryCount: 5 } as any,
+      {
+        id: 1,
+        uuid: "uuid-1",
+        entityType: "game",
+        mutationType: "create",
+        payload: "{}",
+        createdAt: "2026-03-21",
+        retryCount: 5,
+      } as any,
     ]);
     vi.spyOn(mockMutationQueue, "getPendingMutations").mockResolvedValue([]);
     vi.spyOn(mockMutationQueue, "getTemporaryFailures").mockResolvedValue([]);
@@ -173,8 +197,24 @@ describe("usePendingMutationsState", () => {
   it("deve chamar discardAll ao chamar handleDiscardAll", async () => {
     vi.spyOn(mockMutationQueue, "bulkDeletePendingMutations").mockResolvedValue();
     vi.spyOn(mockMutationQueue, "getPendingMutations").mockResolvedValue([
-      { id: 1, uuid: "uuid-1", entityType: "game", mutationType: "create", payload: "{}", createdAt: "2026-03-21", retryCount: 0 } as any,
-      { id: 2, uuid: "uuid-2", entityType: "review", mutationType: "update", payload: "{}", createdAt: "2026-03-20", retryCount: 0 } as any,
+      {
+        id: 1,
+        uuid: "uuid-1",
+        entityType: "game",
+        mutationType: "create",
+        payload: "{}",
+        createdAt: "2026-03-21",
+        retryCount: 0,
+      } as any,
+      {
+        id: 2,
+        uuid: "uuid-2",
+        entityType: "review",
+        mutationType: "update",
+        payload: "{}",
+        createdAt: "2026-03-20",
+        retryCount: 0,
+      } as any,
     ]);
     vi.spyOn(mockMutationQueue, "getPermanentFailures").mockResolvedValue([]);
     vi.spyOn(mockMutationQueue, "getTemporaryFailures").mockResolvedValue([]);

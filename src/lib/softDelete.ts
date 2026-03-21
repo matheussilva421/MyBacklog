@@ -38,11 +38,16 @@ export function filterDeleted<T extends { deletedAt?: string | null }>(entities:
  * Marca uma entidade como deletada (soft delete).
  * Incrementa version, atualiza updatedAt e deletedAt.
  */
-export async function softDelete<T extends { id?: number; uuid?: string; version?: number; updatedAt?: string; deletedAt?: string | null; updatedByDeviceId?: string }>(
-  tableName: keyof typeof db,
-  id: number,
-  deviceId: string,
-): Promise<void> {
+export async function softDelete<
+  T extends {
+    id?: number;
+    uuid?: string;
+    version?: number;
+    updatedAt?: string;
+    deletedAt?: string | null;
+    updatedByDeviceId?: string;
+  },
+>(tableName: keyof typeof db, id: number, deviceId: string): Promise<void> {
   const table = db[tableName] as unknown as Table<T, number>;
   const entity = await table.get(id);
 
@@ -70,10 +75,7 @@ export async function softDelete<T extends { id?: number; uuid?: string; version
  * Hard delete permanente - remove a entidade do banco.
  * Usar apenas para limpeza de tombstones antigos ou dados locais.
  */
-export async function hardDelete<T extends { id?: number }>(
-  tableName: keyof typeof db,
-  id: number,
-): Promise<void> {
+export async function hardDelete<T extends { id?: number }>(tableName: keyof typeof db, id: number): Promise<void> {
   const table = db[tableName] as unknown as Table<T, number>;
   await table.delete(id);
 }

@@ -134,9 +134,7 @@ export async function processMutationQueue(): Promise<{
 
         // Verificar se excedeu máximo de retries antes de processar
         if (m.retryCount >= MAX_RETRY_COUNT) {
-          console.error(
-            `[SyncEngine] Muição ${m.id} excedeu máximo de ${MAX_RETRY_COUNT} retries. Ignorada.`,
-          );
+          console.error(`[SyncEngine] Muição ${m.id} excedeu máximo de ${MAX_RETRY_COUNT} retries. Ignorada.`);
           return { success: false, permanentFailure: true };
         }
 

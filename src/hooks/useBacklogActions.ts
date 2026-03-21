@@ -185,12 +185,7 @@ export function useBacklogActions({
     }
 
     if (session) {
-      await enqueueMutation(
-        session.uuid,
-        "playSession",
-        payload.sessionId != null ? "update" : "create",
-        session,
-      );
+      await enqueueMutation(session.uuid, "playSession", payload.sessionId != null ? "update" : "create", session);
     }
 
     await refreshData();
@@ -218,21 +213,11 @@ export function useBacklogActions({
       if (entryId) {
         const entry = await db.libraryEntries.get(entryId);
         if (entry) {
-          await enqueueMutation(
-            entry.uuid,
-            "libraryEntry",
-            gameModalMode === "edit" ? "update" : "create",
-            entry,
-          );
+          await enqueueMutation(entry.uuid, "libraryEntry", gameModalMode === "edit" ? "update" : "create", entry);
           if (entry.gameId) {
             const game = await db.games.get(entry.gameId);
             if (game) {
-              await enqueueMutation(
-                game.uuid,
-                "game",
-                gameModalMode === "edit" ? "update" : "create",
-                game,
-              );
+              await enqueueMutation(game.uuid, "game", gameModalMode === "edit" ? "update" : "create", game);
             }
           }
         }
@@ -484,7 +469,10 @@ export function useBacklogActions({
           await enqueueMutation(reviewData.uuid, "review", "create", reviewData);
         }
       } else if (existingReview?.id != null) {
-        await enqueueMutation(existingReview.uuid, "review", "delete", { id: existingReview.id, uuid: existingReview.uuid });
+        await enqueueMutation(existingReview.uuid, "review", "delete", {
+          id: existingReview.id,
+          uuid: existingReview.uuid,
+        });
         await softDelete("reviews", existingReview.id, deviceId);
       }
       await db.libraryEntries.update(libraryEntryId, { personalRating: score, updatedAt: new Date().toISOString() });
@@ -850,12 +838,18 @@ export function useBacklogActions({
 
         const entryLists = await db.libraryEntryLists.where("libraryEntryId").equals(deletedEntryId).toArray();
         for (const entryList of entryLists) {
-          await enqueueMutation(entryList.uuid, "libraryEntryList", "delete", { id: entryList.id, uuid: entryList.uuid });
+          await enqueueMutation(entryList.uuid, "libraryEntryList", "delete", {
+            id: entryList.id,
+            uuid: entryList.uuid,
+          });
         }
 
         const entryStores = await db.libraryEntryStores.where("libraryEntryId").equals(deletedEntryId).toArray();
         for (const entryStore of entryStores) {
-          await enqueueMutation(entryStore.uuid, "libraryEntryStore", "delete", { id: entryStore.id, uuid: entryStore.uuid });
+          await enqueueMutation(entryStore.uuid, "libraryEntryStore", "delete", {
+            id: entryStore.id,
+            uuid: entryStore.uuid,
+          });
         }
 
         // Library entry
@@ -1008,7 +1002,12 @@ export function useBacklogActions({
       if (editingGoalId != null) {
         const existingGoal = await db.goals.get(editingGoalId);
         if (existingGoal) {
-          const updatedGoal = { ...existingGoal, type: goalData.type, target: goalData.target, period: goalData.period };
+          const updatedGoal = {
+            ...existingGoal,
+            type: goalData.type,
+            target: goalData.target,
+            period: goalData.period,
+          };
           await db.goals.update(editingGoalId, updatedGoal);
           await enqueueMutation(updatedGoal.uuid, "goal", "update", updatedGoal);
         }
@@ -1492,7 +1491,10 @@ export function useBacklogActions({
           for (const duplicateEntry of duplicateEntries) {
             if (duplicateEntry.id != null) await softDelete("libraryEntries", duplicateEntry.id, deviceId);
           }
-          const duplicateEntryStores = await db.libraryEntryStores.where("libraryEntryId").anyOf(uniqueMergedIds).toArray();
+          const duplicateEntryStores = await db.libraryEntryStores
+            .where("libraryEntryId")
+            .anyOf(uniqueMergedIds)
+            .toArray();
           for (const store of duplicateEntryStores) {
             if (store.id != null) await softDelete("libraryEntryStores", store.id, deviceId);
           }

@@ -129,8 +129,24 @@ describe("PendingMutationsPanel", () => {
     vi.mocked(usePendingMutationsStateModule.usePendingMutationsState).mockReturnValue({
       pending: [],
       permanentFailures: [
-        { id: 1, uuid: "uuid-1", entityType: "game", mutationType: "create", payload: "{}", createdAt: "2026-03-21", retryCount: 5 },
-        { id: 2, uuid: "uuid-2", entityType: "review", mutationType: "update", payload: "{}", createdAt: "2026-03-20", retryCount: 5 },
+        {
+          id: 1,
+          uuid: "uuid-1",
+          entityType: "game",
+          mutationType: "create",
+          payload: "{}",
+          createdAt: "2026-03-21",
+          retryCount: 5,
+        },
+        {
+          id: 2,
+          uuid: "uuid-2",
+          entityType: "review",
+          mutationType: "update",
+          payload: "{}",
+          createdAt: "2026-03-20",
+          retryCount: 5,
+        },
       ],
       temporaryFailures: [],
       isLoading: false,
@@ -164,7 +180,15 @@ describe("PendingMutationsPanel", () => {
     vi.mocked(usePendingMutationsStateModule.usePendingMutationsState).mockReturnValue({
       pending: [],
       permanentFailures: [
-        { id: 1, uuid: "uuid-1", entityType: "game", mutationType: "create", payload: "{}", createdAt: "2026-03-21", retryCount: 5 },
+        {
+          id: 1,
+          uuid: "uuid-1",
+          entityType: "game",
+          mutationType: "create",
+          payload: "{}",
+          createdAt: "2026-03-21",
+          retryCount: 5,
+        },
       ],
       temporaryFailures: [],
       isLoading: false,
@@ -197,7 +221,15 @@ describe("PendingMutationsPanel", () => {
     const mockDiscardAll = vi.fn();
     vi.mocked(usePendingMutationsStateModule.usePendingMutationsState).mockReturnValue({
       pending: [
-        { id: 1, uuid: "uuid-1", entityType: "game", mutationType: "create", payload: "{}", createdAt: "2026-03-21", retryCount: 0 },
+        {
+          id: 1,
+          uuid: "uuid-1",
+          entityType: "game",
+          mutationType: "create",
+          payload: "{}",
+          createdAt: "2026-03-21",
+          retryCount: 0,
+        },
       ],
       permanentFailures: [],
       temporaryFailures: [],

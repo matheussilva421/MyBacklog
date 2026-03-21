@@ -104,9 +104,7 @@ describe("softDelete", () => {
     it("deve avisar se entidade não existir", async () => {
       const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       await softDelete("tags", 99999, "device-test");
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        "softDelete: entidade não encontrada em tags com id 99999",
-      );
+      expect(consoleWarnSpy).toHaveBeenCalledWith("softDelete: entidade não encontrada em tags com id 99999");
       consoleWarnSpy.mockRestore();
     });
   });

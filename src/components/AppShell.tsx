@@ -291,7 +291,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
                 "tour-focus",
             )}
           >
-                      <AppShellScreenContent
+            <AppShellScreenContent
               app={app}
               isAuthEnabled={isAuthEnabled}
               isOnline={isOnline}

@@ -36,3 +36,37 @@ type: project
 **Próximos passos:**
 - Implementar UI na Central de Sync para mostrar mutações com falha permanente
 - Adicionar opção para retry manual ou cancelamento de mutações travadas
+
+---
+
+## Fase 4 - UI para Falhas Permanentes (COMPLETA EM 2026-03-21)
+
+**Arquivos criados:**
+- `src/modules/sync-center/hooks/usePendingMutationsState.ts` - Hook para gerenciar estado das mutações
+- `src/modules/sync-center/hooks/usePendingMutationsState.test.ts` - Testes do hook
+- `src/modules/sync-center/components/PendingMutationsPanel.tsx` - Componente de UI
+- `src/modules/sync-center/components/PendingMutationsPanel.test.tsx` - Testes do componente
+- `src/lib/syncTelemetry.ts` - Telemetria de falhas de sync
+- `src/lib/syncTelemetry.test.ts` - Testes da telemetria
+
+**Arquivos modificados:**
+- `src/lib/mutationQueue.ts` - Funções utilitárias para gerenciar mutações (retry, delete)
+- `src/lib/syncEngine.ts` - Integração com telemetria (logSyncFailure, resolveSyncFailure)
+- `src/modules/sync-center/components/SyncCenterScreen.tsx` - Integração do PendingMutationsPanel
+- `src/components/AppShellScreenContent.tsx` - Props para onSyncNow
+- `src/components/AppShell.tsx` - Exposição de triggerSyncToCloud
+- `src/index.css` - Estilos para componentes de mutações
+
+**Funcionalidades implementadas:**
+1. **PendingMutationsPanel**: Componente na Central de Sync que mostra:
+   - Falhas permanentes (retryCount >= 5) com ações de retry/descarte
+   - Falhas temporárias (0 < retryCount < 5) em retry automático
+   - Mutações pendentes sem falha (retryCount = 0) agendadas para sync
+2. **Ações em batch**: Retry todas, descartar todas, descartar pendentes
+3. **Confirmação modal**: Para ações destrutivas em batch
+4. **Telemetria**: Log de falhas com resolução automática/manual
+
+**Comportamento:**
+- Falhas permanentes exigem intervenção manual (retry ou descarte)
+- Ações de retry resetam contador para 0 e reagemendam sync
+- Telemetria mantém histórico de 100 últimas falhas para análise

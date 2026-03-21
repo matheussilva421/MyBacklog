@@ -828,9 +828,7 @@ export function useCloudSync({
     const intervalId = setInterval(async () => {
       // Verificar se há mutações pendentes antes de disparar sync
       const { db } = await import("../core/db");
-      const pendingCount = await db.pendingMutations
-        .filter((m: { syncedAt?: string | null }) => !m.syncedAt)
-        .count();
+      const pendingCount = await db.pendingMutations.filter((m: { syncedAt?: string | null }) => !m.syncedAt).count();
 
       if (pendingCount > 0) {
         await triggerSyncToCloud();

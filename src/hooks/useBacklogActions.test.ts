@@ -1252,17 +1252,24 @@ describe("useBacklogActions", () => {
       window.confirm = vi.fn(() => true);
 
       // Mock getDeviceId to return a test device ID
-      vi.mocked(db.settings.get).mockResolvedValue({ key: "deviceId", value: "test-device", updatedAt: new Date().toISOString() } as any);
+      vi.mocked(db.settings.get).mockResolvedValue({
+        key: "deviceId",
+        value: "test-device",
+        updatedAt: new Date().toISOString(),
+      } as any);
       // Mock goals.get to return an existing goal
       vi.mocked(db.goals.get).mockResolvedValue({ id: 1, name: "Test Goal", deletedAt: null, version: 1 } as any);
 
       await result.current.handleGoalDelete(1);
 
       window.confirm = originalConfirm;
-      expect(db.goals.update).toHaveBeenCalledWith(1, expect.objectContaining({
-        deletedAt: expect.any(String),
-        version: 2,
-      }));
+      expect(db.goals.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          deletedAt: expect.any(String),
+          version: 2,
+        }),
+      );
       expect(args.setNotice).toHaveBeenCalledWith("Meta removida.");
     });
   });

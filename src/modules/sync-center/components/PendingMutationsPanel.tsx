@@ -68,14 +68,14 @@ function MutationItem({
             </span>
           </div>
         </div>
-        <Pill tone={isPermanent ? "magenta" : "yellow"}>
-          {isPermanent ? "Falha permanente" : "Tentando..."}
-        </Pill>
+        <Pill tone={isPermanent ? "magenta" : "yellow"}>{isPermanent ? "Falha permanente" : "Tentando..."}</Pill>
       </div>
 
       <div className="app-card__body">
         <p className="app-card__meta">
-          <span>UUID: {mutation.uuid.slice(0, 8)}...{mutation.uuid.slice(-4)}</span>
+          <span>
+            UUID: {mutation.uuid.slice(0, 8)}...{mutation.uuid.slice(-4)}
+          </span>
           <span>Criado em: {formatDateTime(mutation.createdAt)}</span>
         </p>
       </div>
@@ -104,11 +104,7 @@ function MutationItem({
   );
 }
 
-export function PendingMutationsPanel({
-  onSyncNow,
-}: {
-  onSyncNow?: () => void;
-}) {
+export function PendingMutationsPanel({ onSyncNow }: { onSyncNow?: () => void }) {
   const {
     pending,
     permanentFailures,
@@ -164,14 +160,12 @@ export function PendingMutationsPanel({
         action={
           <div className="panel-toolbar">
             {stats.permanent > 0 && (
-              <Pill tone="magenta">{stats.permanent} falha{stats.permanent === 1 ? "" : "s"} perm.</Pill>
+              <Pill tone="magenta">
+                {stats.permanent} falha{stats.permanent === 1 ? "" : "s"} perm.
+              </Pill>
             )}
-            {stats.temporary > 0 && (
-              <Pill tone="yellow">{stats.temporary} tentando...</Pill>
-            )}
-            {stats.total > 0 && (
-              <Pill tone="cyan">{stats.total} total</Pill>
-            )}
+            {stats.temporary > 0 && <Pill tone="yellow">{stats.temporary} tentando...</Pill>}
+            {stats.total > 0 && <Pill tone="cyan">{stats.total} total</Pill>}
           </div>
         }
       />
@@ -205,12 +199,7 @@ export function PendingMutationsPanel({
 
           <div className="mutations-list">
             {permanentFailures.map((mutation) => (
-              <MutationItem
-                key={mutation.id}
-                mutation={mutation}
-                onRetry={retry}
-                onDelete={deleteMutation}
-              />
+              <MutationItem key={mutation.id} mutation={mutation} onRetry={retry} onDelete={deleteMutation} />
             ))}
           </div>
 
@@ -233,12 +222,7 @@ export function PendingMutationsPanel({
 
           <div className="mutations-list">
             {temporaryFailures.map((mutation) => (
-              <MutationItem
-                key={mutation.id}
-                mutation={mutation}
-                onRetry={retry}
-                onDelete={deleteMutation}
-              />
+              <MutationItem key={mutation.id} mutation={mutation} onRetry={retry} onDelete={deleteMutation} />
             ))}
           </div>
         </div>
@@ -255,7 +239,9 @@ export function PendingMutationsPanel({
             <NotchButton
               variant="ghost"
               className="danger"
-              onClick={() => setConfirmModal({ type: "discard-all", count: pending.filter((m) => m.retryCount === 0).length })}
+              onClick={() =>
+                setConfirmModal({ type: "discard-all", count: pending.filter((m) => m.retryCount === 0).length })
+              }
             >
               <Trash2 size={14} />
               Descartar pendentes
@@ -263,14 +249,11 @@ export function PendingMutationsPanel({
           </div>
 
           <div className="mutations-list">
-            {pending.filter((m) => m.retryCount === 0).map((mutation) => (
-              <MutationItem
-                key={mutation.id}
-                mutation={mutation}
-                onRetry={retry}
-                onDelete={deleteMutation}
-              />
-            ))}
+            {pending
+              .filter((m) => m.retryCount === 0)
+              .map((mutation) => (
+                <MutationItem key={mutation.id} mutation={mutation} onRetry={retry} onDelete={deleteMutation} />
+              ))}
           </div>
 
           <div className="mutations-section__hint">
@@ -295,15 +278,15 @@ export function PendingMutationsPanel({
             confirmModal.type === "retry-all"
               ? "Retentar todas as falhas permanentes?"
               : confirmModal.type === "delete-all"
-              ? "Descartar todas as falhas permanentes?"
-              : "Descartar mutações pendentes?"
+                ? "Descartar todas as falhas permanentes?"
+                : "Descartar mutações pendentes?"
           }
           description={
             confirmModal.type === "retry-all"
               ? `Isso irá resetar o contador de retry de ${confirmModal.count} mutação(ões) e agendar novo sync.`
               : confirmModal.type === "delete-all"
-              ? `Isso irá remover permanentemente ${confirmModal.count} mutação(ões) falhas. Esta ação não pode ser desfeita.`
-              : `Isso irá remover ${confirmModal.count} mutação(ões) pendentes não sincronizadas.`
+                ? `Isso irá remover permanentemente ${confirmModal.count} mutação(ões) falhas. Esta ação não pode ser desfeita.`
+                : `Isso irá remover ${confirmModal.count} mutação(ões) pendentes não sincronizadas.`
           }
           onClose={() => setConfirmModal(null)}
         >
@@ -328,8 +311,8 @@ export function PendingMutationsPanel({
               {confirmModal.type === "retry-all"
                 ? "Confirmar retry"
                 : confirmModal.type === "delete-all"
-                ? "Confirmar descarte"
-                : "Descartar"}
+                  ? "Confirmar descarte"
+                  : "Descartar"}
             </NotchButton>
           </div>
         </Modal>
