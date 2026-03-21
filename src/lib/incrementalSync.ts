@@ -72,8 +72,8 @@ export async function pushEntityToCloud<
   const entityWithTimestamp = {
     ...entity,
     updatedAt: Timestamp.fromDate(new Date(entity.updatedAt)),
-    createdAt: Object.hasOwn(entity, "createdAt")
-      ? Timestamp.fromDate(new Date((entity as { createdAt: string }).createdAt))
+    createdAt: "createdAt" in entity && entity.createdAt
+      ? Timestamp.fromDate(new Date(entity.createdAt))
       : Timestamp.now(),
   };
 
