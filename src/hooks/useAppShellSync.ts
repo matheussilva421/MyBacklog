@@ -18,7 +18,7 @@ export function useAppShellSync(args: {
     refreshData: args.app.refreshData,
     setNotice: args.app.setNotice,
   });
-  const { triggerSyncToCloud } = sync;
+  const { debouncedTriggerSync } = sync;
 
   useEffect(() => {
     if (
@@ -30,14 +30,15 @@ export function useAppShellSync(args: {
       return;
     }
 
-    void triggerSyncToCloud();
+    // Usar versão debouncada para auto-sync para agrupar mudanças rápidas
+    void debouncedTriggerSync();
   }, [
     args.app.autoSyncWatchKey,
     args.app.loading,
     args.app.preferences.autoSyncEnabled,
     args.isAuthEnabled,
     args.user,
-    triggerSyncToCloud,
+    debouncedTriggerSync,
   ]);
 
   return sync;

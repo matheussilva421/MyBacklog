@@ -4,6 +4,7 @@ import type { BackupPayload } from "../backlog/shared";
 import { db } from "../core/db";
 import { clearCloudBackup, pullFromCloud, pushToCloud } from "../lib/sync";
 import { acquireSyncLockWrapper, releaseSyncLockWrapper } from "../lib/tabSyncLockWrapper";
+import { debounce } from "../lib/debounce";
 import { upsertSettingsRows } from "../modules/settings/utils/settingsStorage";
 import {
   buildBackupPayload,
@@ -816,6 +817,12 @@ export function useCloudSync({
     await runPushFlow("auto-push");
   }, [autoSyncEnabled, comparison?.decision, isWorkingLocal, runPushFlow]);
 
+  // Versão debouncada para auto-sync (5 segundos)
+  const debouncedTriggerSync = useMemo(
+    () => debounce(() => triggerSyncToCloud(), 5000),
+    [triggerSyncToCloud]
+  );
+
   const pushLocalToCloud = useCallback(async () => {
     setIsWorkingLocal(false);
     await runPushFlow("manual-push");
@@ -832,6 +839,7 @@ export function useCloudSync({
     lastSuccessfulSyncAt,
     syncHistory,
     triggerSyncToCloud,
+    debouncedTriggerSync,
     pushLocalToCloud,
     pullCloudToLocal,
     mergeLocalAndCloud,
