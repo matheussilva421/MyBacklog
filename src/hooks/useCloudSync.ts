@@ -3,6 +3,7 @@ import type { User } from "firebase/auth";
 import type { BackupPayload } from "../backlog/shared";
 import { db } from "../core/db";
 import { clearCloudBackup, pullFromCloud, pushToCloud } from "../lib/sync";
+import { acquireSyncLockWrapper, releaseSyncLockWrapper } from "../lib/tabSyncLockWrapper";
 import { upsertSettingsRows } from "../modules/settings/utils/settingsStorage";
 import {
   buildBackupPayload,
@@ -164,7 +165,6 @@ export function useCloudSync({
   const lastSuccessfulSyncAtRef = useRef<string | null>(null);
   const previousFingerprintRef = useRef<string | null>(null);
   const cloudSnapshotRef = useRef<BackupPayload | null>(null);
-  const syncLockRef = useRef<symbol | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const emptySyncTables = useMemo(() => createEmptySyncTables(), []);
 
@@ -278,18 +278,12 @@ export function useCloudSync({
     [persistSyncMeta, refreshData],
   );
 
-  const acquireSyncLock = useCallback(() => {
-    if (syncLockRef.current) return null;
-    const token = Symbol("cloud-sync");
-    syncLockRef.current = token;
-    setIsSyncing(true);
-    return token;
+  const acquireSyncLock = useCallback(async () => {
+    return await acquireSyncLockWrapper();
   }, []);
 
   const releaseSyncLock = useCallback((token: symbol | null) => {
-    if (!token || syncLockRef.current !== token) return;
-    syncLockRef.current = null;
-    setIsSyncing(false);
+    releaseSyncLockWrapper(token);
   }, []);
 
   const finalizeMatchState = useCallback((localTables: SyncTables, cloudData: BackupPayload | null, mergedAt?: string | null) => {
@@ -323,10 +317,12 @@ export function useCloudSync({
           return;
         }
 
-        const syncToken = acquireSyncLock();
+        const syncToken = await acquireSyncLock();
         if (!syncToken) return;
 
         try {
+          // Already inside try block, sync operation continues
+          setIsSyncing(true);
           const cloudData = await pullFromCloud(user.uid);
           if (!active) return;
 
@@ -427,6 +423,7 @@ export function useCloudSync({
             "Conflito detectado entre base local e nuvem. Abra a Central de Sync e escolha conscientemente como resolver.",
           );
         } finally {
+          setIsSyncing(false);
           releaseSyncLock(syncToken);
         }
       } catch (error) {
@@ -474,10 +471,12 @@ export function useCloudSync({
       if (isOnline && user && isAuthEnabled && autoSyncEnabled && !isSyncing) {
         // Disparar um novo bootstrap do sync
         void (async () => {
-          const syncToken = acquireSyncLock();
+          const syncToken = await acquireSyncLock();
           if (!syncToken) return;
 
           try {
+            setIsSyncing(true);
+
             const localTables = await readBackupTables();
             const cloudData = await pullFromCloud(user.uid);
 
@@ -495,6 +494,7 @@ export function useCloudSync({
           } catch (error) {
             logSyncError("Reconnect sync error:", error);
           } finally {
+            setIsSyncing(false);
             releaseSyncLock(syncToken);
           }
         })();
@@ -527,10 +527,11 @@ export function useCloudSync({
       } = {},
     ) => {
       if (!user || !isAuthEnabled || !isOnline) return;
-      const syncToken = options.lockToken ?? acquireSyncLock();
+      const syncToken = options.lockToken ?? await acquireSyncLock();
       if (!syncToken) return;
 
       try {
+        setIsSyncing(true);
         const [localTables, cloudData] = await Promise.all([
           options.localTables ? Promise.resolve(options.localTables) : readBackupTables(),
           options.cloudData !== undefined ? Promise.resolve(options.cloudData) : pullFromCloud(user.uid),
@@ -598,6 +599,7 @@ export function useCloudSync({
         setNotice("Falha ao enviar backup para a nuvem.");
       } finally {
         if (!options.lockToken) {
+          setIsSyncing(false);
           releaseSyncLock(syncToken);
         }
       }
@@ -627,12 +629,13 @@ export function useCloudSync({
       return;
     }
 
-    const syncToken = acquireSyncLock();
+    const syncToken = await acquireSyncLock();
     if (!syncToken) return;
 
     let cloudCleared = false;
 
     try {
+      setIsSyncing(true);
       if (isAuthEnabled && user) {
         await clearCloudBackup(user.uid);
         cloudCleared = true;
@@ -662,6 +665,7 @@ export function useCloudSync({
           : "Falha ao apagar local e nuvem. Nenhum reset completo foi concluído.",
       );
     } finally {
+      setIsSyncing(false);
       releaseSyncLock(syncToken);
     }
   }, [
@@ -682,9 +686,10 @@ export function useCloudSync({
       setNotice("Você está offline. Reconecte para puxar o snapshot remoto.");
       return;
     }
-    const syncToken = acquireSyncLock();
+    const syncToken = await acquireSyncLock();
     if (!syncToken) return;
     try {
+      setIsSyncing(true);
       const cloudData = await pullFromCloud(user.uid);
       if (!cloudData) {
         await pushHistory("manual-pull", "skipped", "Nenhum snapshot remoto encontrado para puxar.");
@@ -714,6 +719,7 @@ export function useCloudSync({
       await pushHistory("manual-pull", "error", "Falha ao puxar o snapshot remoto.");
       setNotice("Falha ao puxar a nuvem.");
     } finally {
+      setIsSyncing(false);
       releaseSyncLock(syncToken);
     }
   }, [
@@ -735,9 +741,10 @@ export function useCloudSync({
       setNotice("Você está offline. Reconecte para mesclar snapshots.");
       return;
     }
-    const syncToken = acquireSyncLock();
+    const syncToken = await acquireSyncLock();
     if (!syncToken) return;
     try {
+      setIsSyncing(true);
       const [localTables, cloudData] = await Promise.all([readBackupTables(), pullFromCloud(user.uid)]);
       if (!cloudData) {
         await runPushFlow("manual-push", {
@@ -774,6 +781,7 @@ export function useCloudSync({
       await pushHistory("manual-merge", "error", "Falha ao mesclar snapshots local e remoto.");
       setNotice("Falha ao mesclar os dados de sync.");
     } finally {
+      setIsSyncing(false);
       releaseSyncLock(syncToken);
     }
   }, [
