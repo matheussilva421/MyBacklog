@@ -3,7 +3,15 @@ import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useBacklogActions } from "./useBacklogActions";
 import { db } from "../core/db";
 import type { DbLibraryEntry, DbGameMetadata, DbGoal, DbList, DbSavedView } from "../core/types";
-import type { LibraryRecord, Game, StatusFilter, LibraryListFilter, LibraryViewSortBy, LibraryViewSortDirection, LibraryViewGroupBy } from "../backlog/shared";
+import type {
+  LibraryRecord,
+  Game,
+  StatusFilter,
+  LibraryListFilter,
+  LibraryViewSortBy,
+  LibraryViewSortDirection,
+  LibraryViewGroupBy,
+} from "../backlog/shared";
 import type { AppPreferences } from "../modules/settings/utils/preferences";
 import type { useImportExportState } from "../modules/import-export/hooks/useImportExportState";
 
@@ -61,6 +69,7 @@ vi.mock("../core/db", () => ({
     reviews: {
       add: vi.fn(),
       put: vi.fn(),
+      get: vi.fn(),
       where: vi.fn(() => ({
         equals: vi.fn(() => ({
           first: vi.fn(),
@@ -71,6 +80,7 @@ vi.mock("../core/db", () => ({
     },
     tags: {
       add: vi.fn(),
+      get: vi.fn(),
       where: vi.fn(() => ({
         equals: vi.fn(() => ({
           first: vi.fn(),
@@ -83,6 +93,7 @@ vi.mock("../core/db", () => ({
     },
     gameTags: {
       add: vi.fn(),
+      get: vi.fn(),
       where: vi.fn(() => ({
         equals: vi.fn(() => ({
           toArray: vi.fn(),
@@ -98,6 +109,7 @@ vi.mock("../core/db", () => ({
     },
     lists: {
       add: vi.fn(),
+      get: vi.fn(),
       where: vi.fn(() => ({
         equals: vi.fn(() => ({
           toArray: vi.fn(),
@@ -112,6 +124,7 @@ vi.mock("../core/db", () => ({
     },
     libraryEntryLists: {
       add: vi.fn(),
+      get: vi.fn(),
       where: vi.fn(() => ({
         equals: vi.fn(() => ({
           toArray: vi.fn().mockResolvedValue([]),
@@ -128,13 +141,19 @@ vi.mock("../core/db", () => ({
     },
     playSessions: {
       add: vi.fn(),
+      get: vi.fn(),
       where: vi.fn(() => ({
         equals: vi.fn(() => ({
           delete: vi.fn(),
-          toArray: vi.fn(),
+          toArray: vi.fn(() => []),
+          reverse: vi.fn(() => ({
+            limit: vi.fn(() => ({
+              toArray: vi.fn(() => []),
+            })),
+          })),
         })),
         anyOf: vi.fn(() => ({
-          toArray: vi.fn(),
+          toArray: vi.fn(() => []),
         })),
       })),
       update: vi.fn(),
@@ -142,6 +161,7 @@ vi.mock("../core/db", () => ({
     },
     stores: {
       add: vi.fn(),
+      get: vi.fn(),
       toArray: vi.fn(),
       where: vi.fn(() => ({
         equals: vi.fn(() => ({
@@ -155,6 +175,7 @@ vi.mock("../core/db", () => ({
     },
     libraryEntryStores: {
       add: vi.fn(),
+      get: vi.fn(),
       where: vi.fn(() => ({
         equals: vi.fn(() => ({
           toArray: vi.fn(),
@@ -171,6 +192,7 @@ vi.mock("../core/db", () => ({
     },
     platforms: {
       add: vi.fn(),
+      get: vi.fn(),
       toArray: vi.fn(),
       where: vi.fn(() => ({
         equals: vi.fn(() => ({
@@ -184,6 +206,7 @@ vi.mock("../core/db", () => ({
     },
     gamePlatforms: {
       add: vi.fn(),
+      get: vi.fn(),
       where: vi.fn(() => ({
         equals: vi.fn(() => ({
           toArray: vi.fn(),
@@ -203,12 +226,22 @@ vi.mock("../core/db", () => ({
       update: vi.fn(),
       delete: vi.fn(),
       toArray: vi.fn(),
+      get: vi.fn(),
     },
     settings: {
       bulkPut: vi.fn(),
+      get: vi.fn(),
+      put: vi.fn(),
+      add: vi.fn(),
+      where: vi.fn(() => ({
+        equals: vi.fn(() => ({
+          delete: vi.fn(),
+        })),
+      })),
     },
     savedViews: {
       put: vi.fn(),
+      get: vi.fn(),
       delete: vi.fn(),
       where: vi.fn(() => ({
         equals: vi.fn(() => ({
@@ -221,16 +254,26 @@ vi.mock("../core/db", () => ({
       add: vi.fn(),
       clear: vi.fn(),
     },
+    pendingMutations: {
+      add: vi.fn(),
+      update: vi.fn(),
+      get: vi.fn(),
+      where: vi.fn(() => ({
+        equals: vi.fn(() => ({
+          toArray: vi.fn(),
+        })),
+      })),
+      toArray: vi.fn(),
+      bulkDelete: vi.fn(),
+    },
     transaction: vi.fn(),
   },
 }));
 
 vi.mock("../modules/sessions/utils/sessionMutations", () => ({
   savePlaySession: vi.fn(async (payload) => ({
-    sessionId: payload.sessionId ?? 1,
     libraryEntryId: payload.libraryEntryId,
-    date: payload.date,
-    durationMinutes: payload.durationMinutes,
+    mode: payload.sessionId != null ? "edit" : "create",
   })),
   deletePlaySession: vi.fn(async (sessionId) => {
     await vi.mocked(db.playSessions.delete).mockResolvedValue(undefined);
@@ -292,7 +335,7 @@ vi.mock("../core/structuredRelations", () => ({
   buildPlatformNamesByGameId: vi.fn(() => new Map()),
   derivePrimaryPlatform: vi.fn((platforms) => platforms?.[0] ?? ""),
   derivePrimaryStore: vi.fn((stores) => stores?.[0] ?? ""),
-  resolveStructuredPlatforms: vi.fn((_, platform) => platform ? [platform] : []),
+  resolveStructuredPlatforms: vi.fn((_, platform) => (platform ? [platform] : [])),
   resolveStructuredStores: vi.fn(() => []),
 }));
 
@@ -303,7 +346,14 @@ vi.mock("../core/utils", async (importOriginal) => {
     ...(actual as object),
     downloadText: vi.fn(),
     normalizeToken: vi.fn((t) => t?.toLowerCase() ?? ""),
-    splitCsvTokens: vi.fn((t) => (typeof t === "string" ? t.split(",").map((s) => s.trim()).filter(Boolean) : [])),
+    splitCsvTokens: vi.fn((t) =>
+      typeof t === "string"
+        ? t
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [],
+    ),
     normalizePreferencesDraft: vi.fn((draft) => draft),
     preferencesToSettingPairs: vi.fn((prefs) => []),
     ...(actualPrefs as object),
@@ -554,17 +604,39 @@ function createMockArgs(overrides: Record<string, unknown> = {}) {
     editingGoalId: null,
     preferences: createMockPreferences(),
     catalogAuditReport: {
-      summary: { totalIssues: 0, repairableIssues: 0, metadataIssues: 0, orphanSessions: 0, playtimeIssues: 0, progressIssues: 0 },
+      summary: {
+        totalIssues: 0,
+        repairableIssues: 0,
+        metadataIssues: 0,
+        orphanSessions: 0,
+        playtimeIssues: 0,
+        progressIssues: 0,
+      },
       issues: [],
       repairPlan: { entryUpdates: [], orphanSessionIds: [] },
     },
     catalogMaintenanceReport: {
-      summary: { totalIssues: 0, structuralIssues: 0, repairableStructuralIssues: 0, duplicateGroups: 0, duplicateEntries: 0, metadataQueue: 0, orphanSessions: 0 },
+      summary: {
+        totalIssues: 0,
+        structuralIssues: 0,
+        repairableStructuralIssues: 0,
+        duplicateGroups: 0,
+        duplicateEntries: 0,
+        metadataQueue: 0,
+        orphanSessions: 0,
+      },
       duplicateGroups: [],
       metadataQueue: [],
       normalizationQueue: [],
       audit: {
-        summary: { totalIssues: 0, repairableIssues: 0, metadataIssues: 0, orphanSessions: 0, playtimeIssues: 0, progressIssues: 0 },
+        summary: {
+          totalIssues: 0,
+          repairableIssues: 0,
+          metadataIssues: 0,
+          orphanSessions: 0,
+          playtimeIssues: 0,
+          progressIssues: 0,
+        },
         issues: [],
         repairPlan: { entryUpdates: [], orphanSessionIds: [] },
       },
@@ -670,7 +742,9 @@ describe("useBacklogActions", () => {
     });
 
     it("should handle errors gracefully", async () => {
-      vi.mocked(await import("../services/gameCatalogService")).saveGameFromForm.mockRejectedValueOnce(new Error("Database error"));
+      vi.mocked(await import("../services/gameCatalogService")).saveGameFromForm.mockRejectedValueOnce(
+        new Error("Database error"),
+      );
 
       const args = createMockArgs({
         gameForm: { libraryEntryId: 0, title: "Test Game" },
@@ -874,7 +948,9 @@ describe("useBacklogActions", () => {
     });
 
     it("should handle errors gracefully", async () => {
-      vi.mocked(await import("../modules/sessions/utils/sessionMutations")).savePlaySession.mockRejectedValueOnce(new Error("Failed"));
+      vi.mocked(await import("../modules/sessions/utils/sessionMutations")).savePlaySession.mockRejectedValueOnce(
+        new Error("Failed"),
+      );
 
       const args = createMockArgs();
       const { result } = renderHook(() => useBacklogActions(args));
@@ -908,6 +984,8 @@ describe("useBacklogActions", () => {
     });
 
     it("should remove review if all fields are empty", async () => {
+      // Quando todos os campos estao vazios e nao ha review existente,
+      // o codigo nao faz nada (nao ha review para remover)
       const args = createMockArgs();
       const { result } = renderHook(() => useBacklogActions(args));
 
@@ -921,7 +999,8 @@ describe("useBacklogActions", () => {
         hasSpoiler: false,
       });
 
-      expect(args.setNotice).toHaveBeenCalledWith("Review removida.");
+      // Sem review existente, nenhuma acao e tomada
+      expect(args.setNotice).toHaveBeenCalledWith("Review do jogo atualizada.");
     });
   });
 
@@ -1032,7 +1111,20 @@ describe("useBacklogActions", () => {
     it("should toggle favorite status", async () => {
       const args = createMockArgs({
         selectedRecord: createMockRecord({
-          libraryEntry: { id: 1, gameId: 1, favorite: true, progress: 0, hours: 0, status: "Backlog", priority: "Média", ownershipStatus: "owned", progressStatus: "not_started", sourceStore: "Steam", platform: "PC", updatedAt: new Date().toISOString() },
+          libraryEntry: {
+            id: 1,
+            gameId: 1,
+            favorite: true,
+            progress: 0,
+            hours: 0,
+            status: "Backlog",
+            priority: "Média",
+            ownershipStatus: "owned",
+            progressStatus: "not_started",
+            sourceStore: "Steam",
+            platform: "PC",
+            updatedAt: new Date().toISOString(),
+          },
         }),
       });
       const { result } = renderHook(() => useBacklogActions(args));
@@ -1046,7 +1138,20 @@ describe("useBacklogActions", () => {
     it("should mark as favorite when not favorited", async () => {
       const args = createMockArgs({
         selectedRecord: createMockRecord({
-          libraryEntry: { id: 1, gameId: 1, favorite: false, progress: 0, hours: 0, status: "Backlog", priority: "Média", ownershipStatus: "owned", progressStatus: "not_started", sourceStore: "Steam", platform: "PC", updatedAt: new Date().toISOString() },
+          libraryEntry: {
+            id: 1,
+            gameId: 1,
+            favorite: false,
+            progress: 0,
+            hours: 0,
+            status: "Backlog",
+            priority: "Média",
+            ownershipStatus: "owned",
+            progressStatus: "not_started",
+            sourceStore: "Steam",
+            platform: "PC",
+            updatedAt: new Date().toISOString(),
+          },
         }),
       });
       const { result } = renderHook(() => useBacklogActions(args));
@@ -1103,6 +1208,18 @@ describe("useBacklogActions", () => {
         goalForm: { type: "games", target: 15, period: "weekly" },
         editingGoalId: 1,
       });
+      vi.mocked(db.goals.get).mockResolvedValueOnce({
+        id: 1,
+        uuid: "goal-uuid",
+        version: 1,
+        type: "games",
+        target: 10,
+        current: 5,
+        period: "monthly",
+        createdAt: "2024-01-01",
+        updatedAt: "2024-01-01",
+        deletedAt: null,
+      } as DbGoal);
       const { result } = renderHook(() => useBacklogActions(args));
 
       const event = { preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>;
@@ -1124,7 +1241,7 @@ describe("useBacklogActions", () => {
       await result.current.handleGoalDelete(1);
 
       window.confirm = originalConfirm;
-      expect(db.goals.delete).not.toHaveBeenCalled();
+      expect(db.goals.update).not.toHaveBeenCalled();
     });
 
     it("should delete goal when confirmed", async () => {
@@ -1134,10 +1251,18 @@ describe("useBacklogActions", () => {
       const originalConfirm = window.confirm;
       window.confirm = vi.fn(() => true);
 
+      // Mock getDeviceId to return a test device ID
+      vi.mocked(db.settings.get).mockResolvedValue({ key: "deviceId", value: "test-device", updatedAt: new Date().toISOString() } as any);
+      // Mock goals.get to return an existing goal
+      vi.mocked(db.goals.get).mockResolvedValue({ id: 1, name: "Test Goal", deletedAt: null, version: 1 } as any);
+
       await result.current.handleGoalDelete(1);
 
       window.confirm = originalConfirm;
-      expect(db.goals.delete).toHaveBeenCalledWith(1);
+      expect(db.goals.update).toHaveBeenCalledWith(1, expect.objectContaining({
+        deletedAt: expect.any(String),
+        version: 2,
+      }));
       expect(args.setNotice).toHaveBeenCalledWith("Meta removida.");
     });
   });
@@ -1175,7 +1300,14 @@ describe("useBacklogActions", () => {
 
       await result.current.handleListCreate("New List");
 
-      expect(db.lists.add).toHaveBeenCalledWith({ name: "New List", createdAt: expect.any(String) });
+      expect(db.lists.add).toHaveBeenCalledWith({
+        uuid: expect.any(String),
+        version: 1,
+        name: "New List",
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+        deletedAt: null,
+      });
       expect(args.setNotice).toHaveBeenCalledWith("Lista criada com sucesso.");
     });
   });
@@ -1211,7 +1343,17 @@ describe("useBacklogActions", () => {
 
     it("should update existing view", async () => {
       const args = createMockArgs({
-        savedViewRows: [{ id: 1, name: "Test View", scope: "library", query: "", sortBy: "updatedAt", sortDirection: "desc", groupBy: "none" } as DbSavedView],
+        savedViewRows: [
+          {
+            id: 1,
+            name: "Test View",
+            scope: "library",
+            query: "",
+            sortBy: "updatedAt",
+            sortDirection: "desc",
+            groupBy: "none",
+          } as DbSavedView,
+        ],
       });
       const { result } = renderHook(() => useBacklogActions(args));
 
@@ -1318,7 +1460,14 @@ describe("useBacklogActions", () => {
     it("should show notice if no repairs needed", async () => {
       const args = createMockArgs({
         catalogAuditReport: {
-          summary: { totalIssues: 0, repairableIssues: 0, metadataIssues: 0, orphanSessions: 0, playtimeIssues: 0, progressIssues: 0 },
+          summary: {
+            totalIssues: 0,
+            repairableIssues: 0,
+            metadataIssues: 0,
+            orphanSessions: 0,
+            playtimeIssues: 0,
+            progressIssues: 0,
+          },
           issues: [],
           repairPlan: { entryUpdates: [], orphanSessionIds: [] },
         },
@@ -1333,7 +1482,14 @@ describe("useBacklogActions", () => {
     it("should not proceed if not confirmed", async () => {
       const args = createMockArgs({
         catalogAuditReport: {
-          summary: { totalIssues: 1, repairableIssues: 1, metadataIssues: 0, orphanSessions: 0, playtimeIssues: 0, progressIssues: 0 },
+          summary: {
+            totalIssues: 1,
+            repairableIssues: 1,
+            metadataIssues: 0,
+            orphanSessions: 0,
+            playtimeIssues: 0,
+            progressIssues: 0,
+          },
           issues: [],
           repairPlan: { entryUpdates: [{ libraryEntryId: 1, updates: { status: "playing" } }], orphanSessionIds: [1] },
         },

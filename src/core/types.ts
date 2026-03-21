@@ -340,7 +340,8 @@ export type EntityType =
   | "libraryEntryStore"
   | "libraryEntryList"
   | "gameTag"
-  | "gamePlatform";
+  | "gamePlatform"
+  | "setting";
 
 export interface PendingMutation {
   id?: number;

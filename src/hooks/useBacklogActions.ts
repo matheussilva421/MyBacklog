@@ -1,8 +1,6 @@
 import type { FormEvent } from "react";
 import { db } from "../core/db";
-import {
-  syncStructuredRelationsForRecord,
-} from "../core/structuredDataSync";
+import { syncStructuredRelationsForRecord } from "../core/structuredDataSync";
 import {
   buildPlatformNamesByGameId,
   buildStoreNamesByEntryId,
@@ -11,7 +9,8 @@ import {
   resolveStructuredPlatforms,
   resolveStructuredStores,
 } from "../core/structuredRelations";
-import { normalizeToken, splitCsvTokens } from "../core/utils";
+import { normalizeToken, splitCsvTokens, generateUuid } from "../core/utils";
+import { softDelete, getDeviceId } from "../lib/softDelete";
 import type {
   Game as DbGameMetadata,
   Goal as DbGoal,
@@ -54,6 +53,7 @@ import {
 import type { useImportExportState } from "../modules/import-export/hooks/useImportExportState";
 import { deletePlaySession, savePlaySession } from "../modules/sessions/utils/sessionMutations";
 import { upsertSettingsRows } from "../modules/settings/utils/settingsStorage";
+import { enqueueMutation } from "../lib/mutationQueue";
 import {
   mergeGameMetadata,
   mergeLibraryEntries,
@@ -168,6 +168,31 @@ export function useBacklogActions({
     note?: string;
   }) => {
     const result = await savePlaySession(payload);
+
+    // Enqueue mutation for session
+    let session;
+    if (payload.sessionId != null) {
+      session = await db.playSessions.get(payload.sessionId);
+    } else {
+      // Buscar sessão recém-criada pela entry
+      const sessions = await db.playSessions
+        .where("libraryEntryId")
+        .equals(payload.libraryEntryId)
+        .reverse()
+        .limit(1)
+        .toArray();
+      session = sessions[0];
+    }
+
+    if (session) {
+      await enqueueMutation(
+        session.uuid,
+        "playSession",
+        payload.sessionId != null ? "update" : "create",
+        session,
+      );
+    }
+
     await refreshData();
     setSelectedGameId(result.libraryEntryId);
     return result;
@@ -188,6 +213,30 @@ export function useBacklogActions({
         selectedRecord,
         preferences,
       });
+
+      // Enqueue mutations for game and libraryEntry
+      if (entryId) {
+        const entry = await db.libraryEntries.get(entryId);
+        if (entry) {
+          await enqueueMutation(
+            entry.uuid,
+            "libraryEntry",
+            gameModalMode === "edit" ? "update" : "create",
+            entry,
+          );
+          if (entry.gameId) {
+            const game = await db.games.get(entry.gameId);
+            if (game) {
+              await enqueueMutation(
+                game.uuid,
+                "game",
+                gameModalMode === "edit" ? "update" : "create",
+                game,
+              );
+            }
+          }
+        }
+      }
 
       await refreshData();
       setGameModalMode(null);
@@ -241,16 +290,21 @@ export function useBacklogActions({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "erro desconhecido";
       const now = new Date().toISOString();
-      await db.importJobs.add({
-        source: importState.importSource,
-        status: "failed",
-        totalItems: importState.importPreview?.length ?? 0,
-        processedItems: 0,
-        summary: `Falha: ${errorMessage}`,
-        createdAt: now,
-        updatedAt: now,
-      }).catch(() => {});
-      
+      await db.importJobs
+        .add({
+          uuid: generateUuid(),
+          version: 1,
+          source: importState.importSource,
+          status: "failed",
+          totalItems: importState.importPreview?.length ?? 0,
+          processedItems: 0,
+          summary: `Falha: ${errorMessage}`,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: null,
+        })
+        .catch(() => {});
+
       setNotice(`Falha ao processar importação: ${errorMessage}.`);
     } finally {
       setSubmitting(false);
@@ -301,9 +355,7 @@ export function useBacklogActions({
         }
 
         importState.setRestorePreview(preview);
-        setNotice(
-          `Preview de restore pronto para ${preview.payload.libraryEntries.length} itens da biblioteca.`,
-        );
+        setNotice(`Preview de restore pronto para ${preview.payload.libraryEntries.length} itens da biblioteca.`);
         return;
       }
 
@@ -319,7 +371,11 @@ export function useBacklogActions({
       await refreshData();
       importState.closeRestoreFlow();
       setScreen("library");
-      setNotice(importState.restorePreview.mode === "replace" ? "Backup restaurado com substituição total da base local." : "Backup mesclado com a base local.");
+      setNotice(
+        importState.restorePreview.mode === "replace"
+          ? "Backup restaurado com substituição total da base local."
+          : "Backup mesclado com a base local.",
+      );
     } catch (error) {
       setNotice(`Falha ao restaurar o backup: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
     } finally {
@@ -378,22 +434,58 @@ export function useBacklogActions({
     }
   };
 
-  const handleGameReviewSave = async (payload: { score: string; recommend: "" | "yes" | "no"; shortReview: string; longReview: string; pros: string; cons: string; hasSpoiler: boolean }) => {
+  const handleGameReviewSave = async (payload: {
+    score: string;
+    recommend: "" | "yes" | "no";
+    shortReview: string;
+    longReview: string;
+    pros: string;
+    cons: string;
+    hasSpoiler: boolean;
+  }) => {
     if (!selectedRecord?.libraryEntry.id) return;
     const libraryEntryId = selectedRecord.libraryEntry.id;
     const normalizedScore = payload.score.trim();
     const parsedScore = normalizedScore === "" ? undefined : Number.parseFloat(normalizedScore);
-    const score = typeof parsedScore === "number" && Number.isFinite(parsedScore) ? Math.max(0, Math.min(10, parsedScore)) : undefined;
-    const reviewData = { libraryEntryId, score, shortReview: payload.shortReview.trim() || undefined, longReview: payload.longReview.trim() || undefined, pros: payload.pros.trim() || undefined, cons: payload.cons.trim() || undefined, recommend: payload.recommend || undefined, hasSpoiler: payload.hasSpoiler || undefined };
-    const hasContent = Object.entries(reviewData).some(([key, value]) => key !== "libraryEntryId" && value != null && value !== "");
+    const score =
+      typeof parsedScore === "number" && Number.isFinite(parsedScore)
+        ? Math.max(0, Math.min(10, parsedScore))
+        : undefined;
+    const now = new Date().toISOString();
+    const reviewData = {
+      uuid: generateUuid(),
+      version: 1,
+      libraryEntryId,
+      score,
+      shortReview: payload.shortReview.trim() || undefined,
+      longReview: payload.longReview.trim() || undefined,
+      pros: payload.pros.trim() || undefined,
+      cons: payload.cons.trim() || undefined,
+      recommend: payload.recommend || undefined,
+      hasSpoiler: payload.hasSpoiler || undefined,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    const hasContent = Object.entries(reviewData).some(
+      ([key, value]) => key !== "libraryEntryId" && value != null && value !== "",
+    );
 
+    const deviceId = await getDeviceId();
     await db.transaction("rw", db.reviews, db.libraryEntries, async () => {
       const existingReview = await db.reviews.where("libraryEntryId").equals(libraryEntryId).first();
       if (hasContent) {
-        if (existingReview?.id != null) await db.reviews.put({ ...existingReview, ...reviewData, id: existingReview.id });
-        else await db.reviews.add(reviewData);
+        if (existingReview?.id != null) {
+          const updatedReview = { ...existingReview, ...reviewData, id: existingReview.id };
+          await db.reviews.put(updatedReview);
+          await enqueueMutation(updatedReview.uuid, "review", "update", updatedReview);
+        } else {
+          await db.reviews.add(reviewData);
+          await enqueueMutation(reviewData.uuid, "review", "create", reviewData);
+        }
       } else if (existingReview?.id != null) {
-        await db.reviews.delete(existingReview.id);
+        await enqueueMutation(existingReview.uuid, "review", "delete", { id: existingReview.id, uuid: existingReview.uuid });
+        await softDelete("reviews", existingReview.id, deviceId);
       }
       await db.libraryEntries.update(libraryEntryId, { personalRating: score, updatedAt: new Date().toISOString() });
     });
@@ -405,8 +497,16 @@ export function useBacklogActions({
   const handleGameTagsSave = async (value: string) => {
     if (!selectedRecord?.libraryEntry.id) return;
     const libraryEntryId = selectedRecord.libraryEntry.id;
-    const names = Array.from(new Set(value.split(",").map((token) => token.trim()).filter(Boolean)));
+    const names = Array.from(
+      new Set(
+        value
+          .split(",")
+          .map((token) => token.trim())
+          .filter(Boolean),
+      ),
+    );
 
+    const deviceId = await getDeviceId();
     await db.transaction("rw", db.tags, db.gameTags, async () => {
       const existingTags = await db.tags.toArray();
       const tagsByName = new Map(existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag] as const));
@@ -418,19 +518,53 @@ export function useBacklogActions({
         const existing = tagsByName.get(key);
         if (existing?.id != null) nextTagIds.add(existing.id);
         else {
-          const tagId = Number(await db.tags.add({ name }));
-          tagsByName.set(key, { id: tagId, name });
+          const now = new Date().toISOString();
+          const tagId = Number(
+            await db.tags.add({
+              uuid: generateUuid(),
+              version: 1,
+              name,
+              createdAt: now,
+              updatedAt: now,
+              deletedAt: null,
+            }),
+          );
+          tagsByName.set(key, {
+            id: tagId,
+            name,
+            uuid: generateUuid(),
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+          });
           nextTagIds.add(tagId);
         }
       }
 
       for (const relation of currentRelations) {
-        if (!nextTagIds.has(relation.tagId) && relation.id != null) await db.gameTags.delete(relation.id);
+        if (!nextTagIds.has(relation.tagId) && relation.id != null) {
+          await enqueueMutation(relation.uuid, "gameTag", "delete", { id: relation.id, uuid: relation.uuid });
+          await softDelete("gameTags", relation.id, deviceId);
+        }
       }
 
       const currentTagIds = new Set(currentRelations.map((relation) => relation.tagId));
       for (const tagId of nextTagIds) {
-        if (!currentTagIds.has(tagId)) await db.gameTags.add({ libraryEntryId, tagId });
+        if (!currentTagIds.has(tagId)) {
+          const now = new Date().toISOString();
+          const newRelation = {
+            uuid: generateUuid(),
+            version: 1,
+            libraryEntryId,
+            tagId,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+          };
+          await db.gameTags.add(newRelation);
+          await enqueueMutation(newRelation.uuid, "gameTag", "create", newRelation);
+        }
       }
     });
 
@@ -444,14 +578,31 @@ export function useBacklogActions({
     const validListIds = new Set(listRows.map((list) => list.id).filter((listId): listId is number => listId != null));
     const nextListIds = Array.from(new Set(listIds)).filter((listId) => validListIds.has(listId));
 
+    const deviceId = await getDeviceId();
     await db.transaction("rw", db.libraryEntryLists, async () => {
       const currentRelations = await db.libraryEntryLists.where("libraryEntryId").equals(libraryEntryId).toArray();
       const currentListIds = new Set(currentRelations.map((relation) => relation.listId));
       for (const relation of currentRelations) {
-        if (!nextListIds.includes(relation.listId) && relation.id != null) await db.libraryEntryLists.delete(relation.id);
+        if (!nextListIds.includes(relation.listId) && relation.id != null) {
+          await enqueueMutation(relation.uuid, "libraryEntryList", "delete", { id: relation.id, uuid: relation.uuid });
+          await softDelete("libraryEntryLists", relation.id, deviceId);
+        }
       }
       for (const listId of nextListIds) {
-        if (!currentListIds.has(listId)) await db.libraryEntryLists.add({ libraryEntryId, listId, createdAt: new Date().toISOString() });
+        if (!currentListIds.has(listId)) {
+          const now = new Date().toISOString();
+          const newRelation = {
+            uuid: generateUuid(),
+            version: 1,
+            libraryEntryId,
+            listId,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+          };
+          await db.libraryEntryLists.add(newRelation);
+          await enqueueMutation(newRelation.uuid, "libraryEntryList", "create", newRelation);
+        }
       }
     });
 
@@ -492,6 +643,7 @@ export function useBacklogActions({
 
     setSubmitting(true);
     try {
+      const deviceId = await getDeviceId();
       await db.transaction(
         "rw",
         [
@@ -506,8 +658,8 @@ export function useBacklogActions({
           db.libraryEntryLists,
         ],
         async () => {
-          const entries = (await db.libraryEntries.bulkGet(entryIds)).filter(
-            (entry): entry is DbLibraryEntry => Boolean(entry?.id),
+          const entries = (await db.libraryEntries.bulkGet(entryIds)).filter((entry): entry is DbLibraryEntry =>
+            Boolean(entry?.id),
           );
           const gamesById = new Map(
             (await db.games.bulkGet(Array.from(new Set(entries.map((entry) => entry.gameId)))))
@@ -517,7 +669,10 @@ export function useBacklogActions({
           const storeRows = await db.stores.toArray();
           const libraryEntryStoreRows = await db.libraryEntryStores.where("libraryEntryId").anyOf(entryIds).toArray();
           const platformRows = await db.platforms.toArray();
-          const gamePlatformRows = await db.gamePlatforms.where("gameId").anyOf(Array.from(new Set(entries.map((entry) => entry.gameId)))).toArray();
+          const gamePlatformRows = await db.gamePlatforms
+            .where("gameId")
+            .anyOf(Array.from(new Set(entries.map((entry) => entry.gameId))))
+            .toArray();
           const storeNamesByEntryId = buildStoreNamesByEntryId(storeRows, libraryEntryStoreRows);
           const platformNamesByGameId = buildPlatformNamesByGameId(platformRows, gamePlatformRows);
           const currentTagRows = await db.tags.toArray();
@@ -532,8 +687,25 @@ export function useBacklogActions({
               ensuredTagIds.push(existing.id);
               continue;
             }
-            const tagId = Number(await db.tags.add({ name: tagName }));
-            tagsByName.set(key, { id: tagId, name: tagName });
+            const tagId = Number(
+              await db.tags.add({
+                uuid: generateUuid(),
+                version: 1,
+                name: tagName,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                deletedAt: null,
+              }),
+            );
+            tagsByName.set(key, {
+              id: tagId,
+              name: tagName,
+              uuid: generateUuid(),
+              version: 1,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              deletedAt: null,
+            });
             ensuredTagIds.push(tagId);
           }
 
@@ -550,7 +722,11 @@ export function useBacklogActions({
               ...entry,
               sourceStore: batchEditForm.primaryStore.trim() || derivePrimaryStore(nextStores, entry.sourceStore),
               platform: batchEditForm.primaryPlatform.trim() || derivePrimaryPlatform(nextPlatforms, entry.platform),
-              ownershipStatus: batchEditForm.status ? (batchEditForm.status === "Wishlist" ? "wishlist" : "owned") : entry.ownershipStatus,
+              ownershipStatus: batchEditForm.status
+                ? batchEditForm.status === "Wishlist"
+                  ? "wishlist"
+                  : "owned"
+                : entry.ownershipStatus,
               progressStatus: batchEditForm.status ? statusToDbStatus(batchEditForm.status) : entry.progressStatus,
               priority: batchEditForm.priority ? priorityToDbPriority(batchEditForm.priority) : entry.priority,
               updatedAt: now,
@@ -578,12 +754,20 @@ export function useBacklogActions({
                 : Array.from(new Set([...currentListIds, ...validListIds]));
             for (const relation of currentListRelations) {
               if (!nextListIds.includes(relation.listId) && relation.id != null) {
-                await db.libraryEntryLists.delete(relation.id);
+                await softDelete("libraryEntryLists", relation.id, deviceId);
               }
             }
             for (const listId of nextListIds) {
               if (!currentListIds.includes(listId)) {
-                await db.libraryEntryLists.add({ libraryEntryId: entry.id, listId, createdAt: now });
+                await db.libraryEntryLists.add({
+                  uuid: generateUuid(),
+                  version: 1,
+                  libraryEntryId: entry.id,
+                  listId,
+                  createdAt: now,
+                  updatedAt: now,
+                  deletedAt: null,
+                });
               }
             }
 
@@ -595,12 +779,20 @@ export function useBacklogActions({
                 : Array.from(new Set([...currentTagIds, ...ensuredTagIds]));
             for (const relation of currentTagRelations) {
               if (!nextTagIds.includes(relation.tagId) && relation.id != null) {
-                await db.gameTags.delete(relation.id);
+                await softDelete("gameTags", relation.id, deviceId);
               }
             }
             for (const tagId of nextTagIds) {
               if (!currentTagIds.includes(tagId)) {
-                await db.gameTags.add({ libraryEntryId: entry.id, tagId });
+                await db.gameTags.add({
+                  uuid: generateUuid(),
+                  version: 1,
+                  libraryEntryId: entry.id,
+                  tagId,
+                  createdAt: now,
+                  updatedAt: now,
+                  deletedAt: null,
+                });
               }
             }
           }
@@ -623,6 +815,7 @@ export function useBacklogActions({
     const confirmed = window.confirm(`Excluir ${selectedGame.title} da biblioteca?`);
     if (!confirmed) return;
     const deletedEntryId = selectedRecord.libraryEntry.id!;
+    const deviceId = await getDeviceId();
 
     await db.transaction(
       "rw",
@@ -639,19 +832,77 @@ export function useBacklogActions({
         db.libraryEntryLists,
       ],
       async () => {
-        await db.playSessions.where("libraryEntryId").equals(deletedEntryId).delete();
-        await db.reviews.where("libraryEntryId").equals(deletedEntryId).delete();
-        await db.gameTags.where("libraryEntryId").equals(deletedEntryId).delete();
-        await db.libraryEntryLists.where("libraryEntryId").equals(deletedEntryId).delete();
-        await db.libraryEntryStores.where("libraryEntryId").equals(deletedEntryId).delete();
-        await db.libraryEntries.delete(deletedEntryId);
+        // Enqueue mutations antes de deletar
+        const sessions = await db.playSessions.where("libraryEntryId").equals(deletedEntryId).toArray();
+        for (const session of sessions) {
+          await enqueueMutation(session.uuid, "playSession", "delete", { id: session.id, uuid: session.uuid });
+        }
+
+        const review = await db.reviews.where("libraryEntryId").equals(deletedEntryId).first();
+        if (review) {
+          await enqueueMutation(review.uuid, "review", "delete", { id: review.id, uuid: review.uuid });
+        }
+
+        const gameTags = await db.gameTags.where("libraryEntryId").equals(deletedEntryId).toArray();
+        for (const gameTag of gameTags) {
+          await enqueueMutation(gameTag.uuid, "gameTag", "delete", { id: gameTag.id, uuid: gameTag.uuid });
+        }
+
+        const entryLists = await db.libraryEntryLists.where("libraryEntryId").equals(deletedEntryId).toArray();
+        for (const entryList of entryLists) {
+          await enqueueMutation(entryList.uuid, "libraryEntryList", "delete", { id: entryList.id, uuid: entryList.uuid });
+        }
+
+        const entryStores = await db.libraryEntryStores.where("libraryEntryId").equals(deletedEntryId).toArray();
+        for (const entryStore of entryStores) {
+          await enqueueMutation(entryStore.uuid, "libraryEntryStore", "delete", { id: entryStore.id, uuid: entryStore.uuid });
+        }
+
+        // Library entry
+        const entry = await db.libraryEntries.get(deletedEntryId);
+        if (entry) {
+          await enqueueMutation(entry.uuid, "libraryEntry", "delete", { id: entry.id, uuid: entry.uuid });
+        }
+
+        // Soft delete nas entidades relacionadas
+        for (const session of sessions) {
+          await softDelete("playSessions", session.id!, deviceId);
+        }
+
+        if (review?.id) await softDelete("reviews", review.id, deviceId);
+
+        for (const gameTag of gameTags) {
+          await softDelete("gameTags", gameTag.id!, deviceId);
+        }
+
+        for (const entryList of entryLists) {
+          await softDelete("libraryEntryLists", entryList.id!, deviceId);
+        }
+
+        for (const entryStore of entryStores) {
+          await softDelete("libraryEntryStores", entryStore.id!, deviceId);
+        }
+
+        // Soft delete na library entry
+        await softDelete("libraryEntries", deletedEntryId, deviceId);
+
+        // Verificar se deve deletar o jogo (sem outras entradas)
         const siblingCount = await db.libraryEntries
           .where("gameId")
           .equals(selectedRecord.game.id!)
+          .filter((e) => !e.deletedAt)
           .count();
         if (siblingCount === 0) {
-          await db.gamePlatforms.where("gameId").equals(selectedRecord.game.id!).delete();
-          await db.games.delete(selectedRecord.game.id!);
+          const game = await db.games.get(selectedRecord.game.id!);
+          if (game) {
+            await enqueueMutation(game.uuid, "game", "delete", { id: game.id, uuid: game.uuid });
+          }
+          const gamePlatforms = await db.gamePlatforms.where("gameId").equals(selectedRecord.game.id!).toArray();
+          for (const gp of gamePlatforms) {
+            await enqueueMutation(gp.uuid, "gamePlatform", "delete", { id: gp.id, uuid: gp.uuid });
+            await softDelete("gamePlatforms", gp.id!, deviceId);
+          }
+          await softDelete("games", selectedRecord.game.id!, deviceId);
         }
       },
     );
@@ -666,29 +917,68 @@ export function useBacklogActions({
     if (!selectedRecord?.libraryEntry.id || !selectedGame) return;
     const currentStatus = selectedRecord.libraryEntry.progressStatus;
     if (currentStatus === "finished" || currentStatus === "completed_100") {
-      const confirmed = window.confirm(`${selectedGame.title} já está concluído. Deseja realmente retomar como "Jogando"?`);
+      const confirmed = window.confirm(
+        `${selectedGame.title} já está concluído. Deseja realmente retomar como "Jogando"?`,
+      );
       if (!confirmed) return;
     }
-    await db.libraryEntries.update(selectedRecord.libraryEntry.id, { ownershipStatus: "owned", progressStatus: "playing", updatedAt: new Date().toISOString() });
+    const entry = await db.libraryEntries.get(selectedRecord.libraryEntry.id);
+    if (entry) {
+      const updatedEntry = {
+        ...entry,
+        ownershipStatus: "owned" as const,
+        progressStatus: "playing" as const,
+        updatedAt: new Date().toISOString(),
+      };
+      await db.libraryEntries.update(selectedRecord.libraryEntry.id, updatedEntry);
+      await enqueueMutation(entry.uuid, "libraryEntry", "update", updatedEntry);
+    } else {
+      await db.libraryEntries.update(selectedRecord.libraryEntry.id, {
+        ownershipStatus: "owned",
+        progressStatus: "playing",
+        updatedAt: new Date().toISOString(),
+      });
+    }
     await refreshData();
     setNotice(`${selectedGame.title} voltou para a fila ativa.`);
   };
 
   const handleFavoriteSelectedGame = async () => {
     if (!selectedRecord?.libraryEntry.id) return;
-    await db.libraryEntries.update(selectedRecord.libraryEntry.id, { favorite: !selectedRecord.libraryEntry.favorite, updatedAt: new Date().toISOString() });
+    const entry = await db.libraryEntries.get(selectedRecord.libraryEntry.id);
+    if (entry) {
+      const updatedEntry = {
+        ...entry,
+        favorite: !entry.favorite,
+        updatedAt: new Date().toISOString(),
+      };
+      await db.libraryEntries.update(selectedRecord.libraryEntry.id, updatedEntry);
+      await enqueueMutation(entry.uuid, "libraryEntry", "update", updatedEntry);
+    } else {
+      await db.libraryEntries.update(selectedRecord.libraryEntry.id, {
+        favorite: !selectedRecord.libraryEntry.favorite,
+        updatedAt: new Date().toISOString(),
+      });
+    }
     await refreshData();
     setNotice(selectedRecord.libraryEntry.favorite ? "Favorito removido." : "Jogo marcado como favorito.");
   };
 
   const handleSendSelectedToPlanner = async () => {
     if (!selectedRecord?.libraryEntry.id || !selectedGame) return;
+    const entry = await db.libraryEntries.get(selectedRecord.libraryEntry.id);
     const updates: Partial<DbLibraryEntry> = { priority: "high", updatedAt: new Date().toISOString() };
     if (selectedGame.status === "Wishlist") {
       updates.ownershipStatus = "owned";
       updates.progressStatus = "not_started";
     }
-    await db.libraryEntries.update(selectedRecord.libraryEntry.id, updates);
+    if (entry) {
+      const updatedEntry = { ...entry, ...updates };
+      await db.libraryEntries.update(selectedRecord.libraryEntry.id, updatedEntry);
+      await enqueueMutation(entry.uuid, "libraryEntry", "update", updatedEntry);
+    } else {
+      await db.libraryEntries.update(selectedRecord.libraryEntry.id, updates);
+    }
     await refreshData();
     setScreen("planner");
     setNotice(`${selectedGame.title} recebeu prioridade alta no planner.`);
@@ -703,9 +993,29 @@ export function useBacklogActions({
     }
     setSubmitting(true);
     try {
-      const goalData = { type: goalForm.type as GoalType, target, current: 0, period: goalForm.period as Period };
-      if (editingGoalId != null) await db.goals.update(editingGoalId, { type: goalData.type, target: goalData.target, period: goalData.period });
-      else await db.goals.add(goalData);
+      const now = new Date().toISOString();
+      const goalData = {
+        uuid: generateUuid(),
+        version: 1,
+        type: goalForm.type as GoalType,
+        target,
+        current: 0,
+        period: goalForm.period as Period,
+        createdAt: now,
+        updatedAt: now,
+        deletedAt: null,
+      };
+      if (editingGoalId != null) {
+        const existingGoal = await db.goals.get(editingGoalId);
+        if (existingGoal) {
+          const updatedGoal = { ...existingGoal, type: goalData.type, target: goalData.target, period: goalData.period };
+          await db.goals.update(editingGoalId, updatedGoal);
+          await enqueueMutation(updatedGoal.uuid, "goal", "update", updatedGoal);
+        }
+      } else {
+        await db.goals.add(goalData);
+        await enqueueMutation(goalData.uuid, "goal", "create", goalData);
+      }
       await refreshData();
       setGoalModalMode(null);
       setNotice(editingGoalId != null ? "Meta atualizada." : "Meta criada com sucesso.");
@@ -719,7 +1029,12 @@ export function useBacklogActions({
   const handleGoalDelete = async (goalId: number) => {
     const confirmed = window.confirm("Excluir esta meta?");
     if (!confirmed) return;
-    await db.goals.delete(goalId);
+    const deviceId = await getDeviceId();
+    const existingGoal = await db.goals.get(goalId);
+    if (existingGoal) {
+      await enqueueMutation(existingGoal.uuid, "goal", "delete", { id: existingGoal.id, uuid: existingGoal.uuid });
+    }
+    await softDelete("goals", goalId, deviceId);
     await refreshData();
     setNotice("Meta removida.");
   };
@@ -727,9 +1042,21 @@ export function useBacklogActions({
   const handleListCreate = async (name: string) => {
     const normalizedName = name.trim();
     if (!normalizedName) return void setNotice("Informe um nome para a lista.");
-    const existing = await db.lists.filter((list) => list.name.trim().toLowerCase() === normalizedName.toLowerCase()).first();
+    const existing = await db.lists
+      .filter((list) => list.name.trim().toLowerCase() === normalizedName.toLowerCase())
+      .first();
     if (existing) return void setNotice("Essa lista já existe.");
-    await db.lists.add({ name: normalizedName, createdAt: new Date().toISOString() });
+    const now = new Date().toISOString();
+    const newList = {
+      uuid: generateUuid(),
+      version: 1,
+      name: normalizedName,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    await db.lists.add(newList);
+    await enqueueMutation(newList.uuid, "list", "create", newList);
     await refreshData();
     setNotice("Lista criada com sucesso.");
   };
@@ -737,9 +1064,20 @@ export function useBacklogActions({
   const handleListDelete = async (listId: number) => {
     const confirmed = window.confirm("Excluir esta lista?");
     if (!confirmed) return;
+    const deviceId = await getDeviceId();
     await db.transaction("rw", db.lists, db.libraryEntryLists, async () => {
-      await db.libraryEntryLists.where("listId").equals(listId).delete();
-      await db.lists.delete(listId);
+      const relations = await db.libraryEntryLists.where("listId").equals(listId).toArray();
+      for (const relation of relations) {
+        if (relation.id != null) {
+          await enqueueMutation(relation.uuid, "libraryEntryList", "delete", { id: relation.id, uuid: relation.uuid });
+          await softDelete("libraryEntryLists", relation.id, deviceId);
+        }
+      }
+      const list = await db.lists.get(listId);
+      if (list) {
+        await enqueueMutation(list.uuid, "list", "delete", { id: list.id, uuid: list.uuid });
+      }
+      await softDelete("lists", listId, deviceId);
     });
     if (selectedListFilter === listId) setSelectedListFilter("all");
     await refreshData();
@@ -758,7 +1096,13 @@ export function useBacklogActions({
     );
     const payload = buildSavedViewPayload(currentLibraryView, normalizedName, existing);
 
-    await db.savedViews.put(payload);
+    if (existing?.id) {
+      await db.savedViews.put(payload);
+      await enqueueMutation(payload.uuid, "savedView", "update", payload);
+    } else {
+      await db.savedViews.add(payload);
+      await enqueueMutation(payload.uuid, "savedView", "create", payload);
+    }
     await refreshData();
     setNotice(existing ? "View salva atualizada." : "View salva criada.");
   };
@@ -766,7 +1110,12 @@ export function useBacklogActions({
   const handleDeleteSavedView = async (viewId: number) => {
     const confirmed = window.confirm("Excluir esta view salva?");
     if (!confirmed) return;
-    await db.savedViews.delete(viewId);
+    const deviceId = await getDeviceId();
+    const existingView = await db.savedViews.get(viewId);
+    if (existingView) {
+      await enqueueMutation(existingView.uuid, "savedView", "delete", { id: existingView.id, uuid: existingView.uuid });
+    }
+    await softDelete("savedViews", viewId, deviceId);
     await refreshData();
     setNotice("View salva removida.");
   };
@@ -795,7 +1144,18 @@ export function useBacklogActions({
   };
 
   const handleSettingSave = async (key: string, value: string) => {
-    await upsertSettingsRows([{ key, value }]);
+    const existing = await db.settings.get({ key });
+    const now = new Date().toISOString();
+    const settingData = { key, value, updatedAt: now };
+    if (existing?.id) {
+      const updatedSetting = { ...existing, ...settingData };
+      await db.settings.put(updatedSetting);
+      await enqueueMutation(`setting-${key}`, "setting", "update", updatedSetting);
+    } else {
+      const newSetting = { ...settingData, id: undefined };
+      await db.settings.add(newSetting);
+      await enqueueMutation(`setting-${key}`, "setting", "create", newSetting);
+    }
     await refreshData();
     setNotice("Configuração salva.");
   };
@@ -807,8 +1167,21 @@ export function useBacklogActions({
         onboardingCompleted: preferences.onboardingCompleted,
         guidedTourCompleted: preferences.guidedTourCompleted,
       });
+      const settingPairs = preferencesToSettingPairs(nextPreferences);
       await db.transaction("rw", db.settings, async () => {
-        await upsertSettingsRows(preferencesToSettingPairs(nextPreferences));
+        for (const pair of settingPairs) {
+          const existing = await db.settings.get({ key: pair.key });
+          const now = new Date().toISOString();
+          if (existing?.id) {
+            const updatedSetting = { ...existing, ...pair, updatedAt: now };
+            await db.settings.put(updatedSetting);
+            await enqueueMutation(`setting-${pair.key}`, "setting", "update", updatedSetting);
+          } else {
+            const newSetting = { ...pair, updatedAt: now };
+            await db.settings.add(newSetting);
+            await enqueueMutation(`setting-${pair.key}`, "setting", "create", newSetting);
+          }
+        }
       });
       await refreshData();
       setNotice("Preferências atualizadas.");
@@ -819,7 +1192,11 @@ export function useBacklogActions({
     }
   };
 
-  const handleOnboardingSubmit = async (payload: { draft: PreferencesDraft; starterLists: string[]; goalTemplateIds: string[] }) => {
+  const handleOnboardingSubmit = async (payload: {
+    draft: PreferencesDraft;
+    starterLists: string[];
+    goalTemplateIds: string[];
+  }) => {
     setSubmitting(true);
     try {
       const nextPreferences = normalizePreferencesDraft(payload.draft, {
@@ -827,23 +1204,68 @@ export function useBacklogActions({
         guidedTourCompleted: false,
       });
       const starterLists = Array.from(new Set(payload.starterLists.map((item) => item.trim()).filter(Boolean)));
-      const selectedTemplates = onboardingGoalTemplates.filter((template) => payload.goalTemplateIds.includes(template.id));
+      const selectedTemplates = onboardingGoalTemplates.filter((template) =>
+        payload.goalTemplateIds.includes(template.id),
+      );
       await db.transaction("rw", db.settings, db.lists, db.goals, async () => {
-        await upsertSettingsRows(preferencesToSettingPairs(nextPreferences));
-        const existingLists = new Map((await db.lists.toArray()).map((list) => [list.name.trim().toLowerCase(), list] as const));
+        // Settings
+        const settingPairs = preferencesToSettingPairs(nextPreferences);
+        for (const pair of settingPairs) {
+          const existing = await db.settings.get({ key: pair.key });
+          const now = new Date().toISOString();
+          if (existing?.id) {
+            const updatedSetting = { ...existing, ...pair, updatedAt: now };
+            await db.settings.put(updatedSetting);
+            await enqueueMutation(`setting-${pair.key}`, "setting", "update", updatedSetting);
+          } else {
+            const newSetting = { ...pair, updatedAt: now };
+            await db.settings.add(newSetting);
+            await enqueueMutation(`setting-${pair.key}`, "setting", "create", newSetting);
+          }
+        }
+
+        // Lists
+        const existingLists = new Map(
+          (await db.lists.toArray()).map((list) => [list.name.trim().toLowerCase(), list] as const),
+        );
         for (const listName of starterLists) {
           const key = listName.toLowerCase();
           if (existingLists.has(key)) continue;
-          const createdList: DbList = { name: listName, createdAt: new Date().toISOString() };
+          const now = new Date().toISOString();
+          const createdList: DbList = {
+            uuid: generateUuid(),
+            version: 1,
+            name: listName,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+          };
           await db.lists.add(createdList);
+          await enqueueMutation(createdList.uuid, "list", "create", createdList);
           existingLists.set(key, createdList);
         }
-        const existingGoals = new Map<string, DbGoal>((await db.goals.toArray()).map((goal) => [`${goal.type}::${goal.period}`, goal] as const));
+
+        // Goals
+        const existingGoals = new Map<string, DbGoal>(
+          (await db.goals.toArray()).map((goal) => [`${goal.type}::${goal.period}`, goal] as const),
+        );
         for (const template of selectedTemplates) {
           const key = `${template.type}::${template.period}`;
           if (existingGoals.has(key)) continue;
-          const goal: DbGoal = { type: template.type, target: template.target, current: 0, period: template.period };
+          const now = new Date().toISOString();
+          const goal: DbGoal = {
+            uuid: generateUuid(),
+            version: 1,
+            type: template.type,
+            target: template.target,
+            current: 0,
+            period: template.period,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+          };
           await db.goals.add(goal);
+          await enqueueMutation(goal.uuid, "goal", "create", goal);
           existingGoals.set(key, goal);
         }
       });
@@ -860,6 +1282,10 @@ export function useBacklogActions({
   const handleSessionDelete = async (sessionId: number) => {
     const confirmed = window.confirm("Excluir esta sessão?");
     if (!confirmed) return;
+    const session = await db.playSessions.get(sessionId);
+    if (session) {
+      await enqueueMutation(session.uuid, "playSession", "delete", { id: session.id, uuid: session.uuid });
+    }
     const libraryEntryId = await deletePlaySession(sessionId);
     if (libraryEntryId != null) setSelectedGameId(libraryEntryId);
     await refreshData();
@@ -881,8 +1307,9 @@ export function useBacklogActions({
     setSubmitting(true);
     try {
       await db.transaction("rw", db.libraryEntries, db.playSessions, async () => {
+        const deviceId = await getDeviceId();
         for (const orphanSessionId of orphanSessionIds) {
-          await db.playSessions.delete(orphanSessionId);
+          await softDelete("playSessions", orphanSessionId, deviceId);
         }
 
         for (const entryUpdate of entryUpdates) {
@@ -918,6 +1345,7 @@ export function useBacklogActions({
 
     setSubmitting(true);
     try {
+      const deviceId = await getDeviceId();
       await db.transaction(
         "rw",
         [
@@ -934,8 +1362,8 @@ export function useBacklogActions({
         ],
         async () => {
           const allEntryIds = [primaryEntryId, ...uniqueMergedIds];
-          const entries = (await db.libraryEntries.bulkGet(allEntryIds)).filter(
-            (entry): entry is DbLibraryEntry => Boolean(entry?.id),
+          const entries = (await db.libraryEntries.bulkGet(allEntryIds)).filter((entry): entry is DbLibraryEntry =>
+            Boolean(entry?.id),
           );
           const primaryEntry = entries.find((entry) => entry.id === primaryEntryId);
           if (!primaryEntry?.id) throw new Error("Entrada principal não encontrada.");
@@ -944,9 +1372,7 @@ export function useBacklogActions({
           if (duplicateEntries.length === 0) return;
 
           const gamesById = new Map(
-            (await db.games.bulkGet(
-              Array.from(new Set(entries.map((entry) => entry.gameId))),
-            ))
+            (await db.games.bulkGet(Array.from(new Set(entries.map((entry) => entry.gameId)))))
               .filter((game): game is DbGameMetadata => Boolean(game?.id))
               .map((game) => [game.id, game] as const),
           );
@@ -954,19 +1380,18 @@ export function useBacklogActions({
           const duplicateGameIds = Array.from(
             new Set(duplicateEntries.map((entry) => entry.gameId).filter((gameId) => gameId !== primaryGame?.id)),
           );
-          const storeNameById = new Map(
-            (await db.stores.toArray()).map((store) => [store.id, store.name] as const),
-          );
-          const extraStoreNames = (
-            await db.libraryEntryStores.where("libraryEntryId").anyOf(allEntryIds).toArray()
-          )
+          const storeNameById = new Map((await db.stores.toArray()).map((store) => [store.id, store.name] as const));
+          const extraStoreNames = (await db.libraryEntryStores.where("libraryEntryId").anyOf(allEntryIds).toArray())
             .map((relation) => storeNameById.get(relation.storeId))
             .filter((name): name is string => Boolean(name));
           const platformNameById = new Map(
             (await db.platforms.toArray()).map((platform) => [platform.id, platform.name] as const),
           );
           const extraPlatformNames = (
-            await db.gamePlatforms.where("gameId").anyOf([primaryGame?.id ?? 0, ...duplicateGameIds]).toArray()
+            await db.gamePlatforms
+              .where("gameId")
+              .anyOf([primaryGame?.id ?? 0, ...duplicateGameIds])
+              .toArray()
           )
             .map((relation) => platformNameById.get(relation.platformId))
             .filter((name): name is string => Boolean(name));
@@ -1017,7 +1442,7 @@ export function useBacklogActions({
           }
           for (const review of reviews) {
             if (review.libraryEntryId === primaryEntryId || review.id == null) continue;
-            await db.reviews.delete(review.id);
+            await softDelete("reviews", review.id, deviceId);
           }
 
           const primaryTagRelations = await db.gameTags.where("libraryEntryId").equals(primaryEntryId).toArray();
@@ -1025,19 +1450,25 @@ export function useBacklogActions({
           const primaryTagSet = new Set(primaryTagRelations.map((relation) => relation.tagId));
           for (const relation of duplicateTagRelations) {
             if (primaryTagSet.has(relation.tagId)) {
-              if (relation.id != null) await db.gameTags.delete(relation.id);
+              if (relation.id != null) await softDelete("gameTags", relation.id, deviceId);
               continue;
             }
             primaryTagSet.add(relation.tagId);
             if (relation.id != null) await db.gameTags.update(relation.id, { libraryEntryId: primaryEntryId });
           }
 
-          const primaryListRelations = await db.libraryEntryLists.where("libraryEntryId").equals(primaryEntryId).toArray();
-          const duplicateListRelations = await db.libraryEntryLists.where("libraryEntryId").anyOf(uniqueMergedIds).toArray();
+          const primaryListRelations = await db.libraryEntryLists
+            .where("libraryEntryId")
+            .equals(primaryEntryId)
+            .toArray();
+          const duplicateListRelations = await db.libraryEntryLists
+            .where("libraryEntryId")
+            .anyOf(uniqueMergedIds)
+            .toArray();
           const primaryListSet = new Set(primaryListRelations.map((relation) => relation.listId));
           for (const relation of duplicateListRelations) {
             if (primaryListSet.has(relation.listId)) {
-              if (relation.id != null) await db.libraryEntryLists.delete(relation.id);
+              if (relation.id != null) await softDelete("libraryEntryLists", relation.id, deviceId);
               continue;
             }
             primaryListSet.add(relation.listId);
@@ -1059,15 +1490,21 @@ export function useBacklogActions({
           });
 
           for (const duplicateEntry of duplicateEntries) {
-            if (duplicateEntry.id != null) await db.libraryEntries.delete(duplicateEntry.id);
+            if (duplicateEntry.id != null) await softDelete("libraryEntries", duplicateEntry.id, deviceId);
           }
-          await db.libraryEntryStores.where("libraryEntryId").anyOf(uniqueMergedIds).delete();
+          const duplicateEntryStores = await db.libraryEntryStores.where("libraryEntryId").anyOf(uniqueMergedIds).toArray();
+          for (const store of duplicateEntryStores) {
+            if (store.id != null) await softDelete("libraryEntryStores", store.id, deviceId);
+          }
 
           for (const duplicateGameId of duplicateGameIds) {
             const remainingEntries = await db.libraryEntries.where("gameId").equals(duplicateGameId).count();
             if (remainingEntries === 0) {
-              await db.gamePlatforms.where("gameId").equals(duplicateGameId).delete();
-              await db.games.delete(duplicateGameId);
+              const duplicateGamePlatforms = await db.gamePlatforms.where("gameId").equals(duplicateGameId).toArray();
+              for (const gp of duplicateGamePlatforms) {
+                if (gp.id != null) await softDelete("gamePlatforms", gp.id, deviceId);
+              }
+              await softDelete("games", duplicateGameId, deviceId);
             }
           }
         },
@@ -1089,14 +1526,7 @@ export function useBacklogActions({
     try {
       await db.transaction(
         "rw",
-        [
-          db.games,
-          db.libraryEntries,
-          db.stores,
-          db.libraryEntryStores,
-          db.platforms,
-          db.gamePlatforms,
-        ],
+        [db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
         async () => {
           await normalizeStructuredEntry(libraryEntryId);
         },
@@ -1126,14 +1556,7 @@ export function useBacklogActions({
 
       await db.transaction(
         "rw",
-        [
-          db.games,
-          db.libraryEntries,
-          db.stores,
-          db.libraryEntryStores,
-          db.platforms,
-          db.gamePlatforms,
-        ],
+        [db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
         async () => {
           for (const entryId of entryIds) {
             await normalizeStructuredEntry(entryId);
@@ -1150,12 +1573,10 @@ export function useBacklogActions({
     }
   };
 
-  const handleCatalogConsolidateAliasGroup = async (
-    kind: "store" | "platform",
-    normalizedName: string,
-  ) => {
+  const handleCatalogConsolidateAliasGroup = async (kind: "store" | "platform", normalizedName: string) => {
     setSubmitting(true);
     try {
+      const deviceId = await getDeviceId();
       if (kind === "store") {
         await db.transaction("rw", [db.stores, db.libraryEntryStores, db.libraryEntries], async () => {
           const rows = (await db.stores.toArray()).filter(
@@ -1167,10 +1588,7 @@ export function useBacklogActions({
           const relations = await db.libraryEntryStores.where("storeId").anyOf(ids).toArray();
           const relationCountByStoreId = new Map<number, number>();
           for (const relation of relations) {
-            relationCountByStoreId.set(
-              relation.storeId,
-              (relationCountByStoreId.get(relation.storeId) ?? 0) + 1,
-            );
+            relationCountByStoreId.set(relation.storeId, (relationCountByStoreId.get(relation.storeId) ?? 0) + 1);
           }
 
           const canonical = [...rows].sort((left, right) => {
@@ -1194,7 +1612,7 @@ export function useBacklogActions({
               if (relation.isPrimary && !canonicalRelation.isPrimary) {
                 await db.libraryEntryStores.update(canonicalRelation.id, { isPrimary: true });
               }
-              if (relation.id != null) await db.libraryEntryStores.delete(relation.id);
+              if (relation.id != null) await softDelete("libraryEntryStores", relation.id, deviceId);
               continue;
             }
             if (relation.id != null) {
@@ -1216,7 +1634,7 @@ export function useBacklogActions({
           }
 
           for (const duplicateId of duplicateIds) {
-            await db.stores.delete(duplicateId);
+            await softDelete("stores", duplicateId, deviceId);
           }
         });
       } else {
@@ -1254,7 +1672,7 @@ export function useBacklogActions({
             if (!duplicateIds.includes(relation.platformId)) continue;
             const canonicalRelation = canonicalRelationByGameId.get(relation.gameId);
             if (canonicalRelation?.id != null) {
-              if (relation.id != null) await db.gamePlatforms.delete(relation.id);
+              if (relation.id != null) await softDelete("gamePlatforms", relation.id, deviceId);
               continue;
             }
             if (relation.id != null) {
@@ -1288,7 +1706,7 @@ export function useBacklogActions({
           }
 
           for (const duplicateId of duplicateIds) {
-            await db.platforms.delete(duplicateId);
+            await softDelete("platforms", duplicateId, deviceId);
           }
         });
       }
@@ -1383,7 +1801,9 @@ export function useBacklogActions({
       await refreshData();
       setNotice(`Fila processada: ${updated} jogo(s) enriquecido(s) e ${skipped} sem match confiável.`);
     } catch (error) {
-      setNotice(`Falha ao enriquecer a fila de metadado: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+      setNotice(
+        `Falha ao enriquecer a fila de metadado: ${error instanceof Error ? error.message : "erro desconhecido"}.`,
+      );
     } finally {
       setSubmitting(false);
     }
@@ -1397,7 +1817,9 @@ export function useBacklogActions({
       await refreshData();
       return true;
     } catch (error) {
-      setNotice(`Falha ao registrar o tutorial guiado: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+      setNotice(
+        `Falha ao registrar o tutorial guiado: ${error instanceof Error ? error.message : "erro desconhecido"}.`,
+      );
       return false;
     }
   };
