@@ -215,12 +215,13 @@ export function SyncCenterScreen({
   const modeCopy = describeMode(syncMode, isAuthEnabled);
   const ModeIcon = modeCopy.icon;
   const isConflict = syncMode === "conflict" && comparison?.decision === "conflict";
+  const wasMerged = Boolean(comparison?.mergedAt);
   const divergentBlocks = useMemo(
-    () => comparison?.blocks.filter((block) => block.state !== "same") ?? [],
-    [comparison],
+    () => wasMerged ? [] : comparison?.blocks.filter((block) => block.state !== "same") ?? [],
+    [comparison, wasMerged],
   );
   const displayedBlocks =
-    isConflict && divergentBlocks.length > 0 ? divergentBlocks : comparison?.blocks ?? [];
+    isConflict && divergentBlocks.length > 0 && !wasMerged ? divergentBlocks : comparison?.blocks ?? [];
   const conflictStats = useMemo(
     () =>
       divergentBlocks.reduce(
@@ -443,11 +444,27 @@ export function SyncCenterScreen({
           icon={CheckCheck}
           title="Comparação de snapshots"
           description={
-            isConflict
-              ? "Blocos que exigem decisão antes de retomar a sincronização."
-              : "Diferenças por bloco entre a base local e o snapshot remoto atual."
+            wasMerged
+              ? "Merge completado com sucesso. Todos os blocos foram reconciliados e sincronizados."
+              : isConflict
+                ? "Blocos que exigem decisão antes de retomar a sincronização."
+                : "Diferenças por bloco entre a base local e o snapshot remoto atual."
           }
         />
+
+        {wasMerged && (
+          <div className="sync-merged-banner" style={{ padding: 12, marginBottom: 16, background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.3)", borderRadius: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <ShieldCheck size={18} color="#22c55e" />
+              <div>
+                <strong style={{ color: "#22c55e" }}>Merge completado com sucesso</strong>
+                <p style={{ margin: 0, fontSize: 13, color: "#9ca3af" }}>
+                  Todos os blocos foram reconciliados. Última sync: {formatDateTime(comparison?.cloudExportedAt ?? null)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {!comparison ? (
           <EmptyState message="Faça login ou configure a nuvem para comparar snapshots." />

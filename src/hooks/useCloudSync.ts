@@ -292,8 +292,8 @@ export function useCloudSync({
     setIsSyncing(false);
   }, []);
 
-  const finalizeMatchState = useCallback((localTables: SyncTables, cloudData: BackupPayload | null) => {
-    const nextComparison = buildSyncComparison(localTables, cloudData);
+  const finalizeMatchState = useCallback((localTables: SyncTables, cloudData: BackupPayload | null, mergedAt?: string | null) => {
+    const nextComparison = buildSyncComparison(localTables, cloudData, mergedAt);
     setComparison(nextComparison);
     cloudSnapshotRef.current = cloudData;
     previousFingerprintRef.current = nextComparison.localFingerprint;
@@ -402,7 +402,7 @@ export function useCloudSync({
 
             await applySnapshotLocally(mergedTables, mergedPayload.exportedAt);
             commitLastSuccessfulSyncAt(mergedPayload.exportedAt);
-            finalizeMatchState(mergedTables, mergedPayload);
+            finalizeMatchState(mergedTables, mergedPayload, mergedPayload.exportedAt);
 
             // Contar registros mesclados para log
             const mergedSessionCount = mergedTables.playSessions.length;
@@ -755,7 +755,7 @@ export function useCloudSync({
       await applySnapshotLocally(mergedTables, mergedPayload.exportedAt);
       commitLastSuccessfulSyncAt(mergedPayload.exportedAt);
       setIsWorkingLocal(false);
-      finalizeMatchState(mergedTables, mergedPayload);
+      finalizeMatchState(mergedTables, mergedPayload, mergedPayload.exportedAt);
       await pushHistory(
         "manual-merge",
         "success",

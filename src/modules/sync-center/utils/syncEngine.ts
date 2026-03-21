@@ -72,6 +72,7 @@ export type SyncComparison = {
   cloudFingerprint: string | null;
   hasCloudSnapshot: boolean;
   cloudExportedAt: string | null;
+  mergedAt?: string | null;
 };
 
 const syncBlockLabels: Record<SyncBlockKey, string> = {
@@ -394,6 +395,7 @@ function groupBy<T>(items: T[], keyFn: (item: T) => number | string): Map<string
 export function buildSyncComparison(
   localTables: SyncTables,
   cloudData: BackupPayload | null,
+  mergedAt?: string | null,
 ): SyncComparison {
   const sanitizedLocalTables = sanitizeSyncTables(localTables);
   const { decision, localFingerprint, cloudFingerprint } = resolveInitialSyncDecision(
@@ -410,12 +412,34 @@ export function buildSyncComparison(
     const localHash = buildBlockFingerprint(localRows);
     const cloudHash = buildBlockFingerprint(cloudRows);
 
+    // Se merge foi completado, todos os blocos foram reconciliados
+    if (mergedAt) {
+      return {
+        key,
+        label: syncBlockLabels[key],
+        localCount,
+        cloudCount,
+        state: "same" as const,
+      };
+    }
+
     let state: SyncBlockDiff["state"] = "different";
     if (localHash === cloudHash) state = "same";
     else if (localCount > 0 && cloudCount === 0) state = "local-only";
     else if (cloudCount > 0 && localCount === 0) state = "cloud-only";
     else if (localCount === cloudCount && decision === "auto-merge") {
       // Contagens iguais + auto-merge = blocos compatíveis (não mostrar como divergente)
+      state = "same";
+    } else if (localCount > 0 && cloudCount === 0 && decision === "auto-merge") {
+      // Pós-auto-merge: blocos que estavam só na nuvem foram incorporados localmente
+      // Marcar como "same" pois foram reconciliados
+      state = "same";
+    } else if (localCount === cloudCount && decision === "match") {
+      // Decision match já indica que os dados são semanticamente iguais
+      state = "same";
+    } else if (decision === "match" && localCount > 0 && cloudCount === 0) {
+      // Pós-merge manual: blocos reconciliados aparecem só no local mas decision é match
+      // Isso significa que foram incorporados com sucesso
       state = "same";
     }
 
@@ -435,6 +459,7 @@ export function buildSyncComparison(
     cloudFingerprint,
     hasCloudSnapshot: Boolean(cloudTables && hasSyncData(cloudTables)),
     cloudExportedAt: cloudData?.exportedAt ?? null,
+    mergedAt,
   };
 }
 
