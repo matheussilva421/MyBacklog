@@ -3,7 +3,7 @@ import { AlertTriangle, RefreshCcw, Trash2, XCircle, CheckCircle2 } from "lucide
 import { cx } from "../../../backlog/shared";
 import { NotchButton, Pill, Modal, EmptyState, SectionHeader, Panel } from "../../../components/cyberpunk-ui";
 import { usePendingMutationsState } from "../hooks/usePendingMutationsState";
-import type { PendingMutation } from "../../core/types";
+import type { PendingMutation } from "../../../core/types";
 
 const ENTITY_LABELS: Record<string, string> = {
   game: "Jogo",

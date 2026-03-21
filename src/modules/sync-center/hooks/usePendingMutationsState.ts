@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { PendingMutation } from "../../core/types";
+import type { PendingMutation } from "../../../core/types";
 import {
   getPendingMutations,
   getPermanentFailures,

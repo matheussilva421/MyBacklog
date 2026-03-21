@@ -18,6 +18,7 @@ import { EmptyState, Modal, NotchButton, Panel, Pill, SectionHeader } from "../.
 import type { SyncMode } from "../../../hooks/useCloudSync";
 import type { SyncComparison } from "../utils/syncEngine";
 import type { SyncHistoryEntry } from "../utils/syncStorage";
+import { PendingMutationsPanel } from "./PendingMutationsPanel";
 
 type SyncCenterScreenProps = {
   isAuthEnabled: boolean;
@@ -35,6 +36,7 @@ type SyncCenterScreenProps = {
   onWorkLocal: () => Promise<void> | void;
   onResetEverywhere: () => Promise<void> | void;
   onOpenSettings: () => void;
+  onSyncNow?: () => void;
 };
 
 type SyncConflictAction = "push-local" | "pull-cloud" | "merge";
@@ -197,6 +199,7 @@ export function SyncCenterScreen({
   onWorkLocal,
   onResetEverywhere,
   onOpenSettings,
+  onSyncNow,
 }: SyncCenterScreenProps) {
   const [pendingAction, setPendingAction] = useState<SyncConflictAction | null>(null);
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -531,6 +534,8 @@ export function SyncCenterScreen({
           </div>
         )}
       </Panel>
+
+      <PendingMutationsPanel onSyncNow={onSyncNow} />
 
       {pendingAction && pendingActionCopy ? (
         <Modal

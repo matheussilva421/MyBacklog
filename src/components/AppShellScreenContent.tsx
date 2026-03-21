@@ -69,6 +69,7 @@ type AppShellScreenContentProps = {
   mergeLocalAndCloud: () => Promise<void>;
   workLocal: () => Promise<void>;
   resetLocalAndCloud: () => Promise<void>;
+  triggerSyncToCloud?: () => Promise<void>;
 };
 
 export function AppShellScreenContent({
@@ -86,6 +87,7 @@ export function AppShellScreenContent({
   mergeLocalAndCloud,
   workLocal,
   resetLocalAndCloud,
+  triggerSyncToCloud,
 }: AppShellScreenContentProps) {
   let screenContent = null;
 
@@ -127,6 +129,7 @@ export function AppShellScreenContent({
         onWorkLocal={workLocal}
         onResetEverywhere={resetLocalAndCloud}
         onOpenSettings={() => app.setScreen("profile")}
+        onSyncNow={triggerSyncToCloud}
       />
     );
   } else if (app.screen === "planner") {

@@ -2219,6 +2219,109 @@ button {
   text-transform: uppercase;
 }
 
+/* Mutations Section Styles */
+.mutations-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mutations-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.mutations-section__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.mutations-section__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.mutations-section__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mutations-section__hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(234, 179, 8, 0.1);
+  border-radius: 4px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.mutations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mutations-section__footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.app-card--error {
+  border-left: 3px solid #dc2626;
+}
+
+.app-card--warning {
+  border-left: 3px solid #eab308;
+}
+
+.app-card__icon--error {
+  color: #dc2626;
+}
+
+.app-card__icon--warning {
+  color: #eab308;
+}
+
+.app-card__head__start {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.app-card__subtitle {
+  display: block;
+  color: var(--text-faint);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.app-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.app-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .sync-toggle-card {
   justify-content: space-between;
   padding: 14px;

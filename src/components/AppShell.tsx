@@ -87,6 +87,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
     mergeLocalAndCloud,
     workLocal,
     resetLocalAndCloud,
+    triggerSyncToCloud,
   } = useAppShellSync({ app, user, isAuthEnabled });
   const guidedTourOpen = app.guidedTourOpen;
   const guidedTourScreen = app.guidedTourStep.screen;
@@ -290,7 +291,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
                 "tour-focus",
             )}
           >
-            <AppShellScreenContent
+                      <AppShellScreenContent
               app={app}
               isAuthEnabled={isAuthEnabled}
               isOnline={isOnline}
@@ -305,6 +306,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
               mergeLocalAndCloud={mergeLocalAndCloud}
               workLocal={workLocal}
               resetLocalAndCloud={resetLocalAndCloud}
+              triggerSyncToCloud={triggerSyncToCloud}
             />
           </div>
         </main>
