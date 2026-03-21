@@ -6,6 +6,8 @@ import type { PendingMutation, MutationType, EntityType } from "../core/types";
  * Armazena operações create/update/delete que ainda não foram sincronizadas.
  */
 
+export const MAX_RETRY_COUNT = 5;
+
 /**
  * Enfileira uma mutação pendente.
  */

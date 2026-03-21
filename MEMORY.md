@@ -6,3 +6,4 @@
 - [Soft Delete Implementation](memory/soft-delete-implementation.md) - Implementação de soft delete com tombstones para todas as entidades syncáveis (Phase 2 Task 7)
 - [Incremental Sync Structure](memory/incremental-sync-structure.md) - Estrutura de documentos por entidade no Firestore para sync incremental (Phase 3 Task 9)
 - [Mutation Queue Implementation](memory/mutation-queue-implementation.md) - Fila local de mutações pendentes para sync incremental (Phase 3 Task 10)
+- [Sync Engine Backoff](memory/sync-engine-backoff.md) - Retry com backoff exponencial e polling de 30s para fila de mutações

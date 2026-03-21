@@ -1,4 +1,4 @@
-import { getPendingMutations, markMutationsSynced, incrementMutationRetry } from "./mutationQueue";
+import { getPendingMutations, markMutationsSynced, incrementMutationRetry, MAX_RETRY_COUNT } from "./mutationQueue";
 import { pushEntityToCloud, deleteEntityInCloud } from "./incrementalSync";
 import { auth } from "./firebase";
 import type { EntityType } from "../core/types";
@@ -9,6 +9,24 @@ import type { EntityType } from "../core/types";
  */
 
 const BATCH_SIZE = 10;
+const BASE_DELAY_MS = 1000; // 1 segundo
+const MAX_DELAY_MS = 300000; // 5 minutos
+
+/**
+ * Calcula delay com backoff exponencial baseado no retryCount.
+ * Fórmula: min(BASE_DELAY * 2^retryCount, MAX_DELAY)
+ */
+export function calculateBackoffDelay(retryCount: number): number {
+  const exponentialDelay = BASE_DELAY_MS * Math.pow(2, retryCount);
+  return Math.min(exponentialDelay, MAX_DELAY_MS);
+}
+
+/**
+ * Delay assíncrono.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * Processa uma única mutação pendente.
@@ -19,7 +37,25 @@ async function processMutation(mutation: {
   entityType: EntityType;
   mutationType: "create" | "update" | "delete";
   payload: string;
+  retryCount: number;
 }): Promise<boolean> {
+  // Verificar se excedeu máximo de retries
+  if (mutation.retryCount >= MAX_RETRY_COUNT) {
+    console.error(
+      `[SyncEngine] Muição ${mutation.id} excedeu máximo de ${MAX_RETRY_COUNT} retries. Marcada como falha permanente.`,
+    );
+    return false;
+  }
+
+  // Aplicar delay com backoff exponencial para retries
+  if (mutation.retryCount > 0) {
+    const delay = calculateBackoffDelay(mutation.retryCount);
+    console.log(
+      `[SyncEngine] Aguardando ${delay}ms antes de retry #${mutation.retryCount} para mutação ${mutation.id}`,
+    );
+    await sleep(delay);
+  }
+
   try {
     if (!auth) return false;
 
@@ -68,34 +104,47 @@ async function processMutation(mutation: {
 /**
  * Processa toda a fila de mutações pendentes.
  * Usa concorrência limitada para evitar rate limiting do Firestore.
+ * Aplica backoff exponencial para retries e respeita limite máximo de retries.
  */
 export async function processMutationQueue(): Promise<{
   processed: number;
   succeeded: number;
   failed: number;
+  permanentFailures: number;
 }> {
   const pending = await getPendingMutations();
 
   if (pending.length === 0) {
-    return { processed: 0, succeeded: 0, failed: 0 };
+    return { processed: 0, succeeded: 0, failed: 0, permanentFailures: 0 };
   }
 
   let processed = 0;
   let succeeded = 0;
   let failed = 0;
+  let permanentFailures = 0;
 
   // Processar em batches
   for (let i = 0; i < pending.length; i += BATCH_SIZE) {
     const batch = pending.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.allSettled(
       batch.map(async (m) => {
-        if (!m.id) return false;
+        if (!m.id) return { success: false, permanentFailure: false };
+
+        // Verificar se excedeu máximo de retries antes de processar
+        if (m.retryCount >= MAX_RETRY_COUNT) {
+          console.error(
+            `[SyncEngine] Muição ${m.id} excedeu máximo de ${MAX_RETRY_COUNT} retries. Ignorada.`,
+          );
+          return { success: false, permanentFailure: true };
+        }
+
         const success = await processMutation({
           id: m.id,
           uuid: m.uuid,
           entityType: m.entityType,
           mutationType: m.mutationType,
           payload: m.payload,
+          retryCount: m.retryCount,
         });
         if (success) {
           succeeded++;
@@ -103,7 +152,7 @@ export async function processMutationQueue(): Promise<{
           failed++;
         }
         processed++;
-        return success;
+        return { success, permanentFailure: false };
       }),
     );
 
@@ -111,7 +160,7 @@ export async function processMutationQueue(): Promise<{
     const successIds = batch
       .map((m, idx) => {
         const result = batchResults[idx];
-        return result.status === "fulfilled" && result.value && m.id ? m.id : null;
+        return result.status === "fulfilled" && result.value.success && m.id ? m.id : null;
       })
       .filter((id): id is number => id !== null);
 
@@ -119,11 +168,16 @@ export async function processMutationQueue(): Promise<{
       await markMutationsSynced(successIds);
     }
 
-    // Incrementar retry para falhas
+    // Incrementar retry para falhas temporárias
     const failIds = batch
       .map((m, idx) => {
         const result = batchResults[idx];
-        return result.status !== "fulfilled" || !result.value ? m.id : null;
+        const permanentFailure = result.status === "fulfilled" && result.value.permanentFailure;
+        if (permanentFailure) {
+          permanentFailures++;
+          return null;
+        }
+        return (result.status !== "fulfilled" || !result.value.success) && !permanentFailure ? m.id : null;
       })
       .filter((id): id is number => id !== null);
 
@@ -132,7 +186,7 @@ export async function processMutationQueue(): Promise<{
     }
   }
 
-  return { processed, succeeded, failed };
+  return { processed, succeeded, failed, permanentFailures };
 }
 
 /**
@@ -142,7 +196,10 @@ export async function syncPendingMutations(): Promise<void> {
   try {
     const result = await processMutationQueue();
     if (result.processed > 0) {
-      console.log(`[SyncEngine] Sync concluído: ${result.succeeded}/${result.processed} mutações sincronizadas`);
+      console.log(
+        `[SyncEngine] Sync concluído: ${result.succeeded}/${result.processed} mutações sincronizadas` +
+          (result.permanentFailures > 0 ? `, ${result.permanentFailures} falhas permanentes` : ""),
+      );
     }
   } catch (error) {
     console.error("[SyncEngine] Erro crítico no sync:", error);

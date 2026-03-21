@@ -5,6 +5,7 @@ import { db } from "../core/db";
 import { clearCloudBackup, pullFromCloud, pushToCloud } from "../lib/sync";
 import { acquireSyncLockWrapper, releaseSyncLockWrapper } from "../lib/tabSyncLockWrapper";
 import { debounce } from "../lib/debounce";
+import { syncPendingMutations } from "../lib/syncEngine";
 import { upsertSettingsRows } from "../modules/settings/utils/settingsStorage";
 import {
   buildBackupPayload,
@@ -31,12 +32,7 @@ export {
   stripBackupMeta,
 } from "../modules/sync-center/utils/syncEngine";
 
-export type SyncMode =
-  | "local-only"
-  | "cloud-synced"
-  | "conflict"
-  | "offline"
-  | "auth-required";
+export type SyncMode = "local-only" | "cloud-synced" | "conflict" | "offline" | "auth-required";
 
 type UseCloudSyncArgs = {
   user: User | null;
@@ -158,9 +154,7 @@ export function useCloudSync({
   const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>([]);
   const [lastSuccessfulSyncAt, setLastSuccessfulSyncAt] = useState<string | null>(null);
   const [isWorkingLocal, setIsWorkingLocal] = useState(false);
-  const [isOnline, setIsOnline] = useState(
-    typeof navigator === "undefined" ? true : navigator.onLine,
-  );
+  const [isOnline, setIsOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
 
   const historyRef = useRef<SyncHistoryEntry[]>([]);
   const lastSuccessfulSyncAtRef = useRef<string | null>(null);
@@ -246,10 +240,7 @@ export function useCloudSync({
       message: string,
       nextLastSuccessfulSyncAt = lastSuccessfulSyncAtRef.current,
     ) => {
-      const nextHistory = normalizeSyncHistory([
-        createHistoryEntry(action, result, message),
-        ...historyRef.current,
-      ]);
+      const nextHistory = normalizeSyncHistory([createHistoryEntry(action, result, message), ...historyRef.current]);
       historyRef.current = nextHistory;
       setSyncHistory(nextHistory);
       if (nextLastSuccessfulSyncAt !== lastSuccessfulSyncAtRef.current) {
@@ -260,14 +251,17 @@ export function useCloudSync({
     [commitLastSuccessfulSyncAt, persistSyncMeta],
   );
 
-  const hydrateLocalSyncState = useCallback((localTables: SyncTables) => {
-    const nextHistory = parseSyncHistory(localTables.settings);
-    const nextLastSuccessfulSyncAt = parseLastSuccessfulSyncAt(localTables.settings);
-    historyRef.current = nextHistory;
-    setSyncHistory(nextHistory);
-    commitLastSuccessfulSyncAt(nextLastSuccessfulSyncAt);
-    previousFingerprintRef.current = buildSyncFingerprint(localTables);
-  }, [commitLastSuccessfulSyncAt]);
+  const hydrateLocalSyncState = useCallback(
+    (localTables: SyncTables) => {
+      const nextHistory = parseSyncHistory(localTables.settings);
+      const nextLastSuccessfulSyncAt = parseLastSuccessfulSyncAt(localTables.settings);
+      historyRef.current = nextHistory;
+      setSyncHistory(nextHistory);
+      commitLastSuccessfulSyncAt(nextLastSuccessfulSyncAt);
+      previousFingerprintRef.current = buildSyncFingerprint(localTables);
+    },
+    [commitLastSuccessfulSyncAt],
+  );
 
   const applySnapshotLocally = useCallback(
     async (tables: SyncTables, nextLastSyncAt: string | null) => {
@@ -287,14 +281,17 @@ export function useCloudSync({
     releaseSyncLockWrapper(token);
   }, []);
 
-  const finalizeMatchState = useCallback((localTables: SyncTables, cloudData: BackupPayload | null, mergedAt?: string | null) => {
-    const nextComparison = buildSyncComparison(localTables, cloudData, mergedAt);
-    setComparison(nextComparison);
-    cloudSnapshotRef.current = cloudData;
-    previousFingerprintRef.current = nextComparison.localFingerprint;
-    setIsWorkingLocal(false);
-    return nextComparison;
-  }, []);
+  const finalizeMatchState = useCallback(
+    (localTables: SyncTables, cloudData: BackupPayload | null, mergedAt?: string | null) => {
+      const nextComparison = buildSyncComparison(localTables, cloudData, mergedAt);
+      setComparison(nextComparison);
+      cloudSnapshotRef.current = cloudData;
+      previousFingerprintRef.current = nextComparison.localFingerprint;
+      setIsWorkingLocal(false);
+      return nextComparison;
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -353,12 +350,7 @@ export function useCloudSync({
             cloudSnapshotRef.current = payload;
             commitLastSuccessfulSyncAt(successAt);
             finalizeMatchState(localTables, payload);
-            await pushHistory(
-              "auto-push",
-              "success",
-              "Backup local enviado automaticamente para a nuvem.",
-              successAt,
-            );
+            await pushHistory("auto-push", "success", "Backup local enviado automaticamente para a nuvem.", successAt);
             return;
           }
 
@@ -382,11 +374,7 @@ export function useCloudSync({
             if (!cloudData) {
               // Não deveria acontecer, mas tratar como conflito se cloudData for null
               setIsWorkingLocal(false);
-              await pushHistory(
-                "conflict",
-                "conflict",
-                "Conflito detectado: dados da nuvem inesperadamente ausentes.",
-              );
+              await pushHistory("conflict", "conflict", "Conflito detectado: dados da nuvem inesperadamente ausentes.");
               return;
             }
 
@@ -507,7 +495,19 @@ export function useCloudSync({
     return () => {
       window.removeEventListener("mybacklog:sync-request", handleSyncRequest);
     };
-  }, [acquireSyncLock, autoSyncEnabled, buildSyncComparison, finalizeMatchState, isAuthEnabled, isOnline, isSyncing, readBackupTables, releaseSyncLock, setNotice, user]);
+  }, [
+    acquireSyncLock,
+    autoSyncEnabled,
+    buildSyncComparison,
+    finalizeMatchState,
+    isAuthEnabled,
+    isOnline,
+    isSyncing,
+    readBackupTables,
+    releaseSyncLock,
+    setNotice,
+    user,
+  ]);
 
   const syncMode = useMemo<SyncMode>(() => {
     if (!isAuthEnabled) return "local-only";
@@ -528,7 +528,7 @@ export function useCloudSync({
       } = {},
     ) => {
       if (!user || !isAuthEnabled || !isOnline) return;
-      const syncToken = options.lockToken ?? await acquireSyncLock();
+      const syncToken = options.lockToken ?? (await acquireSyncLock());
       if (!syncToken) return;
 
       try {
@@ -556,11 +556,7 @@ export function useCloudSync({
           previousFingerprintRef.current = nextComparison.localFingerprint;
           setIsWorkingLocal(false);
           if (action === "manual-push") {
-            await pushHistory(
-              action,
-              "skipped",
-              "Nada para enviar. A base local e a nuvem já estão vazias.",
-            );
+            await pushHistory(action, "skipped", "Nada para enviar. A base local e a nuvem já estão vazias.");
             setNotice("Nada para enviar. Local e nuvem já estão vazios.");
           }
           return;
@@ -814,14 +810,37 @@ export function useCloudSync({
     if (!autoSyncEnabled || isWorkingLocal || comparison?.decision === "conflict") {
       return;
     }
-    await runPushFlow("auto-push");
+    const result = await runPushFlow("auto-push");
+    // Processar fila de mutações pendentes após push
+    await syncPendingMutations();
+    return result;
   }, [autoSyncEnabled, comparison?.decision, isWorkingLocal, runPushFlow]);
 
   // Versão debouncada para auto-sync (5 segundos)
-  const debouncedTriggerSync = useMemo(
-    () => debounce(() => triggerSyncToCloud(), 5000),
-    [triggerSyncToCloud]
-  );
+  const debouncedTriggerSync = useMemo(() => debounce(() => triggerSyncToCloud(), 5000), [triggerSyncToCloud]);
+
+  // Intervalo periódico para processar fila de mutações pendentes (30 segundos)
+  useEffect(() => {
+    if (!isAuthEnabled || !user || !isOnline || isWorkingLocal || isSyncing) {
+      return;
+    }
+
+    const intervalId = setInterval(async () => {
+      // Verificar se há mutações pendentes antes de disparar sync
+      const { db } = await import("../core/db");
+      const pendingCount = await db.pendingMutations
+        .filter((m: { syncedAt?: string | null }) => !m.syncedAt)
+        .count();
+
+      if (pendingCount > 0) {
+        await triggerSyncToCloud();
+      }
+    }, 30000); // 30 segundos
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isAuthEnabled, isOnline, isSyncing, isWorkingLocal, triggerSyncToCloud, user]);
 
   const pushLocalToCloud = useCallback(async () => {
     setIsWorkingLocal(false);
