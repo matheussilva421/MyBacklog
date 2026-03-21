@@ -11,6 +11,15 @@ import {
 import { db } from "../core/db";
 import { syncSettingsKeys } from "../modules/sync-center/utils/syncStorage";
 
+// Helper para mock de cadeias de metodos Dexie (orderBy().reverse().toArray())
+function createDexieOrderByMock() {
+  return {
+    reverse: vi.fn().mockReturnValue({
+      toArray: vi.fn(),
+    }),
+  };
+}
+
 // Mock do db para testes que não precisam de IndexedDB real
 vi.mock("../core/db", () => ({
   db: {
@@ -412,41 +421,21 @@ describe("backlogRepository", () => {
 
   describe("readBacklogDataSnapshot", () => {
     beforeEach(() => {
-      vi.mocked(db.libraryEntries.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
-      vi.mocked(db.playSessions.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
-      vi.mocked(db.importJobs.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
-      vi.mocked(db.savedViews.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+      const emptyOrderByMock = createDexieOrderByMock();
+      vi.mocked(db.libraryEntries.orderBy).mockReturnValue(emptyOrderByMock as any);
+      vi.mocked(db.playSessions.orderBy).mockReturnValue(emptyOrderByMock as any);
+      vi.mocked(db.importJobs.orderBy).mockReturnValue(emptyOrderByMock as any);
+      vi.mocked(db.savedViews.orderBy).mockReturnValue(emptyOrderByMock as any);
     });
 
     it("returns empty snapshot when no data exists", async () => {
-      vi.mocked(db.libraryEntries.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+      const emptyOrderByMock = createDexieOrderByMock();
+      emptyOrderByMock.reverse().toArray.mockResolvedValue([]);
+
+      vi.mocked(db.libraryEntries.orderBy).mockReturnValue(emptyOrderByMock as any);
       vi.mocked(db.settings.toArray).mockResolvedValue([]);
       vi.mocked(db.games.toArray).mockResolvedValue([]);
-      vi.mocked(db.playSessions.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+      vi.mocked(db.playSessions.orderBy).mockReturnValue(emptyOrderByMock as any);
       vi.mocked(db.reviews.toArray).mockResolvedValue([]);
       vi.mocked(db.tags.toArray).mockResolvedValue([]);
       vi.mocked(db.gameTags.toArray).mockResolvedValue([]);
@@ -458,11 +447,7 @@ describe("backlogRepository", () => {
       vi.mocked(db.platforms.toArray).mockResolvedValue([]);
       vi.mocked(db.gamePlatforms.toArray).mockResolvedValue([]);
       vi.mocked(db.savedViews.toArray).mockResolvedValue([]);
-      vi.mocked(db.importJobs.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+      vi.mocked(db.importJobs.orderBy).mockReturnValue(emptyOrderByMock as any);
 
       const result = await readBacklogDataSnapshot(false);
 
@@ -480,22 +465,15 @@ describe("backlogRepository", () => {
         return undefined;
       });
 
-      vi.mocked(db.libraryEntries.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi
-            .fn()
-            .mockResolvedValueOnce([])
-            .mockResolvedValueOnce([{ id: 1, gameId: 1, updatedAt: "2024-01-01T00:00:00.000Z" }]),
-        }),
-      } as any);
+      const emptyOrderByMock = createDexieOrderByMock();
+      emptyOrderByMock.reverse().toArray
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 1, gameId: 1, updatedAt: "2024-01-01T00:00:00.000Z" }]);
 
+      vi.mocked(db.libraryEntries.orderBy).mockReturnValue(emptyOrderByMock as any);
       vi.mocked(db.settings.toArray).mockResolvedValue([]);
       vi.mocked(db.games.toArray).mockResolvedValue([{ id: 1, title: "Hades", updatedAt: "2024-01-01T00:00:00.000Z" }]);
-      vi.mocked(db.playSessions.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+      vi.mocked(db.playSessions.orderBy).mockReturnValue(emptyOrderByMock as any);
       vi.mocked(db.reviews.toArray).mockResolvedValue([]);
       vi.mocked(db.tags.toArray).mockResolvedValue([]);
       vi.mocked(db.gameTags.toArray).mockResolvedValue([]);
@@ -507,11 +485,7 @@ describe("backlogRepository", () => {
       vi.mocked(db.platforms.toArray).mockResolvedValue([]);
       vi.mocked(db.gamePlatforms.toArray).mockResolvedValue([]);
       vi.mocked(db.savedViews.toArray).mockResolvedValue([]);
-      vi.mocked(db.importJobs.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+      vi.mocked(db.importJobs.orderBy).mockReturnValue(emptyOrderByMock as any);
 
       // Verifica que a biblioteca foi semeada (libraryEntries tem dados apos o seed)
       const result = await readBacklogDataSnapshot(true);
@@ -520,11 +494,10 @@ describe("backlogRepository", () => {
     });
 
     it("returns data sorted by updatedAt descending for games", async () => {
-      vi.mocked(db.libraryEntries.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+      const emptyOrderByMock = createDexieOrderByMock();
+      emptyOrderByMock.reverse().toArray.mockResolvedValue([]);
+
+      vi.mocked(db.libraryEntries.orderBy).mockReturnValue(emptyOrderByMock as any);
       vi.mocked(db.settings.toArray).mockResolvedValue([]);
       const games = [
         { id: 1, title: "Game 1", updatedAt: "2024-01-01T00:00:00.000Z" },
@@ -532,11 +505,7 @@ describe("backlogRepository", () => {
         { id: 3, title: "Game 3", updatedAt: "2024-01-02T00:00:00.000Z" },
       ];
       vi.mocked(db.games.toArray).mockResolvedValue(games);
-      vi.mocked(db.playSessions.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+      vi.mocked(db.playSessions.orderBy).mockReturnValue(emptyOrderByMock as any);
       vi.mocked(db.reviews.toArray).mockResolvedValue([]);
       vi.mocked(db.tags.toArray).mockResolvedValue([]);
       vi.mocked(db.gameTags.toArray).mockResolvedValue([]);
@@ -548,11 +517,7 @@ describe("backlogRepository", () => {
       vi.mocked(db.platforms.toArray).mockResolvedValue([]);
       vi.mocked(db.gamePlatforms.toArray).mockResolvedValue([]);
       vi.mocked(db.savedViews.toArray).mockResolvedValue([]);
-      vi.mocked(db.importJobs.orderBy).mockReturnValue({
-        reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn().mockResolvedValue([]),
-        }),
-      } as any);
+      vi.mocked(db.importJobs.orderBy).mockReturnValue(emptyOrderByMock as any);
 
       const result = await readBacklogDataSnapshot(false);
 

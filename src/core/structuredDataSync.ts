@@ -4,6 +4,7 @@ import { buildStructuredTablesFromLegacy, type StructuredTablesSnapshot } from "
 import type { Game, GamePlatform, LibraryEntry, LibraryEntryStore, Platform, Store } from "./types";
 import { normalizeToken, splitCsvTokens, generateUuid } from "./utils";
 import { softDelete, getDeviceId } from "../lib/softDelete";
+import { logger } from "../lib/logger";
 
 function getStructuredSyncErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -118,7 +119,12 @@ export async function syncLibraryEntryStoreRelations(
   if (storeNames.length === 0) {
     const deviceId = await getDeviceId();
     for (const relation of existingRelations) {
-      if (relation.id != null) await softDelete("libraryEntryStores", relation.id, deviceId);
+      if (relation.id != null) {
+        const result = await softDelete("libraryEntryStores", relation.id, deviceId);
+        if (result.notFound) {
+          logger.warn("[syncLibraryEntryStoreRelations] libraryEntryStore não encontrada:", relation.id);
+        }
+      }
     }
     return;
   }
@@ -132,7 +138,10 @@ export async function syncLibraryEntryStoreRelations(
   const deviceId = await getDeviceId();
   for (const relation of existingRelations) {
     if (relation.storeId && !desiredStoreIdSet.has(relation.storeId) && relation.id != null) {
-      await softDelete("libraryEntryStores", relation.id, deviceId);
+      const result = await softDelete("libraryEntryStores", relation.id, deviceId);
+      if (result.notFound) {
+        logger.warn("[syncLibraryEntryStoreRelations] libraryEntryStore não encontrada:", relation.id);
+      }
     }
   }
 
@@ -174,7 +183,12 @@ export async function syncGamePlatformRelations(
   if (platformNames.length === 0) {
     const deviceId = await getDeviceId();
     for (const relation of existingRelations) {
-      if (relation.id != null) await softDelete("gamePlatforms", relation.id, deviceId);
+      if (relation.id != null) {
+        const result = await softDelete("gamePlatforms", relation.id, deviceId);
+        if (result.notFound) {
+          logger.warn("[syncGamePlatformRelations] gamePlatform não encontrada:", relation.id);
+        }
+      }
     }
     return;
   }
@@ -188,7 +202,10 @@ export async function syncGamePlatformRelations(
   const deviceId = await getDeviceId();
   for (const relation of existingRelations) {
     if (relation.platformId && !desiredPlatformIdSet.has(relation.platformId) && relation.id != null) {
-      await softDelete("gamePlatforms", relation.id, deviceId);
+      const result = await softDelete("gamePlatforms", relation.id, deviceId);
+      if (result.notFound) {
+        logger.warn("[syncGamePlatformRelations] gamePlatform não encontrada:", relation.id);
+      }
     }
   }
 

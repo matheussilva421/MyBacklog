@@ -1,6 +1,22 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { usePendingMutationsState } from "./usePendingMutationsState";
+import type { PendingMutation } from "../../../core/types";
+
+// Factory function para criar PendingMutation
+function createPendingMutation(
+  overrides: Partial<PendingMutation> = {},
+): PendingMutation {
+  return {
+    uuid: overrides.uuid ?? "test-uuid",
+    entityType: overrides.entityType ?? "game",
+    mutationType: overrides.mutationType ?? "create",
+    payload: overrides.payload ?? "{}",
+    createdAt: overrides.createdAt ?? new Date().toISOString(),
+    retryCount: overrides.retryCount ?? 0,
+    ...overrides,
+  };
+}
 
 // Mock do módulo mutationQueue
 vi.mock("../../../lib/mutationQueue", async () => {
@@ -30,15 +46,14 @@ describe("usePendingMutationsState", () => {
 
   it("deve carregar mutações pendentes no mount", async () => {
     vi.spyOn(mockMutationQueue, "getPendingMutations").mockResolvedValue([
-      {
-        id: 1,
+      createPendingMutation({
         uuid: "uuid-1",
         entityType: "game",
         mutationType: "create",
         payload: "{}",
         createdAt: "2026-03-21",
         retryCount: 0,
-      } as any,
+      }),
     ]);
     vi.spyOn(mockMutationQueue, "getPermanentFailures").mockResolvedValue([]);
     vi.spyOn(mockMutationQueue, "getTemporaryFailures").mockResolvedValue([]);
@@ -53,7 +68,7 @@ describe("usePendingMutationsState", () => {
   it("deve carregar falhas permanentes e temporárias", async () => {
     vi.spyOn(mockMutationQueue, "getPendingMutations").mockResolvedValue([]);
     vi.spyOn(mockMutationQueue, "getPermanentFailures").mockResolvedValue([
-      {
+      createPendingMutation({
         id: 2,
         uuid: "uuid-2",
         entityType: "playSession",
@@ -61,10 +76,10 @@ describe("usePendingMutationsState", () => {
         payload: "{}",
         createdAt: "2026-03-20",
         retryCount: 5,
-      } as any,
+      }),
     ]);
     vi.spyOn(mockMutationQueue, "getTemporaryFailures").mockResolvedValue([
-      {
+      createPendingMutation({
         id: 3,
         uuid: "uuid-3",
         entityType: "review",
@@ -72,7 +87,7 @@ describe("usePendingMutationsState", () => {
         payload: "{}",
         createdAt: "2026-03-19",
         retryCount: 2,
-      } as any,
+      }),
     ]);
 
     const { result } = renderHook(() => usePendingMutationsState());
@@ -87,7 +102,7 @@ describe("usePendingMutationsState", () => {
   it("deve chamar retry ao chamar handleRetry", async () => {
     vi.spyOn(mockMutationQueue, "resetMutationRetry").mockResolvedValue();
     vi.spyOn(mockMutationQueue, "getPendingMutations").mockResolvedValue([
-      {
+      createPendingMutation({
         id: 1,
         uuid: "uuid-1",
         entityType: "game",
@@ -95,7 +110,7 @@ describe("usePendingMutationsState", () => {
         payload: "{}",
         createdAt: "2026-03-21",
         retryCount: 3,
-      } as any,
+      }),
     ]);
     vi.spyOn(mockMutationQueue, "getPermanentFailures").mockResolvedValue([]);
     vi.spyOn(mockMutationQueue, "getTemporaryFailures").mockResolvedValue([]);
@@ -113,7 +128,7 @@ describe("usePendingMutationsState", () => {
   it("deve chamar retryAll ao chamar handleRetryAll", async () => {
     vi.spyOn(mockMutationQueue, "bulkResetMutationRetry").mockResolvedValue();
     vi.spyOn(mockMutationQueue, "getPermanentFailures").mockResolvedValue([
-      {
+      createPendingMutation({
         id: 1,
         uuid: "uuid-1",
         entityType: "game",
@@ -121,8 +136,8 @@ describe("usePendingMutationsState", () => {
         payload: "{}",
         createdAt: "2026-03-21",
         retryCount: 5,
-      } as any,
-      {
+      }),
+      createPendingMutation({
         id: 2,
         uuid: "uuid-2",
         entityType: "review",
@@ -130,7 +145,7 @@ describe("usePendingMutationsState", () => {
         payload: "{}",
         createdAt: "2026-03-20",
         retryCount: 5,
-      } as any,
+      }),
     ]);
     vi.spyOn(mockMutationQueue, "getPendingMutations").mockResolvedValue([]);
     vi.spyOn(mockMutationQueue, "getTemporaryFailures").mockResolvedValue([]);
@@ -147,7 +162,7 @@ describe("usePendingMutationsState", () => {
   it("deve chamar delete ao chamar handleDelete", async () => {
     vi.spyOn(mockMutationQueue, "deletePendingMutation").mockResolvedValue();
     vi.spyOn(mockMutationQueue, "getPendingMutations").mockResolvedValue([
-      {
+      createPendingMutation({
         id: 1,
         uuid: "uuid-1",
         entityType: "game",
@@ -155,7 +170,7 @@ describe("usePendingMutationsState", () => {
         payload: "{}",
         createdAt: "2026-03-21",
         retryCount: 0,
-      } as any,
+      }),
     ]);
     vi.spyOn(mockMutationQueue, "getPermanentFailures").mockResolvedValue([]);
     vi.spyOn(mockMutationQueue, "getTemporaryFailures").mockResolvedValue([]);
@@ -172,7 +187,7 @@ describe("usePendingMutationsState", () => {
   it("deve chamar deleteAll ao chamar handleDeleteAll", async () => {
     vi.spyOn(mockMutationQueue, "bulkDeletePendingMutations").mockResolvedValue();
     vi.spyOn(mockMutationQueue, "getPermanentFailures").mockResolvedValue([
-      {
+      createPendingMutation({
         id: 1,
         uuid: "uuid-1",
         entityType: "game",
@@ -180,7 +195,7 @@ describe("usePendingMutationsState", () => {
         payload: "{}",
         createdAt: "2026-03-21",
         retryCount: 5,
-      } as any,
+      }),
     ]);
     vi.spyOn(mockMutationQueue, "getPendingMutations").mockResolvedValue([]);
     vi.spyOn(mockMutationQueue, "getTemporaryFailures").mockResolvedValue([]);
@@ -197,7 +212,7 @@ describe("usePendingMutationsState", () => {
   it("deve chamar discardAll ao chamar handleDiscardAll", async () => {
     vi.spyOn(mockMutationQueue, "bulkDeletePendingMutations").mockResolvedValue();
     vi.spyOn(mockMutationQueue, "getPendingMutations").mockResolvedValue([
-      {
+      createPendingMutation({
         id: 1,
         uuid: "uuid-1",
         entityType: "game",
@@ -205,8 +220,8 @@ describe("usePendingMutationsState", () => {
         payload: "{}",
         createdAt: "2026-03-21",
         retryCount: 0,
-      } as any,
-      {
+      }),
+      createPendingMutation({
         id: 2,
         uuid: "uuid-2",
         entityType: "review",
@@ -214,7 +229,7 @@ describe("usePendingMutationsState", () => {
         payload: "{}",
         createdAt: "2026-03-20",
         retryCount: 0,
-      } as any,
+      }),
     ]);
     vi.spyOn(mockMutationQueue, "getPermanentFailures").mockResolvedValue([]);
     vi.spyOn(mockMutationQueue, "getTemporaryFailures").mockResolvedValue([]);

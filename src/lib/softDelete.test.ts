@@ -61,7 +61,7 @@ describe("softDelete", () => {
   });
 
   describe("softDelete", () => {
-    it("deve marcar entidade como deletada", async () => {
+    it("deve marcar entidade como deletada e retornar sucesso", async () => {
       const now = new Date().toISOString();
       const tagId = await db.tags.add({
         uuid: "test-uuid",
@@ -72,8 +72,9 @@ describe("softDelete", () => {
         deletedAt: null,
       });
 
-      await softDelete("tags", tagId, "device-test");
+      const result = await softDelete("tags", tagId, "device-test");
 
+      expect(result).toEqual({ success: true, alreadyDeleted: false, notFound: false });
       const updatedTag = await db.tags.get(tagId);
       expect(updatedTag?.deletedAt).toBeDefined();
       expect(updatedTag?.deletedAt).not.toBeNull();
@@ -81,7 +82,7 @@ describe("softDelete", () => {
       expect(updatedTag?.updatedByDeviceId).toBe("device-test");
     });
 
-    it("deve ser idempotente - não fazer nada se já estiver deletada", async () => {
+    it("deve ser idempotente - retornar alreadyDeleted se já estiver deletada", async () => {
       const now = new Date().toISOString();
       const tagId = await db.tags.add({
         uuid: "test-uuid",
@@ -92,8 +93,11 @@ describe("softDelete", () => {
         deletedAt: now,
       });
 
-      await softDelete("tags", tagId, "device-test");
-      await softDelete("tags", tagId, "device-test-2");
+      const result1 = await softDelete("tags", tagId, "device-test");
+      expect(result1).toEqual({ success: true, alreadyDeleted: true, notFound: false });
+
+      const result2 = await softDelete("tags", tagId, "device-test-2");
+      expect(result2).toEqual({ success: true, alreadyDeleted: true, notFound: false });
 
       const updatedTag = await db.tags.get(tagId);
       expect(updatedTag?.deletedAt).toBe(now);
@@ -101,11 +105,13 @@ describe("softDelete", () => {
       expect(updatedTag?.updatedByDeviceId).toBeUndefined();
     });
 
-    it("deve avisar se entidade não existir", async () => {
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      await softDelete("tags", 99999, "device-test");
-      expect(consoleWarnSpy).toHaveBeenCalledWith("softDelete: entidade não encontrada em tags com id 99999");
-      consoleWarnSpy.mockRestore();
+    it("deve retornar notFound e avisar se entidade não existir", async () => {
+      const { logger } = await import("../lib/logger");
+      const loggerWarnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const result = await softDelete("tags", 99999, "device-test");
+      expect(result).toEqual({ success: false, alreadyDeleted: false, notFound: true });
+      expect(loggerWarnSpy).toHaveBeenCalledWith("softDelete: entidade não encontrada em tags com id 99999");
+      loggerWarnSpy.mockRestore();
     });
   });
 

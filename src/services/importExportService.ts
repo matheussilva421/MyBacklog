@@ -33,15 +33,11 @@ import { buildStructuredEntryLookupAliases, createStructuredEntryIdentity } from
 import type { Goal as DbGoal, SavedView as DbSavedView } from "../core/types";
 import type { AppPreferences } from "../modules/settings/utils/preferences";
 import { generateUuid } from "../core/utils";
-import {
-  applyRawgMetadataToImportPayload,
-  fetchRawgMetadata,
-  searchRawgCandidates,
-} from "../modules/import-export/utils/rawg";
+import { applyRawgMetadataToImportPayload, fetchRawgMetadata, searchRawgCandidates } from "../modules/import-export/utils/rawg";
+import { logger } from "../lib/logger";
 
 function logRawgWarning(message: string, error: unknown) {
-  // eslint-disable-next-line no-console
-  console.warn(message, error);
+  logger.warn(message, error);
 }
 
 function buildStructuredEntryLookup(
@@ -307,7 +303,10 @@ export async function applyImportPreview(args: {
       updatedAt: now,
       deletedAt: null,
     })
-    .catch(() => {});
+    .catch((error) => {
+      // Falha ao registrar job concluído - não bloqueia o retorno
+      logger.error("[ImportJob] Falha ao registrar job concluído:", error);
+    });
 
   return { created, updated, ignored };
 }

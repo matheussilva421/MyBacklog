@@ -1,6 +1,7 @@
 import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
 import type { BackupPayload } from "../backlog/shared";
 import { cloudDb } from "./firebase";
+import { logger } from "./logger";
 
 function requireCloudDb() {
   if (!cloudDb) {
@@ -70,8 +71,7 @@ export async function pushToCloud(uid: string, payload: BackupPayload) {
     3,
     1000,
     (error, attempt, remaining) => {
-      // eslint-disable-next-line no-console
-      console.warn(`pushToCloud: tentativa ${attempt} falhou, ${remaining} restantes`, error);
+      logger.warn(`pushToCloud: tentativa ${attempt} falhou, ${remaining} restantes`, error);
     },
   );
 }
@@ -93,8 +93,7 @@ export async function pullFromCloud(uid: string): Promise<BackupPayload | null> 
     3,
     1000,
     (error, attempt, remaining) => {
-      // eslint-disable-next-line no-console
-      console.warn(`pullFromCloud: tentativa ${attempt} falhou, ${remaining} restantes`, error);
+      logger.warn(`pullFromCloud: tentativa ${attempt} falhou, ${remaining} restantes`, error);
     },
   );
 }
@@ -110,8 +109,7 @@ export async function clearCloudBackup(uid: string) {
     3,
     1000,
     (error, attempt, remaining) => {
-      // eslint-disable-next-line no-console
-      console.warn(`clearCloudBackup: tentativa ${attempt} falhou, ${remaining} restantes`, error);
+      logger.warn(`clearCloudBackup: tentativa ${attempt} falhou, ${remaining} restantes`, error);
     },
   );
 }

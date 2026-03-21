@@ -12,10 +12,10 @@ import {
 import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../core/types";
 import type { AppPreferences } from "../modules/settings/utils/preferences";
 import { fetchRawgMetadata, resolveBestRawgCandidate } from "../modules/import-export/utils/rawg";
+import { logger } from "../lib/logger";
 
 function logRawgWarning(message: string, error: unknown) {
-  // eslint-disable-next-line no-console
-  console.warn(message, error);
+  logger.warn(message, error);
 }
 
 export async function normalizeStructuredEntry(libraryEntryId: number) {

@@ -270,8 +270,8 @@ export type GameFormState = {
   genre: string;
   status: Status;
   priority: Priority;
-  progress: string;
-  hours: string;
+  progress: number;
+  hours: number;
   eta: string;
   score: string;
   year: string;
@@ -336,7 +336,7 @@ export const goalPeriodOptions: Array<{ value: Period; label: string }> = [
 export type ImportPreviewAction = "create" | "update" | "ignore";
 
 export type ImportMatchCandidate = {
-  entryId: number;
+  libraryEntryId: number;
   title: string;
   platform: string;
   sourceStore: string;

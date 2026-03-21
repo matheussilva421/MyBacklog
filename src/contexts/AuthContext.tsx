@@ -33,7 +33,9 @@ const AuthContext = createContext<AuthContextType>({
   register: async () => {
     throw new Error(disabledAuthMessage);
   },
-  logout: async () => {},
+  logout: async () => {
+    throw new Error(disabledAuthMessage);
+  },
   loginWithGoogle: async () => {
     throw new Error(disabledAuthMessage);
   },

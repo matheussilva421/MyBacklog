@@ -1253,12 +1253,25 @@ describe("useBacklogActions", () => {
 
       // Mock getDeviceId to return a test device ID
       vi.mocked(db.settings.get).mockResolvedValue({
+        id: 1,
         key: "deviceId",
         value: "test-device",
         updatedAt: new Date().toISOString(),
-      } as any);
+        version: 1,
+      });
       // Mock goals.get to return an existing goal
-      vi.mocked(db.goals.get).mockResolvedValue({ id: 1, name: "Test Goal", deletedAt: null, version: 1 } as any);
+      vi.mocked(db.goals.get).mockResolvedValue({
+        id: 1,
+        uuid: "test-uuid",
+        version: 1,
+        type: "finished",
+        target: 10,
+        current: 5,
+        period: "monthly",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        deletedAt: null,
+      });
 
       await result.current.handleGoalDelete(1);
 

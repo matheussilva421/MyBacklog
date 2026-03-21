@@ -8,6 +8,7 @@ import {
   type MutableRefObject,
 } from "react";
 import { Download, Upload } from "lucide-react";
+import { logger } from "../lib/logger";
 import {
   cx,
   gamePriorities,
@@ -515,7 +516,7 @@ export function GameModal(props: {
               min="0"
               max="100"
               value={form.progress}
-              onChange={(event) => onChange("progress", event.target.value)}
+              onChange={(event) => onChange("progress", Number(event.target.value) || 0)}
             />
           </label>
           <label className="field">
@@ -525,7 +526,7 @@ export function GameModal(props: {
               min="0"
               step="0.5"
               value={form.hours}
-              onChange={(event) => onChange("hours", event.target.value)}
+              onChange={(event) => onChange("hours", Number(event.target.value) || 0)}
             />
           </label>
           <label className="field">
@@ -974,7 +975,9 @@ export function ImportModal(props: {
         .reverse()
         .toArray()
         .then(setHistory)
-        .catch(() => {});
+        .catch((error) => {
+          logger.error("[ImportHistory] Falha ao carregar histórico:", error);
+        });
     }
   }, [activeTab, open]);
 
@@ -1248,7 +1251,7 @@ export function ImportModal(props: {
                         >
                           <option value="">Criar nova LibraryEntry</option>
                           {entry.matchCandidates.map((candidate) => (
-                            <option key={`${candidate.entryId}-${candidate.platform}`} value={candidate.entryId}>
+                            <option key={`${candidate.libraryEntryId}-${candidate.platform}`} value={candidate.libraryEntryId}>
                               {candidate.title} • {candidate.platform} • {candidate.sourceStore} • {candidate.score}%
                             </option>
                           ))}

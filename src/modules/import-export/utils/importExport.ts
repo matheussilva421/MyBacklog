@@ -752,7 +752,7 @@ function createMatchCandidate(
   }
 
   return {
-    entryId: record.libraryEntry.id ?? 0,
+    libraryEntryId: record.libraryEntry.id ?? 0,
     title: record.game.title,
     platform: record.libraryEntry.platform,
     sourceStore: record.libraryEntry.sourceStore,
@@ -849,7 +849,7 @@ export function buildImportPreview(
           ? createMatchCandidate(record, item, "exact")
           : createMatchCandidate(record, item, "title"),
       )
-      .filter((candidate) => candidate.entryId > 0)
+      .filter((candidate) => candidate.libraryEntryId > 0)
       .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title, "pt-BR"));
     const gameCandidates = Array.from(uniqueGamesByTitle.get(normalizedTitle)?.values() ?? [])
       .map((record) =>
@@ -908,7 +908,7 @@ export function buildImportPreview(
     const selectedMatchId = hasExactMatch
       ? (exactRecord?.libraryEntry.id ?? null)
       : confidentTitleMatch
-        ? (bestMatchCandidate?.entryId ?? null)
+        ? (bestMatchCandidate?.libraryEntryId ?? null)
         : null;
     const suggestedAction = hasExactMatch || confidentTitleMatch ? "update" : "create";
     const confidenceScore = hasExactMatch

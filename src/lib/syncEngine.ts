@@ -3,6 +3,7 @@ import { pushEntityToCloud, deleteEntityInCloud } from "./incrementalSync";
 import { logSyncFailure, resolveSyncFailure } from "./syncTelemetry";
 import { auth } from "./firebase";
 import type { EntityType } from "../core/types";
+import { logger } from "./logger";
 
 /**
  * Sync engine para processar fila de mutações pendentes.
@@ -42,7 +43,7 @@ async function processMutation(mutation: {
 }): Promise<boolean> {
   // Verificar se excedeu máximo de retries
   if (mutation.retryCount >= MAX_RETRY_COUNT) {
-    console.error(
+    logger.error(
       `[SyncEngine] Muição ${mutation.id} excedeu máximo de ${MAX_RETRY_COUNT} retries. Marcada como falha permanente.`,
     );
     return false;
@@ -51,7 +52,7 @@ async function processMutation(mutation: {
   // Aplicar delay com backoff exponencial para retries
   if (mutation.retryCount > 0) {
     const delay = calculateBackoffDelay(mutation.retryCount);
-    console.log(
+    logger.info(
       `[SyncEngine] Aguardando ${delay}ms antes de retry #${mutation.retryCount} para mutação ${mutation.id}`,
     );
     await sleep(delay);
@@ -97,7 +98,7 @@ async function processMutation(mutation: {
 
     return true;
   } catch (error) {
-    console.error(`[SyncEngine] Erro ao processar mutação ${mutation.id}:`, error);
+    logger.error(`[SyncEngine] Erro ao processar mutação ${mutation.id}:`, error);
     await logSyncFailure(mutation.id, mutation.entityType, mutation.mutationType, error, mutation.retryCount);
     return false;
   }
@@ -134,7 +135,7 @@ export async function processMutationQueue(): Promise<{
 
         // Verificar se excedeu máximo de retries antes de processar
         if (m.retryCount >= MAX_RETRY_COUNT) {
-          console.error(`[SyncEngine] Muição ${m.id} excedeu máximo de ${MAX_RETRY_COUNT} retries. Ignorada.`);
+          logger.error(`[SyncEngine] Muição ${m.id} excedeu máximo de ${MAX_RETRY_COUNT} retries. Ignorada.`);
           return { success: false, permanentFailure: true };
         }
 
@@ -200,12 +201,12 @@ export async function syncPendingMutations(): Promise<void> {
   try {
     const result = await processMutationQueue();
     if (result.processed > 0) {
-      console.log(
+      logger.info(
         `[SyncEngine] Sync concluído: ${result.succeeded}/${result.processed} mutações sincronizadas` +
           (result.permanentFailures > 0 ? `, ${result.permanentFailures} falhas permanentes` : ""),
       );
     }
   } catch (error) {
-    console.error("[SyncEngine] Erro crítico no sync:", error);
+    logger.error("[SyncEngine] Erro crítico no sync:", error);
   }
 }

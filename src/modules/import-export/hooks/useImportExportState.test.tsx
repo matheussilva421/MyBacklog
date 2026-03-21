@@ -28,7 +28,7 @@ function createPreviewEntry(partial: Partial<ImportPreviewEntry>): ImportPreview
     duplicateCount: 0,
     matchCandidates: [
       {
-        entryId: 10,
+        libraryEntryId: 10,
         title: "Game",
         platform: "PC",
         sourceStore: "Steam",

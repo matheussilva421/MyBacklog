@@ -109,7 +109,7 @@ describe("importExport", () => {
     expect(reviewMatch?.status).toBe("review");
     expect(reviewMatch?.action).toBe("create");
     expect(reviewMatch?.matchCandidates).toHaveLength(1);
-    expect(reviewMatch?.matchCandidates[0]?.entryId).toBe(12);
+    expect(reviewMatch?.matchCandidates[0]?.libraryEntryId).toBe(12);
     expect(reviewMatch?.matchCandidates[0]?.score).toBeLessThan(78);
     expect(reviewMatch?.gameCandidates).toHaveLength(1);
     expect(reviewMatch?.gameCandidates[0]?.gameId).toBe(2);

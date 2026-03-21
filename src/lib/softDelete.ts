@@ -1,5 +1,6 @@
 import { db } from "../core/db";
 import type { Table } from "dexie";
+import { logger } from "./logger";
 
 /**
  * Utilitário para soft delete (tombstone) de entidades syncáveis.
@@ -35,8 +36,18 @@ export function filterDeleted<T extends { deletedAt?: string | null }>(entities:
 }
 
 /**
+ * Resultado de uma operação de soft delete.
+ */
+export type SoftDeleteResult = {
+  success: boolean;
+  alreadyDeleted: boolean;
+  notFound: boolean;
+};
+
+/**
  * Marca uma entidade como deletada (soft delete).
  * Incrementa version, atualiza updatedAt e deletedAt.
+ * @returns Objeto com status da operação
  */
 export async function softDelete<
   T extends {
@@ -47,18 +58,18 @@ export async function softDelete<
     deletedAt?: string | null;
     updatedByDeviceId?: string;
   },
->(tableName: keyof typeof db, id: number, deviceId: string): Promise<void> {
+>(tableName: keyof typeof db, id: number, deviceId: string): Promise<SoftDeleteResult> {
   const table = db[tableName] as unknown as Table<T, number>;
   const entity = await table.get(id);
 
   if (!entity) {
-    console.warn(`softDelete: entidade não encontrada em ${String(tableName)} com id ${id}`);
-    return;
+    logger.warn(`softDelete: entidade não encontrada em ${String(tableName)} com id ${id}`);
+    return { success: false, alreadyDeleted: false, notFound: true };
   }
 
   // Se já está deletada, não faz nada
   if (entity.deletedAt) {
-    return;
+    return { success: true, alreadyDeleted: true, notFound: false };
   }
 
   const now = new Date().toISOString();
@@ -69,6 +80,8 @@ export async function softDelete<
     updatedByDeviceId: deviceId,
     version: (entity.version ?? 0) + 1,
   } as any);
+
+  return { success: true, alreadyDeleted: false, notFound: false };
 }
 
 /**

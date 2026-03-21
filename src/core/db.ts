@@ -381,21 +381,21 @@ class MyBacklogDB extends Dexie {
 
     this.version(7)
       .stores({
-        games: "++id, &uuid, normalizedTitle, title, rawgId, releaseYear, updatedAt, deletedAt",
+        games: "++id, &uuid, normalizedTitle, title, rawgId, releaseYear, updatedAt, deletedAt, [deletedAt+updatedAt]",
         libraryEntries:
-          "++id, &uuid, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate, deletedAt",
-        stores: "++id, &uuid, normalizedName, name, sourceKey, updatedAt, deletedAt",
+          "++id, &uuid, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate, deletedAt, [deletedAt+updatedAt], [deletedAt+lastSessionAt]",
+        stores: "++id, &uuid, normalizedName, name, sourceKey, updatedAt, deletedAt, [deletedAt+updatedAt]",
         libraryEntryStores:
           "++id, &uuid, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt, updatedAt, deletedAt",
-        platforms: "++id, &uuid, normalizedName, name, updatedAt, deletedAt",
+        platforms: "++id, &uuid, normalizedName, name, updatedAt, deletedAt, [deletedAt+updatedAt]",
         gamePlatforms:
           "++id, &uuid, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt, updatedAt, deletedAt",
-        playSessions: "++id, &uuid, libraryEntryId, date, updatedAt, deletedAt",
+        playSessions: "++id, &uuid, libraryEntryId, date, updatedAt, deletedAt, [deletedAt+date]",
         reviews: "++id, &uuid, libraryEntryId, updatedAt, deletedAt",
-        lists: "++id, &uuid, name, updatedAt, deletedAt",
+        lists: "++id, &uuid, name, updatedAt, deletedAt, [deletedAt+updatedAt]",
         libraryEntryLists:
           "++id, &uuid, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt, updatedAt, deletedAt",
-        tags: "++id, &uuid, name, updatedAt, deletedAt",
+        tags: "++id, &uuid, name, updatedAt, deletedAt, [deletedAt+updatedAt]",
         gameTags: "++id, &uuid, libraryEntryId, tagId, createdAt, updatedAt, deletedAt",
         goals: "++id, &uuid, type, period, updatedAt, deletedAt",
         settings: "++id, key, updatedAt",
@@ -456,7 +456,8 @@ class MyBacklogDB extends Dexie {
       });
 
     this.version(8).stores({
-      pendingMutations: "++id, uuid, [uuid+entityType], syncedAt, createdAt, retryCount",
+      pendingMutations:
+        "++id, uuid, [uuid+entityType], syncedAt, createdAt, retryCount, [syncedAt+createdAt], [retryCount+syncedAt]",
     });
   }
 }

@@ -169,7 +169,7 @@ export function useImportExportState(setNotice: (value: string | null) => void) 
           selectedMatchId:
             entry.suggestedAction === "update"
               ? (entry.selectedMatchId ??
-                (entry.matchCandidates.length === 1 ? (entry.matchCandidates[0]?.entryId ?? null) : null))
+                (entry.matchCandidates.length === 1 ? (entry.matchCandidates[0]?.libraryEntryId ?? null) : null))
               : entry.selectedMatchId,
           selectedGameId:
             entry.suggestedAction === "create" && entry.gameCandidates.length === 1
@@ -190,7 +190,7 @@ export function useImportExportState(setNotice: (value: string | null) => void) 
             ? {
                 ...entry,
                 action: "update",
-                selectedMatchId: entry.matchCandidates[0].entryId,
+                selectedMatchId: entry.matchCandidates[0].libraryEntryId,
                 selectedGameId: null,
               }
             : entry,

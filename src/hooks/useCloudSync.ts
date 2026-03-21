@@ -25,6 +25,7 @@ import {
   type SyncHistoryEntry,
 } from "../modules/sync-center/utils/syncStorage";
 import { clearBacklogDataForFreshStart } from "../services/backlogRepository";
+import { logger } from "../lib/logger";
 
 export {
   buildSyncFingerprint,
@@ -77,8 +78,7 @@ export function shouldBlockPushBecauseOfConflict(
 }
 
 function logSyncError(message: string, error: unknown) {
-  // eslint-disable-next-line no-console
-  console.error(message, error);
+  logger.error(message, error);
 }
 
 async function replaceLocalTables(tables: SyncTables) {

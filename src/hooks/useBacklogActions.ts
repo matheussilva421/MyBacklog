@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { db } from "../core/db";
 import { syncStructuredRelationsForRecord } from "../core/structuredDataSync";
+import { logger } from "../lib/logger";
 import {
   buildPlatformNamesByGameId,
   buildStoreNamesByEntryId,
@@ -288,7 +289,10 @@ export function useBacklogActions({
           updatedAt: now,
           deletedAt: null,
         })
-        .catch(() => {});
+        .catch((error) => {
+          // Falha ao logar erro no importJob - não bloqueia o fluxo principal
+          logger.error("[ImportJob] Falha ao registrar erro no banco:", error);
+        });
 
       setNotice(`Falha ao processar importação: ${errorMessage}.`);
     } finally {
@@ -473,7 +477,10 @@ export function useBacklogActions({
           id: existingReview.id,
           uuid: existingReview.uuid,
         });
-        await softDelete("reviews", existingReview.id, deviceId);
+        const result = await softDelete("reviews", existingReview.id, deviceId);
+        if (result.notFound) {
+          logger.warn("[handleReviewSave] Review não encontrada para soft delete:", existingReview.id);
+        }
       }
       await db.libraryEntries.update(libraryEntryId, { personalRating: score, updatedAt: new Date().toISOString() });
     });
@@ -533,7 +540,10 @@ export function useBacklogActions({
       for (const relation of currentRelations) {
         if (!nextTagIds.has(relation.tagId) && relation.id != null) {
           await enqueueMutation(relation.uuid, "gameTag", "delete", { id: relation.id, uuid: relation.uuid });
-          await softDelete("gameTags", relation.id, deviceId);
+          const result = await softDelete("gameTags", relation.id, deviceId);
+          if (result.notFound) {
+            logger.warn("[handleGameTagsSave] gameTag não encontrada para soft delete:", relation.id);
+          }
         }
       }
 
@@ -573,7 +583,10 @@ export function useBacklogActions({
       for (const relation of currentRelations) {
         if (!nextListIds.includes(relation.listId) && relation.id != null) {
           await enqueueMutation(relation.uuid, "libraryEntryList", "delete", { id: relation.id, uuid: relation.uuid });
-          await softDelete("libraryEntryLists", relation.id, deviceId);
+          const result = await softDelete("libraryEntryLists", relation.id, deviceId);
+          if (result.notFound) {
+            logger.warn("[handleGameListsSave] libraryEntryList não encontrada para soft delete:", relation.id);
+          }
         }
       }
       for (const listId of nextListIds) {
@@ -742,7 +755,10 @@ export function useBacklogActions({
                 : Array.from(new Set([...currentListIds, ...validListIds]));
             for (const relation of currentListRelations) {
               if (!nextListIds.includes(relation.listId) && relation.id != null) {
-                await softDelete("libraryEntryLists", relation.id, deviceId);
+                const result = await softDelete("libraryEntryLists", relation.id, deviceId);
+                if (result.notFound) {
+                  logger.warn("[handleBatchEditSubmit] libraryEntryList não encontrada:", relation.id);
+                }
               }
             }
             for (const listId of nextListIds) {
@@ -767,7 +783,10 @@ export function useBacklogActions({
                 : Array.from(new Set([...currentTagIds, ...ensuredTagIds]));
             for (const relation of currentTagRelations) {
               if (!nextTagIds.includes(relation.tagId) && relation.id != null) {
-                await softDelete("gameTags", relation.id, deviceId);
+                const result = await softDelete("gameTags", relation.id, deviceId);
+                if (result.notFound) {
+                  logger.warn("[handleBatchEditSubmit] gameTag não encontrada:", relation.id);
+                }
               }
             }
             for (const tagId of nextTagIds) {
@@ -860,25 +879,45 @@ export function useBacklogActions({
 
         // Soft delete nas entidades relacionadas
         for (const session of sessions) {
-          await softDelete("playSessions", session.id!, deviceId);
+          const result = await softDelete("playSessions", session.id!, deviceId);
+          if (result.notFound) {
+            logger.warn("[handleDelete] playSession não encontrada:", session.id);
+          }
         }
 
-        if (review?.id) await softDelete("reviews", review.id, deviceId);
+        if (review?.id) {
+          const result = await softDelete("reviews", review.id, deviceId);
+          if (result.notFound) {
+            logger.warn("[handleDelete] review não encontrada:", review.id);
+          }
+        }
 
         for (const gameTag of gameTags) {
-          await softDelete("gameTags", gameTag.id!, deviceId);
+          const result = await softDelete("gameTags", gameTag.id!, deviceId);
+          if (result.notFound) {
+            logger.warn("[handleDelete] gameTag não encontrada:", gameTag.id);
+          }
         }
 
         for (const entryList of entryLists) {
-          await softDelete("libraryEntryLists", entryList.id!, deviceId);
+          const result = await softDelete("libraryEntryLists", entryList.id!, deviceId);
+          if (result.notFound) {
+            logger.warn("[handleDelete] libraryEntryList não encontrada:", entryList.id);
+          }
         }
 
         for (const entryStore of entryStores) {
-          await softDelete("libraryEntryStores", entryStore.id!, deviceId);
+          const result = await softDelete("libraryEntryStores", entryStore.id!, deviceId);
+          if (result.notFound) {
+            logger.warn("[handleDelete] libraryEntryStore não encontrada:", entryStore.id);
+          }
         }
 
         // Soft delete na library entry
-        await softDelete("libraryEntries", deletedEntryId, deviceId);
+        const result = await softDelete("libraryEntries", deletedEntryId, deviceId);
+        if (result.notFound) {
+          logger.warn("[handleDelete] libraryEntry não encontrada:", deletedEntryId);
+        }
 
         // Verificar se deve deletar o jogo (sem outras entradas)
         const siblingCount = await db.libraryEntries
@@ -894,9 +933,15 @@ export function useBacklogActions({
           const gamePlatforms = await db.gamePlatforms.where("gameId").equals(selectedRecord.game.id!).toArray();
           for (const gp of gamePlatforms) {
             await enqueueMutation(gp.uuid, "gamePlatform", "delete", { id: gp.id, uuid: gp.uuid });
-            await softDelete("gamePlatforms", gp.id!, deviceId);
+            const result = await softDelete("gamePlatforms", gp.id!, deviceId);
+            if (result.notFound) {
+              logger.warn("[handleDelete] gamePlatform não encontrada:", gp.id);
+            }
           }
-          await softDelete("games", selectedRecord.game.id!, deviceId);
+          const result = await softDelete("games", selectedRecord.game.id!, deviceId);
+          if (result.notFound) {
+            logger.warn("[handleDelete] game não encontrado:", selectedRecord.game.id);
+          }
         }
       },
     );
@@ -1033,7 +1078,10 @@ export function useBacklogActions({
     if (existingGoal) {
       await enqueueMutation(existingGoal.uuid, "goal", "delete", { id: existingGoal.id, uuid: existingGoal.uuid });
     }
-    await softDelete("goals", goalId, deviceId);
+    const result = await softDelete("goals", goalId, deviceId);
+    if (result.notFound) {
+      logger.warn("[handleGoalDelete] goal não encontrada:", goalId);
+    }
     await refreshData();
     setNotice("Meta removida.");
   };
@@ -1069,14 +1117,20 @@ export function useBacklogActions({
       for (const relation of relations) {
         if (relation.id != null) {
           await enqueueMutation(relation.uuid, "libraryEntryList", "delete", { id: relation.id, uuid: relation.uuid });
-          await softDelete("libraryEntryLists", relation.id, deviceId);
+          const result = await softDelete("libraryEntryLists", relation.id, deviceId);
+          if (result.notFound) {
+            logger.warn("[handleListDelete] libraryEntryList não encontrada:", relation.id);
+          }
         }
       }
       const list = await db.lists.get(listId);
       if (list) {
         await enqueueMutation(list.uuid, "list", "delete", { id: list.id, uuid: list.uuid });
       }
-      await softDelete("lists", listId, deviceId);
+      const result = await softDelete("lists", listId, deviceId);
+      if (result.notFound) {
+        logger.warn("[handleListDelete] list não encontrada:", listId);
+      }
     });
     if (selectedListFilter === listId) setSelectedListFilter("all");
     await refreshData();
@@ -1114,7 +1168,10 @@ export function useBacklogActions({
     if (existingView) {
       await enqueueMutation(existingView.uuid, "savedView", "delete", { id: existingView.id, uuid: existingView.uuid });
     }
-    await softDelete("savedViews", viewId, deviceId);
+    const result = await softDelete("savedViews", viewId, deviceId);
+    if (result.notFound) {
+      logger.warn("[handleDeleteSavedView] savedView não encontrada:", viewId);
+    }
     await refreshData();
     setNotice("View salva removida.");
   };
@@ -1308,7 +1365,10 @@ export function useBacklogActions({
       await db.transaction("rw", db.libraryEntries, db.playSessions, async () => {
         const deviceId = await getDeviceId();
         for (const orphanSessionId of orphanSessionIds) {
-          await softDelete("playSessions", orphanSessionId, deviceId);
+          const result = await softDelete("playSessions", orphanSessionId, deviceId);
+          if (result.notFound) {
+            logger.warn("[handleCatalogRepair] playSession órfã não encontrada:", orphanSessionId);
+          }
         }
 
         for (const entryUpdate of entryUpdates) {
@@ -1441,7 +1501,10 @@ export function useBacklogActions({
           }
           for (const review of reviews) {
             if (review.libraryEntryId === primaryEntryId || review.id == null) continue;
-            await softDelete("reviews", review.id, deviceId);
+            const result = await softDelete("reviews", review.id, deviceId);
+            if (result.notFound) {
+              logger.warn("[handleCatalogDuplicateMerge] review não encontrada:", review.id);
+            }
           }
 
           const primaryTagRelations = await db.gameTags.where("libraryEntryId").equals(primaryEntryId).toArray();
@@ -1449,7 +1512,12 @@ export function useBacklogActions({
           const primaryTagSet = new Set(primaryTagRelations.map((relation) => relation.tagId));
           for (const relation of duplicateTagRelations) {
             if (primaryTagSet.has(relation.tagId)) {
-              if (relation.id != null) await softDelete("gameTags", relation.id, deviceId);
+              if (relation.id != null) {
+                const result = await softDelete("gameTags", relation.id, deviceId);
+                if (result.notFound) {
+                  logger.warn("[handleCatalogDuplicateMerge] gameTag não encontrada:", relation.id);
+                }
+              }
               continue;
             }
             primaryTagSet.add(relation.tagId);
@@ -1467,7 +1535,12 @@ export function useBacklogActions({
           const primaryListSet = new Set(primaryListRelations.map((relation) => relation.listId));
           for (const relation of duplicateListRelations) {
             if (primaryListSet.has(relation.listId)) {
-              if (relation.id != null) await softDelete("libraryEntryLists", relation.id, deviceId);
+              if (relation.id != null) {
+                const result = await softDelete("libraryEntryLists", relation.id, deviceId);
+                if (result.notFound) {
+                  logger.warn("[handleCatalogDuplicateMerge] libraryEntryList não encontrada:", relation.id);
+                }
+              }
               continue;
             }
             primaryListSet.add(relation.listId);
@@ -1489,14 +1562,24 @@ export function useBacklogActions({
           });
 
           for (const duplicateEntry of duplicateEntries) {
-            if (duplicateEntry.id != null) await softDelete("libraryEntries", duplicateEntry.id, deviceId);
+            if (duplicateEntry.id != null) {
+              const result = await softDelete("libraryEntries", duplicateEntry.id, deviceId);
+              if (result.notFound) {
+                logger.warn("[handleCatalogDuplicateMerge] libraryEntry não encontrada:", duplicateEntry.id);
+              }
+            }
           }
           const duplicateEntryStores = await db.libraryEntryStores
             .where("libraryEntryId")
             .anyOf(uniqueMergedIds)
             .toArray();
           for (const store of duplicateEntryStores) {
-            if (store.id != null) await softDelete("libraryEntryStores", store.id, deviceId);
+            if (store.id != null) {
+              const result = await softDelete("libraryEntryStores", store.id, deviceId);
+              if (result.notFound) {
+                logger.warn("[handleCatalogDuplicateMerge] libraryEntryStore não encontrada:", store.id);
+              }
+            }
           }
 
           for (const duplicateGameId of duplicateGameIds) {
@@ -1504,9 +1587,17 @@ export function useBacklogActions({
             if (remainingEntries === 0) {
               const duplicateGamePlatforms = await db.gamePlatforms.where("gameId").equals(duplicateGameId).toArray();
               for (const gp of duplicateGamePlatforms) {
-                if (gp.id != null) await softDelete("gamePlatforms", gp.id, deviceId);
+                if (gp.id != null) {
+                  const result = await softDelete("gamePlatforms", gp.id, deviceId);
+                  if (result.notFound) {
+                    logger.warn("[handleCatalogDuplicateMerge] gamePlatform não encontrada:", gp.id);
+                  }
+                }
               }
-              await softDelete("games", duplicateGameId, deviceId);
+              const result = await softDelete("games", duplicateGameId, deviceId);
+              if (result.notFound) {
+                logger.warn("[handleCatalogDuplicateMerge] game não encontrado:", duplicateGameId);
+              }
             }
           }
         },
@@ -1614,7 +1705,12 @@ export function useBacklogActions({
               if (relation.isPrimary && !canonicalRelation.isPrimary) {
                 await db.libraryEntryStores.update(canonicalRelation.id, { isPrimary: true });
               }
-              if (relation.id != null) await softDelete("libraryEntryStores", relation.id, deviceId);
+              if (relation.id != null) {
+                const result = await softDelete("libraryEntryStores", relation.id, deviceId);
+                if (result.notFound) {
+                  logger.warn("[handleCatalogConsolidateAliasGroup] libraryEntryStore não encontrada:", relation.id);
+                }
+              }
               continue;
             }
             if (relation.id != null) {
@@ -1636,7 +1732,10 @@ export function useBacklogActions({
           }
 
           for (const duplicateId of duplicateIds) {
-            await softDelete("stores", duplicateId, deviceId);
+            const result = await softDelete("stores", duplicateId, deviceId);
+            if (result.notFound) {
+              logger.warn("[handleCatalogConsolidateAliasGroup] store não encontrada:", duplicateId);
+            }
           }
         });
       } else {
@@ -1674,7 +1773,12 @@ export function useBacklogActions({
             if (!duplicateIds.includes(relation.platformId)) continue;
             const canonicalRelation = canonicalRelationByGameId.get(relation.gameId);
             if (canonicalRelation?.id != null) {
-              if (relation.id != null) await softDelete("gamePlatforms", relation.id, deviceId);
+              if (relation.id != null) {
+                const result = await softDelete("gamePlatforms", relation.id, deviceId);
+                if (result.notFound) {
+                  logger.warn("[handleCatalogConsolidateAliasGroup] gamePlatform não encontrada:", relation.id);
+                }
+              }
               continue;
             }
             if (relation.id != null) {
@@ -1708,7 +1812,10 @@ export function useBacklogActions({
           }
 
           for (const duplicateId of duplicateIds) {
-            await softDelete("platforms", duplicateId, deviceId);
+            const result = await softDelete("platforms", duplicateId, deviceId);
+            if (result.notFound) {
+              logger.warn("[handleCatalogConsolidateAliasGroup] platform não encontrada:", duplicateId);
+            }
           }
         });
       }

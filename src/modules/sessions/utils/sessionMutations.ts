@@ -2,6 +2,7 @@ import { recalculateLibraryEntryFromSessions } from "../../../core/catalogIntegr
 import { db } from "../../../core/db";
 import { generateUuid } from "../../../core/utils";
 import { softDelete, getDeviceId } from "../../../lib/softDelete";
+import { logger } from "../../../lib/logger";
 
 export type SessionMutationInput = {
   sessionId?: number | null;
@@ -110,13 +111,20 @@ export async function deletePlaySession(sessionId: number): Promise<number | nul
   const currentEntry = await db.libraryEntries.get(session.libraryEntryId);
   if (!currentEntry?.id) {
     const deviceId = await getDeviceId();
-    await softDelete("playSessions", sessionId, deviceId);
+    const result = await softDelete("playSessions", sessionId, deviceId);
+    if (result.notFound) {
+      logger.warn("[deletePlaySession] Sessão não encontrada para soft delete:", sessionId);
+    }
     return null;
   }
 
   const deviceId = await getDeviceId();
   await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
-    await softDelete("playSessions", session.id!, deviceId);
+    const result = await softDelete("playSessions", session.id!, deviceId);
+    if (result.notFound) {
+      logger.warn("[deletePlaySession] Sessão não encontrada durante transação:", session.id);
+      return;
+    }
     const snapshot = await readEntrySessionSnapshot(session.libraryEntryId);
     if (!snapshot) return;
 

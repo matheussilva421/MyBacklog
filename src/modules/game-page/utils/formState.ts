@@ -37,8 +37,8 @@ export function createGameFormState(game?: Game, defaults?: GameFormDefaults): G
     genre: game?.genre ?? "",
     status: game?.status ?? "Backlog",
     priority: game?.priority ?? "Média",
-    progress: game ? String(game.progress) : "0",
-    hours: game ? String(game.hours) : "0",
+    progress: game ? Number(game.progress) : 0,
+    hours: game ? Number(game.hours) : 0,
     eta: game?.eta ?? "12h",
     score: game ? String(game.score) : "",
     year: game ? String(game.year) : String(new Date().getFullYear()),
@@ -64,7 +64,7 @@ export function createDbGameFromForm(
   current?: { game: DbGameMetadata; libraryEntry: DbLibraryEntry },
 ): { game: DbGameMetadata; libraryEntry: DbLibraryEntry } {
   const progress = Math.max(0, Math.min(100, Math.round(Number(form.progress) || 0)));
-  const hours = Math.max(0, Number(form.hours) || 0);
+  const hours = Math.max(0, form.hours || 0);
   const rawgId = parseOptionalFiniteInteger(form.rawgId, current?.game.rawgId);
   const releaseYear = parseOptionalFiniteInteger(form.year, current?.game.releaseYear);
   const pricePaid = parseOptionalFiniteNumber(form.pricePaid, current?.libraryEntry.pricePaid);

@@ -105,10 +105,8 @@ export const AppCard = React.memo(function AppCard({
     className,
   );
 
-  const handleClick = onClick || undefined;
-
   return (
-    <Component className={classes} onClick={handleClick}>
+    <Component className={classes} onClick={onClick}>
       {children}
     </Component>
   );

@@ -233,12 +233,12 @@ describe("Database Migrations", () => {
           importJobs: "++id, source, status, createdAt, updatedAt",
         })
         .upgrade(async (tx) => {
-          const legacyGames = await tx.table("games").toArray();
+          const legacyGames = (await tx.table("games").toArray()) as LegacyGameRecord[];
 
-          const migratedGames = new Map<string, any>();
-          const migratedEntries: any[] = [];
+          const migratedGames = new Map<string, Game>();
+          const migratedEntries: LibraryEntry[] = [];
 
-          for (const legacy of legacyGames as any[]) {
+          for (const legacy of legacyGames) {
             if (!legacy.id) continue;
 
             const normalizedTitle = String(legacy.title || "")
@@ -298,7 +298,7 @@ describe("Database Migrations", () => {
           await tx
             .table("playSessions")
             .toCollection()
-            .modify((session: any) => {
+            .modify((session: Record<string, unknown>) => {
               session.libraryEntryId = session.gameId;
               delete session.gameId;
             });
@@ -306,7 +306,7 @@ describe("Database Migrations", () => {
           await tx
             .table("reviews")
             .toCollection()
-            .modify((review: any) => {
+            .modify((review: Record<string, unknown>) => {
               review.libraryEntryId = review.gameId;
               delete review.gameId;
             });
@@ -314,7 +314,7 @@ describe("Database Migrations", () => {
           await tx
             .table("gameTags")
             .toCollection()
-            .modify((entry: any) => {
+            .modify((entry: Record<string, unknown>) => {
               entry.libraryEntryId = entry.gameId;
               delete entry.gameId;
             });
@@ -525,7 +525,7 @@ describe("Database Migrations", () => {
         })
         .upgrade(async (tx) => {
           const entries = await tx.table("libraryEntries").toArray();
-          const migratedEntries = entries.map((entry: any) => ({
+          const migratedEntries = entries.map((entry: Record<string, unknown>) => ({
             ...entry,
             completionDate:
               entry.completionDate ||
@@ -541,8 +541,8 @@ describe("Database Migrations", () => {
       await testDbV4.open();
 
       const entries = await testDbV4.table("libraryEntries").toArray();
-      const finishedEntry = entries.find((e: any) => e.progressStatus === "finished");
-      const playingEntry = entries.find((e: any) => e.progressStatus === "playing");
+      const finishedEntry = entries.find((e: Record<string, unknown>) => e.progressStatus === "finished");
+      const playingEntry = entries.find((e: Record<string, unknown>) => e.progressStatus === "playing");
 
       expect(finishedEntry?.completionDate).toBe("2024-06-15");
       expect(playingEntry?.completionDate).toBeUndefined();
@@ -585,7 +585,7 @@ describe("Database Migrations", () => {
           const stores = await tx.table("stores").toArray();
           if (stores.length > 0) {
             await tx.table("stores").bulkPut(
-              stores.map((store: any) => ({
+              stores.map((store: Record<string, unknown>) => ({
                 ...store,
                 sourceKey:
                   store.sourceKey ??
@@ -608,9 +608,9 @@ describe("Database Migrations", () => {
       const stores = await testDbV5.table("stores").toArray();
       expect(stores.length).toBe(3);
 
-      const steam = stores.find((s: any) => s.name === "Steam");
-      const epic = stores.find((s: any) => s.name === "Epic Games Store");
-      const ps = stores.find((s: any) => s.name === "PlayStation Store");
+      const steam = stores.find((s: Record<string, unknown>) => s.name === "Steam");
+      const epic = stores.find((s: Record<string, unknown>) => s.name === "Epic Games Store");
+      const ps = stores.find((s: Record<string, unknown>) => s.name === "PlayStation Store");
 
       expect(steam?.sourceKey).toBe("steam");
       expect(epic?.sourceKey).toBe("epic");
@@ -704,7 +704,7 @@ describe("Database Migrations", () => {
 
           const games = await tx.table("games").toArray();
 
-          const sanitizedGames = games.map((game: any) => {
+          const sanitizedGames = games.map((game: Record<string, unknown>) => {
             const curated = curatedMetadataByTitle.get(
               String(game.title || "")
                 .trim()
@@ -730,8 +730,8 @@ describe("Database Migrations", () => {
       await testDbV6.open();
 
       const games = await testDbV6.table("games").toArray();
-      const hades = games.find((g: any) => g.title === "Hades");
-      const other = games.find((g: any) => g.title === "Some Other Game");
+      const hades = games.find((g: Record<string, unknown>) => g.title === "Hades");
+      const other = games.find((g: Record<string, unknown>) => g.title === "Some Other Game");
 
       // Hades should have been enriched from curated metadata
       expect(hades?.coverUrl).toBe("https://example.com/hades.jpg");
@@ -777,11 +777,11 @@ describe("Database Migrations", () => {
           importJobs: "++id, source, status, createdAt, updatedAt",
         })
         .upgrade(async (tx) => {
-          const legacyGames = await tx.table("games").toArray();
-          const migratedGames = new Map<string, any>();
-          const migratedEntries: any[] = [];
+          const legacyGames = (await tx.table("games").toArray()) as LegacyGameRecord[];
+          const migratedGames = new Map<string, Game>();
+          const migratedEntries: LibraryEntry[] = [];
 
-          for (const legacy of legacyGames as any[]) {
+          for (const legacy of legacyGames) {
             if (!legacy.id) continue;
             const normalizedTitle = String(legacy.title || "")
               .trim()
@@ -824,7 +824,7 @@ describe("Database Migrations", () => {
           await tx
             .table("playSessions")
             .toCollection()
-            .modify((session: any) => {
+            .modify((session: Record<string, unknown>) => {
               session.libraryEntryId = session.gameId;
               delete session.gameId;
             });
@@ -832,7 +832,7 @@ describe("Database Migrations", () => {
           await tx
             .table("reviews")
             .toCollection()
-            .modify((review: any) => {
+            .modify((review: Record<string, unknown>) => {
               review.libraryEntryId = review.gameId;
               delete review.gameId;
             });
@@ -840,7 +840,7 @@ describe("Database Migrations", () => {
           await tx
             .table("gameTags")
             .toCollection()
-            .modify((entry: any) => {
+            .modify((entry: Record<string, unknown>) => {
               entry.libraryEntryId = entry.gameId;
               delete entry.gameId;
             });
