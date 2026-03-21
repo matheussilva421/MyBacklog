@@ -12,7 +12,10 @@ function dedupeNames(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
-function buildRelationNamesByOwnerId<TRow extends { id?: number; name: string }, TRelation extends { createdAt?: string }>(
+function buildRelationNamesByOwnerId<
+  TRow extends { id?: number; name: string },
+  TRelation extends { createdAt?: string },
+>(
   rows: TRow[],
   relations: TRelation[],
   options: {
@@ -38,10 +41,7 @@ function buildRelationNamesByOwnerId<TRow extends { id?: number; name: string },
       ownerId,
       dedupeNames(
         values
-          .sort(
-            (left, right) =>
-              right.priority - left.priority || left.name.localeCompare(right.name, "pt-BR"),
-          )
+          .sort((left, right) => right.priority - left.priority || left.name.localeCompare(right.name, "pt-BR"))
           .map((row) => row.name),
       ),
     ]),
@@ -74,7 +74,7 @@ export function resolveStructuredStores(
   storeNamesByEntryId: Map<number, string[]>,
 ): string[] {
   return dedupeNames([
-    ...(libraryEntry.id != null ? storeNamesByEntryId.get(libraryEntry.id) ?? [] : []),
+    ...(libraryEntry.id != null ? (storeNamesByEntryId.get(libraryEntry.id) ?? []) : []),
     ...splitCsvTokens(libraryEntry.sourceStore),
   ]);
 }
@@ -85,7 +85,7 @@ export function resolveStructuredPlatforms(
   platformNamesByGameId: Map<number, string[]>,
 ): string[] {
   return dedupeNames([
-    ...(game.id != null ? platformNamesByGameId.get(game.id) ?? [] : []),
+    ...(game.id != null ? (platformNamesByGameId.get(game.id) ?? []) : []),
     ...splitCsvTokens(game.platforms),
     ...splitCsvTokens(primaryPlatform),
   ]);

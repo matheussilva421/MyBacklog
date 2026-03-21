@@ -147,9 +147,13 @@ export function useDashboardInsights({
       return game.status !== "Terminado" && game.status !== "Wishlist" && Boolean(cadence && cadence.sessions30d > 0);
     }).length;
     const finished = games.filter((game) => game.status === "Terminado").length;
-    const hours = Math.round(sessionRows.reduce((totalMinutes, session) => totalMinutes + session.durationMinutes, 0) / 60);
+    const hours = Math.round(
+      sessionRows.reduce((totalMinutes, session) => totalMinutes + session.durationMinutes, 0) / 60,
+    );
     const addedThisMonth = libraryEntryRows.filter((entry) => isSameMonth(entry.createdAt, now)).length;
-    const dormantBacklog = games.filter((game) => game.status === "Backlog" && sessionCadenceMap.get(game.id)?.isDormant).length;
+    const dormantBacklog = games.filter(
+      (game) => game.status === "Backlog" && sessionCadenceMap.get(game.id)?.isDormant,
+    ).length;
     const activeGames7d = games.filter((game) => (sessionCadenceMap.get(game.id)?.sessions7d || 0) > 0).length;
     const recentHours = Math.round(
       sessionRows
@@ -191,18 +195,10 @@ export function useDashboardInsights({
       .filter((game) => {
         const cadence = sessionCadenceMap.get(game.id);
         const isOperational =
-          game.status === "Jogando" ||
-          game.status === "Pausado" ||
-          Boolean(cadence && cadence.sessions30d > 0);
+          game.status === "Jogando" || game.status === "Pausado" || Boolean(cadence && cadence.sessions30d > 0);
         if (!isOperational || game.status === "Terminado" || game.status === "Wishlist") return false;
         if (!normalizedQuery) return true;
-        return [
-          game.title,
-          game.genre,
-          game.notes,
-          ...getGamePlatforms(game),
-          ...getGameStores(game),
-        ].some((value) =>
+        return [game.title, game.genre, game.notes, ...getGamePlatforms(game), ...getGameStores(game)].some((value) =>
           value.toLowerCase().includes(normalizedQuery),
         );
       })

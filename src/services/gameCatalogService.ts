@@ -1,9 +1,4 @@
-import {
-  createDbGameFromForm,
-  mergePlatformList,
-  type GameFormState,
-  type LibraryRecord,
-} from "../backlog/shared";
+import { createDbGameFromForm, mergePlatformList, type GameFormState, type LibraryRecord } from "../backlog/shared";
 import { db } from "../core/db";
 import { syncStructuredRelationsForRecord } from "../core/structuredDataSync";
 import {
@@ -16,10 +11,7 @@ import {
 } from "../core/structuredRelations";
 import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../core/types";
 import type { AppPreferences } from "../modules/settings/utils/preferences";
-import {
-  fetchRawgMetadata,
-  resolveBestRawgCandidate,
-} from "../modules/import-export/utils/rawg";
+import { fetchRawgMetadata, resolveBestRawgCandidate } from "../modules/import-export/utils/rawg";
 
 function logRawgWarning(message: string, error: unknown) {
   // eslint-disable-next-line no-console
@@ -79,15 +71,9 @@ export async function saveGameFromForm(args: {
 
   if (args.preferences.rawgApiKey.trim() && !current?.game.rawgId) {
     try {
-      const bestCandidate = await resolveBestRawgCandidate(
-        payload.game.title,
-        args.preferences.rawgApiKey.trim(),
-      );
+      const bestCandidate = await resolveBestRawgCandidate(payload.game.title, args.preferences.rawgApiKey.trim());
       if (bestCandidate) {
-        const metadata = await fetchRawgMetadata(
-          bestCandidate.rawgId,
-          args.preferences.rawgApiKey.trim(),
-        );
+        const metadata = await fetchRawgMetadata(bestCandidate.rawgId, args.preferences.rawgApiKey.trim());
         if (metadata) {
           payload = {
             game: {
@@ -97,10 +83,7 @@ export async function saveGameFromForm(args: {
               rawgId: payload.game.rawgId ?? metadata.rawgId,
               genres: payload.game.genres || metadata.genres,
               releaseYear: payload.game.releaseYear ?? metadata.releaseYear,
-              platforms: mergePlatformList(
-                payload.game.platforms || metadata.platforms,
-                payload.libraryEntry.platform,
-              ),
+              platforms: mergePlatformList(payload.game.platforms || metadata.platforms, payload.libraryEntry.platform),
               developer: payload.game.developer || metadata.developer,
               publisher: payload.game.publisher || metadata.publisher,
             },
@@ -116,22 +99,12 @@ export async function saveGameFromForm(args: {
   let entryId = payload.libraryEntry.id;
   await db.transaction(
     "rw",
-    [
-      db.games,
-      db.libraryEntries,
-      db.stores,
-      db.libraryEntryStores,
-      db.platforms,
-      db.gamePlatforms,
-    ],
+    [db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
     async () => {
       let gameId = payload.game.id;
       let persistedGame = payload.game;
       if (gameId == null) {
-        const existingMetadata = await db.games
-          .where("normalizedTitle")
-          .equals(payload.game.normalizedTitle)
-          .first();
+        const existingMetadata = await db.games.where("normalizedTitle").equals(payload.game.normalizedTitle).first();
 
         if (existingMetadata?.id != null) {
           gameId = existingMetadata.id;
@@ -139,10 +112,7 @@ export async function saveGameFromForm(args: {
             ...existingMetadata,
             ...payload.game,
             id: existingMetadata.id,
-            platforms: mergePlatformList(
-              existingMetadata.platforms,
-              payload.libraryEntry.platform,
-            ),
+            platforms: mergePlatformList(existingMetadata.platforms, payload.libraryEntry.platform),
           };
           await db.games.put(persistedGame);
         } else {

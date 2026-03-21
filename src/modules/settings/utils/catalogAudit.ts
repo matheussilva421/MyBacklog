@@ -58,22 +58,16 @@ const metadataLabels: Record<string, string> = {
 };
 
 function summarizeMetadataGaps(game: Game, structuredPlatforms: string[] = []): string[] {
-  return [
-    "coverUrl",
-    "genres",
-    "estimatedTime",
-    "platforms",
-    "developer",
-    "publisher",
-    "releaseYear",
-  ].filter((field) => {
-    if (field === "platforms") {
-      return structuredPlatforms.length === 0;
-    }
-    const value = game[field as keyof Game];
-    if (typeof value === "number") return !Number.isFinite(value);
-    return !String(value || "").trim();
-  });
+  return ["coverUrl", "genres", "estimatedTime", "platforms", "developer", "publisher", "releaseYear"].filter(
+    (field) => {
+      if (field === "platforms") {
+        return structuredPlatforms.length === 0;
+      }
+      const value = game[field as keyof Game];
+      if (typeof value === "number") return !Number.isFinite(value);
+      return !String(value || "").trim();
+    },
+  );
 }
 
 function buildMetadataIssue(
@@ -190,11 +184,7 @@ export function buildCatalogAuditReport(args: {
     }
 
     const metadataIssue = game
-      ? buildMetadataIssue(
-          game,
-          resolveStructuredPlatforms(game, entry.platform, platformNamesByGameId),
-          entry.id,
-        )
+      ? buildMetadataIssue(game, resolveStructuredPlatforms(game, entry.platform, platformNamesByGameId), entry.id)
       : null;
     if (metadataIssue) issues.push(metadataIssue);
 

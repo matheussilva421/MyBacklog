@@ -39,10 +39,7 @@ function getMaxWeeklyHours(sessionRows: PlaySession[]) {
 
 function getMaxFinishedInSevenDays(libraryEntryRows: LibraryEntry[]) {
   const finishedDates = libraryEntryRows
-    .filter(
-      (entry) =>
-        entry.progressStatus === "finished" || entry.progressStatus === "completed_100",
-    )
+    .filter((entry) => entry.progressStatus === "finished" || entry.progressStatus === "completed_100")
     .map((entry) => parseDateInput(entry.updatedAt).getTime())
     .filter((value) => Number.isFinite(value))
     .sort((left, right) => left - right);

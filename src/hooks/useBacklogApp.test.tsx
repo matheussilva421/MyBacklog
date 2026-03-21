@@ -292,9 +292,7 @@ describe("useBacklogApp", () => {
   it("opens the game page with the selected id", () => {
     const setScreen = vi.fn();
     const setSelectedGameId = vi.fn();
-    useBacklogUiStateMock.mockReturnValue(
-      createBaseUiState({ setScreen, setSelectedGameId }),
-    );
+    useBacklogUiStateMock.mockReturnValue(createBaseUiState({ setScreen, setSelectedGameId }));
 
     const { result } = renderHook(() => useBacklogApp());
     result.current.openGamePage(7);
@@ -334,33 +332,33 @@ describe("useBacklogApp", () => {
     const setSelectedLibraryIds = vi.fn();
     useBacklogDataStateMock.mockReturnValue(
       createBaseDataState({
-      gameRows: [
-        {
-          id: 1,
-          title: "Cyberpunk 2077",
-          normalizedTitle: "cyberpunk 2077",
-          platforms: "PC",
-          createdAt: "2026-03-01T00:00:00.000Z",
-          updatedAt: "2026-03-01T00:00:00.000Z",
-        },
-      ],
-      libraryEntryRows: [
-        {
-          id: 7,
-          gameId: 1,
-          platform: "PC",
-          sourceStore: "Steam",
-          format: "digital",
-          ownershipStatus: "owned",
-          progressStatus: "playing",
-          priority: "high",
-          completionPercent: 62,
-          playtimeMinutes: 1440,
-          favorite: false,
-          createdAt: "2026-03-01T00:00:00.000Z",
-          updatedAt: "2026-03-10T00:00:00.000Z",
-        },
-      ],
+        gameRows: [
+          {
+            id: 1,
+            title: "Cyberpunk 2077",
+            normalizedTitle: "cyberpunk 2077",
+            platforms: "PC",
+            createdAt: "2026-03-01T00:00:00.000Z",
+            updatedAt: "2026-03-01T00:00:00.000Z",
+          },
+        ],
+        libraryEntryRows: [
+          {
+            id: 7,
+            gameId: 1,
+            platform: "PC",
+            sourceStore: "Steam",
+            format: "digital",
+            ownershipStatus: "owned",
+            progressStatus: "playing",
+            priority: "high",
+            completionPercent: 62,
+            playtimeMinutes: 1440,
+            favorite: false,
+            createdAt: "2026-03-01T00:00:00.000Z",
+            updatedAt: "2026-03-10T00:00:00.000Z",
+          },
+        ],
       }),
     );
     useBacklogUiStateMock.mockReturnValue(

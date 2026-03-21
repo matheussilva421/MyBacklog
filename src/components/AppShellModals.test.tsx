@@ -103,11 +103,7 @@ describe("AppShellModals", () => {
 
     await screen.findByText("game-modal");
 
-    rerender(
-      <AppShellModals
-        app={createAppState({ gameModalMode: "create", importModalOpen: true }) as never}
-      />,
-    );
+    rerender(<AppShellModals app={createAppState({ gameModalMode: "create", importModalOpen: true }) as never} />);
 
     await waitFor(() => {
       expect(screen.getByText("import-modal")).toBeInTheDocument();

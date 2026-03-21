@@ -4,8 +4,7 @@ import type { ScreenKey } from "../../backlog/shared";
 export function useGuidedTourState() {
   const [guidedTourOpen, setGuidedTourOpen] = useState(false);
   const [guidedTourStepIndex, setGuidedTourStepIndex] = useState(0);
-  const [guidedTourOriginScreen, setGuidedTourOriginScreen] =
-    useState<ScreenKey>("dashboard");
+  const [guidedTourOriginScreen, setGuidedTourOriginScreen] = useState<ScreenKey>("dashboard");
 
   const openGuidedTour = useCallback((originScreen: ScreenKey) => {
     setGuidedTourOriginScreen(originScreen);

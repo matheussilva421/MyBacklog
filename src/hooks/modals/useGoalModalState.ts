@@ -29,10 +29,8 @@ export function useGoalModalState() {
 
   const closeGoalModal = () => setGoalModalMode(null);
 
-  const handleGoalFormChange = <K extends keyof GoalFormState>(
-    field: K,
-    value: GoalFormState[K],
-  ) => setGoalForm((current) => ({ ...current, [field]: value }));
+  const handleGoalFormChange = <K extends keyof GoalFormState>(field: K, value: GoalFormState[K]) =>
+    setGoalForm((current) => ({ ...current, [field]: value }));
 
   return {
     goalModalMode,

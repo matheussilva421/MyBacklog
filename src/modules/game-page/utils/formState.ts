@@ -2,7 +2,7 @@ import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../
 import { mergePlatformList, normalizeGameTitle, priorityToDbPriority, statusToDbStatus } from "../../../backlog/shared";
 import type { Game, GameFormState } from "../../../backlog/shared";
 import { deriveCompletionDate } from "../../../core/catalogIntegrity";
-import { getPrimaryCsvToken, splitCsvTokens } from "../../../core/utils";
+import { generateUuid, getPrimaryCsvToken, splitCsvTokens } from "../../../core/utils";
 
 type GameFormDefaults = {
   platform?: string;
@@ -22,7 +22,9 @@ function parseOptionalFiniteInteger(value: string, fallback?: number): number | 
 }
 
 export function createGameFormState(game?: Game, defaults?: GameFormDefaults): GameFormState {
-  const platforms = splitCsvTokens(game?.platforms ?? game?.catalogPlatforms ?? game?.platform ?? defaults?.platform ?? "PC");
+  const platforms = splitCsvTokens(
+    game?.platforms ?? game?.catalogPlatforms ?? game?.platform ?? defaults?.platform ?? "PC",
+  );
   const stores = splitCsvTokens(game?.stores ?? game?.sourceStore ?? defaults?.sourceStore ?? "Manual");
 
   return {
@@ -75,10 +77,13 @@ export function createDbGameFromForm(
   const now = new Date().toISOString();
   const progressStatus = statusToDbStatus(form.status);
   const completionPercent = form.status === "Terminado" ? 100 : progress;
+  const ownershipStatus = form.status === "Wishlist" ? "wishlist" : "owned";
 
   return {
     game: {
       id: current?.game.id,
+      uuid: current?.game.uuid || generateUuid(),
+      version: current?.game.version || 1,
       title,
       normalizedTitle: normalizeGameTitle(title),
       slug: current?.game.slug,
@@ -97,12 +102,14 @@ export function createDbGameFromForm(
     },
     libraryEntry: {
       id: current?.libraryEntry.id,
+      uuid: current?.libraryEntry.uuid || generateUuid(),
+      version: current?.libraryEntry.version || 1,
       gameId: current?.game.id ?? 0,
       platform,
       sourceStore: getPrimaryCsvToken(structuredStores, current?.libraryEntry.sourceStore || "Manual"),
       edition: current?.libraryEntry.edition,
       format: current?.libraryEntry.format || "digital",
-      ownershipStatus: form.status === "Wishlist" ? "wishlist" : "owned",
+      ownershipStatus,
       progressStatus,
       purchaseDate: form.purchaseDate.trim() || current?.libraryEntry.purchaseDate,
       pricePaid,

@@ -1,9 +1,6 @@
 import { useState } from "react";
 import type { PlaySession as DbPlaySession } from "../../core/types";
-import {
-  createSessionFormState,
-  type SessionFormState,
-} from "../../backlog/shared";
+import { createSessionFormState, type SessionFormState } from "../../backlog/shared";
 
 export function useSessionModalState() {
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
@@ -28,18 +25,15 @@ export function useSessionModalState() {
       gameId: String(session.libraryEntryId),
       date: session.date,
       durationMinutes: String(session.durationMinutes),
-      completionPercent:
-        session.completionPercent != null ? String(session.completionPercent) : "",
+      completionPercent: session.completionPercent != null ? String(session.completionPercent) : "",
       mood: session.mood ?? "",
       note: session.note ?? "",
     });
     setSessionModalOpen(true);
   };
 
-  const handleSessionFormChange = <K extends keyof SessionFormState>(
-    field: K,
-    value: SessionFormState[K],
-  ) => setSessionForm((current) => ({ ...current, [field]: value }));
+  const handleSessionFormChange = <K extends keyof SessionFormState>(field: K, value: SessionFormState[K]) =>
+    setSessionForm((current) => ({ ...current, [field]: value }));
 
   return {
     sessionModalOpen,

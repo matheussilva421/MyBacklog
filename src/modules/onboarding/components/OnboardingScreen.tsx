@@ -3,11 +3,7 @@ import { CheckCircle2, Cpu, Flag, ListChecks, Rocket } from "lucide-react";
 import { NotchButton, Panel, Pill, SectionHeader, Tag } from "../../../components/cyberpunk-ui";
 import { PreferencesFields } from "../../settings/components/PreferencesFields";
 import type { PreferencesDraft } from "../../settings/utils/preferences";
-import {
-  onboardingGoalTemplates,
-  suggestedStarterLists,
-  toggleTokenInText,
-} from "../../settings/utils/preferences";
+import { onboardingGoalTemplates, suggestedStarterLists, toggleTokenInText } from "../../settings/utils/preferences";
 
 type OnboardingScreenProps = {
   initialDraft: PreferencesDraft;
@@ -83,8 +79,8 @@ export function OnboardingScreen({
                 Configure o <span>seu operador</span>
               </h2>
               <p>
-                Defina plataformas, lojas, listas iniciais, metas táticas e uma chave RAWG opcional.
-                Esses defaults passam a influenciar criação, importação e o planner.
+                Defina plataformas, lojas, listas iniciais, metas táticas e uma chave RAWG opcional. Esses defaults
+                passam a influenciar criação, importação e o planner.
               </p>
             </div>
           </div>

@@ -28,7 +28,7 @@ import {
   resolveStructuredStores,
 } from "../../../core/structuredRelations";
 import { buildPlaySessionDedupKey } from "../../../core/playSessionIdentity";
-import { normalizeGameTitle } from "../../../core/utils";
+import { generateUuid, normalizeGameTitle } from "../../../core/utils";
 import {
   mergeGameMetadata,
   mergeLibraryEntries,
@@ -209,9 +209,7 @@ export function buildSemanticFingerprint(tables: SyncTables): string {
 
   // Excluir settings de sync (sempre diferem)
   const settingsForFingerprint = sanitizedTables.settings.filter(
-    (setting) =>
-      !localOnlySyncSettingKeys.has(setting.key) &&
-      setting.key !== syncSettingsKeys.autoSyncEnabled,
+    (setting) => !localOnlySyncSettingKeys.has(setting.key) && setting.key !== syncSettingsKeys.autoSyncEnabled,
   );
 
   return JSON.stringify({
@@ -344,7 +342,12 @@ export function canAutoMerge(localTables: SyncTables, cloudTables: SyncTables | 
   for (const [entryId, localReview] of localReviewsByEntryId.entries()) {
     const cloudReview = cloudReviewsByEntryId.get(entryId);
     // Conflito real: mesma review com score diferente (ambos têm score definido e são diferentes)
-    if (cloudReview && localReview.score != null && cloudReview.score != null && localReview.score !== cloudReview.score) {
+    if (
+      cloudReview &&
+      localReview.score != null &&
+      cloudReview.score != null &&
+      localReview.score !== cloudReview.score
+    ) {
       return false;
     }
   }
@@ -398,10 +401,7 @@ export function buildSyncComparison(
   mergedAt?: string | null,
 ): SyncComparison {
   const sanitizedLocalTables = sanitizeSyncTables(localTables);
-  const { decision, localFingerprint, cloudFingerprint } = resolveInitialSyncDecision(
-    sanitizedLocalTables,
-    cloudData,
-  );
+  const { decision, localFingerprint, cloudFingerprint } = resolveInitialSyncDecision(sanitizedLocalTables, cloudData);
   const cloudTables = cloudData ? stripBackupMeta(cloudData) : null;
 
   const blocks = (Object.keys(syncBlockLabels) as SyncBlockKey[]).map((key) => {
@@ -430,16 +430,8 @@ export function buildSyncComparison(
     else if (localCount === cloudCount && decision === "auto-merge") {
       // Contagens iguais + auto-merge = blocos compatíveis (não mostrar como divergente)
       state = "same";
-    } else if (localCount > 0 && cloudCount === 0 && decision === "auto-merge") {
-      // Pós-auto-merge: blocos que estavam só na nuvem foram incorporados localmente
-      // Marcar como "same" pois foram reconciliados
-      state = "same";
     } else if (localCount === cloudCount && decision === "match") {
       // Decision match já indica que os dados são semanticamente iguais
-      state = "same";
-    } else if (decision === "match" && localCount > 0 && cloudCount === 0) {
-      // Pós-merge manual: blocos reconciliados aparecem só no local mas decision é match
-      // Isso significa que foram incorporados com sucesso
       state = "same";
     }
 
@@ -531,17 +523,17 @@ function mergeListRows(rows: ScopedList[]) {
   const idMap = new Map<string, number>();
   let nextId = 1;
 
-  for (const [, group] of Array.from(groups.entries()).sort((left, right) =>
-    left[0].localeCompare(right[0]),
-  )) {
-    const primary = [...group].sort((left, right) =>
-      left.row.createdAt.localeCompare(right.row.createdAt),
-    )[0].row;
+  for (const [, group] of Array.from(groups.entries()).sort((left, right) => left[0].localeCompare(right[0]))) {
+    const primary = [...group].sort((left, right) => left.row.createdAt.localeCompare(right.row.createdAt))[0].row;
     const nextIdValue = nextId++;
     mergedRows.push({
       id: nextIdValue,
+      uuid: generateUuid(),
+      version: 1,
       name: primary.name,
       createdAt: primary.createdAt,
+      updatedAt: primary.updatedAt || primary.createdAt,
+      deletedAt: null,
     });
     for (const item of group) {
       if (item.row.id != null) {
@@ -568,15 +560,17 @@ function mergeTagRows(rows: ScopedTag[]) {
   const idMap = new Map<string, number>();
   let nextId = 1;
 
-  for (const [, group] of Array.from(groups.entries()).sort((left, right) =>
-    left[0].localeCompare(right[0]),
-  )) {
-    const primary = [...group].sort((left, right) => left.row.name.localeCompare(right.row.name))[0]
-      .row;
+  for (const [, group] of Array.from(groups.entries()).sort((left, right) => left[0].localeCompare(right[0]))) {
+    const primary = [...group].sort((left, right) => left.row.name.localeCompare(right.row.name))[0].row;
     const nextIdValue = nextId++;
     mergedRows.push({
       id: nextIdValue,
+      uuid: generateUuid(),
+      version: 1,
       name: primary.name,
+      createdAt: primary.createdAt || new Date().toISOString(),
+      updatedAt: primary.updatedAt || primary.createdAt || new Date().toISOString(),
+      deletedAt: null,
     });
     for (const item of group) {
       if (item.row.id != null) {
@@ -608,11 +602,14 @@ function mergeStoreRows(rows: ScopedStore[]) {
     const nextIdValue = nextId++;
     mergedRows.push({
       id: nextIdValue,
+      uuid: generateUuid(),
+      version: 1,
       name: primary.name,
       normalizedName: primary.normalizedName || primary.name.trim().toLowerCase(),
       sourceKey: group.find((item) => item.row.sourceKey)?.row.sourceKey ?? primary.sourceKey,
-      createdAt: primary.createdAt,
-      updatedAt: primary.updatedAt,
+      createdAt: primary.createdAt || new Date().toISOString(),
+      updatedAt: primary.updatedAt || primary.createdAt || new Date().toISOString(),
+      deletedAt: null,
     });
     for (const item of group) {
       if (item.row.id != null) idMap.set(`${item.scope}:${item.row.id}`, nextIdValue);
@@ -642,10 +639,13 @@ function mergePlatformRows(rows: ScopedPlatform[]) {
     const nextIdValue = nextId++;
     mergedRows.push({
       id: nextIdValue,
+      uuid: generateUuid(),
+      version: 1,
       name: primary.name,
       normalizedName: primary.normalizedName || primary.name.trim().toLowerCase(),
-      createdAt: primary.createdAt,
-      updatedAt: primary.updatedAt,
+      createdAt: primary.createdAt || new Date().toISOString(),
+      updatedAt: primary.updatedAt || primary.createdAt || new Date().toISOString(),
+      deletedAt: null,
     });
     for (const item of group) {
       if (item.row.id != null) idMap.set(`${item.scope}:${item.row.id}`, nextIdValue);
@@ -669,9 +669,7 @@ function mergeGameRows(rows: ScopedGame[]) {
   const idMap = new Map<string, number>();
   let nextId = 1;
 
-  for (const [key, group] of Array.from(groups.entries()).sort((left, right) =>
-    left[0].localeCompare(right[0]),
-  )) {
+  for (const [key, group] of Array.from(groups.entries()).sort((left, right) => left[0].localeCompare(right[0]))) {
     let merged = { ...group[0].row, normalizedTitle: key };
     for (const item of group.slice(1)) {
       merged = mergeGameMetadata(merged, item.row);
@@ -694,11 +692,7 @@ function mergeGameRows(rows: ScopedGame[]) {
   return { rows: mergedRows, idMap };
 }
 
-function mergeEntryRows(args: {
-  localTables: SyncTables;
-  cloudTables: SyncTables;
-  gameIdMap: Map<string, number>;
-}) {
+function mergeEntryRows(args: { localTables: SyncTables; cloudTables: SyncTables; gameIdMap: Map<string, number> }) {
   const groups = new Map<string, Array<ScopedStructuredLibraryEntry>>();
   const scopedSessions = new Map<string, ScopedSession[]>();
   const scopedReviews = new Map<string, ScopedReview[]>();
@@ -835,9 +829,7 @@ function mergeEntryRows(args: {
         {
           ...primaryScoped.row,
           id: nextId,
-          gameId:
-            args.gameIdMap.get(`${primaryScoped.scope}:${primaryScoped.row.gameId}`) ??
-            primaryScoped.row.gameId,
+          gameId: args.gameIdMap.get(`${primaryScoped.scope}:${primaryScoped.row.gameId}`) ?? primaryScoped.row.gameId,
         },
         duplicateScoped.map((entry) => ({
           ...entry.row,
@@ -849,15 +841,11 @@ function mergeEntryRows(args: {
       mergedRows.push({
         ...mergedEntry,
         id: nextId,
-        gameId:
-          args.gameIdMap.get(`${primaryScoped.scope}:${primaryScoped.row.gameId}`) ??
-          mergedEntry.gameId,
+        gameId: args.gameIdMap.get(`${primaryScoped.scope}:${primaryScoped.row.gameId}`) ?? mergedEntry.gameId,
       });
       mergedSessionsByEntryId.set(nextId, normalizedSessions);
 
-      const sourceReviews = group.flatMap(
-        (entry) => scopedReviews.get(`${entry.scope}:${entry.row.id}`) ?? [],
-      );
+      const sourceReviews = group.flatMap((entry) => scopedReviews.get(`${entry.scope}:${entry.row.id}`) ?? []);
       const mergedReview = sourceReviews.reduce<Review | undefined>(
         (current, review) =>
           mergeReviewRecords(
@@ -871,10 +859,7 @@ function mergeEntryRows(args: {
           ),
         undefined,
       );
-      mergedReviewsByEntryId.set(
-        nextId,
-        mergedReview ? { ...mergedReview, libraryEntryId: nextId } : undefined,
-      );
+      mergedReviewsByEntryId.set(nextId, mergedReview ? { ...mergedReview, libraryEntryId: nextId } : undefined);
 
       for (const item of group) {
         if (item.row.id != null) {
@@ -933,12 +918,17 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
     const key = `${nextEntryId}::${nextStoreId}`;
     if (libraryEntryStoreKeys.has(key)) continue;
     libraryEntryStoreKeys.add(key);
+    const now = new Date().toISOString();
     mergedLibraryEntryStores.push({
       id: nextLibraryEntryStoreId++,
+      uuid: generateUuid(),
+      version: 1,
       libraryEntryId: nextEntryId,
       storeId: nextStoreId,
       isPrimary: relation.row.isPrimary,
-      createdAt: relation.row.createdAt,
+      createdAt: relation.row.createdAt || now,
+      updatedAt: now,
+      deletedAt: null,
     });
   }
 
@@ -961,11 +951,16 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
     const key = `${nextGameId}::${nextPlatformId}`;
     if (gamePlatformKeys.has(key)) continue;
     gamePlatformKeys.add(key);
+    const now = new Date().toISOString();
     mergedGamePlatforms.push({
       id: nextGamePlatformId++,
+      uuid: generateUuid(),
+      version: 1,
       gameId: nextGameId,
       platformId: nextPlatformId,
-      createdAt: relation.row.createdAt,
+      createdAt: relation.row.createdAt || now,
+      updatedAt: now,
+      deletedAt: null,
     });
   }
 
@@ -973,9 +968,7 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
   let nextSessionId = 1;
   const sessionSignatures = new Set<string>();
 
-  for (const [entryId, sessions] of Array.from(sessionsByEntryId.entries()).sort(
-    (left, right) => left[0] - right[0],
-  )) {
+  for (const [entryId, sessions] of Array.from(sessionsByEntryId.entries()).sort((left, right) => left[0] - right[0])) {
     for (const session of sessions) {
       const signature = buildPlaySessionDedupKey(entryId, session);
       if (sessionSignatures.has(signature)) continue;
@@ -990,9 +983,7 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
 
   const mergedReviews: Review[] = [];
   let nextReviewId = 1;
-  for (const [entryId, review] of Array.from(reviewsByEntryId.entries()).sort(
-    (left, right) => left[0] - right[0],
-  )) {
+  for (const [entryId, review] of Array.from(reviewsByEntryId.entries()).sort((left, right) => left[0] - right[0])) {
     if (!review) continue;
     mergedReviews.push({
       ...review,
@@ -1020,11 +1011,16 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
     const key = `${nextEntryId}::${nextListId}`;
     if (relationKeys.has(key)) continue;
     relationKeys.add(key);
+    const now = new Date().toISOString();
     mergedLibraryEntryLists.push({
       id: nextLibraryEntryListId++,
+      uuid: generateUuid(),
+      version: 1,
       libraryEntryId: nextEntryId,
       listId: nextListId,
-      createdAt: relation.row.createdAt,
+      createdAt: relation.row.createdAt || now,
+      updatedAt: now,
+      deletedAt: null,
     });
   }
 
@@ -1047,10 +1043,16 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
     const key = `${nextEntryId}::${nextTagId}`;
     if (gameTagKeys.has(key)) continue;
     gameTagKeys.add(key);
+    const now = new Date().toISOString();
     mergedGameTags.push({
       id: nextGameTagId++,
+      uuid: generateUuid(),
+      version: 1,
       libraryEntryId: nextEntryId,
       tagId: nextTagId,
+      createdAt: relation.row.createdAt || now,
+      updatedAt: now,
+      deletedAt: null,
     });
   }
 
@@ -1064,13 +1066,12 @@ export function mergeSyncTables(localTables: SyncTables, cloudTables: SyncTables
     .sort((left, right) => `${left.type}:${left.period}`.localeCompare(`${right.type}:${right.period}`))
     .map((goal, index) => ({ ...goal, id: index + 1 }));
 
-  const mergedSettings = mergeSettingRows([
-    ...sanitizedLocalTables.settings,
-    ...sanitizedCloudTables.settings,
-  ]).map((setting, index) => ({
-    ...setting,
-    id: index + 1,
-  }));
+  const mergedSettings = mergeSettingRows([...sanitizedLocalTables.settings, ...sanitizedCloudTables.settings]).map(
+    (setting, index) => ({
+      ...setting,
+      id: index + 1,
+    }),
+  );
 
   const mergedSavedViews = mergeSavedViewRows([
     ...sanitizedLocalTables.savedViews.map((row) => ({ scope: "local" as const, row })),

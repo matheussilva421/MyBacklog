@@ -14,14 +14,7 @@ import {
   Upload,
 } from "lucide-react";
 import { cx } from "../../../backlog/shared";
-import {
-  EmptyState,
-  Modal,
-  NotchButton,
-  Panel,
-  Pill,
-  SectionHeader,
-} from "../../../components/cyberpunk-ui";
+import { EmptyState, Modal, NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 import type { SyncMode } from "../../../hooks/useCloudSync";
 import type { SyncComparison } from "../utils/syncEngine";
 import type { SyncHistoryEntry } from "../utils/syncStorage";
@@ -88,8 +81,7 @@ function describeMode(mode: SyncMode, isAuthEnabled: boolean) {
     case "conflict":
       return {
         title: "Conflito detectado",
-        description:
-          "A base local e a nuvem divergem. Resolva pela Central de Sync antes de retomar o auto-sync.",
+        description: "A base local e a nuvem divergem. Resolva pela Central de Sync antes de retomar o auto-sync.",
         tone: "magenta" as const,
         icon: AlertTriangle,
       };
@@ -104,8 +96,7 @@ function describeMode(mode: SyncMode, isAuthEnabled: boolean) {
     case "auth-required":
       return {
         title: "Login necessário",
-        description:
-          "Faça login para acessar snapshot remoto, comparar divergências e sincronizar seus dados.",
+        description: "Faça login para acessar snapshot remoto, comparar divergências e sincronizar seus dados.",
         tone: "cyan" as const,
         icon: Cloud,
       };
@@ -113,8 +104,7 @@ function describeMode(mode: SyncMode, isAuthEnabled: boolean) {
     default:
       return {
         title: "Trabalhando localmente",
-        description:
-          "O modo local está ativo e a sincronização automática ficou pausada até uma nova ação manual.",
+        description: "O modo local está ativo e a sincronização automática ficou pausada até uma nova ação manual.",
         tone: "neutral" as const,
         icon: HardDriveDownload,
       };
@@ -217,11 +207,11 @@ export function SyncCenterScreen({
   const isConflict = syncMode === "conflict" && comparison?.decision === "conflict";
   const wasMerged = Boolean(comparison?.mergedAt);
   const divergentBlocks = useMemo(
-    () => wasMerged ? [] : comparison?.blocks.filter((block) => block.state !== "same") ?? [],
+    () => (wasMerged ? [] : (comparison?.blocks.filter((block) => block.state !== "same") ?? [])),
     [comparison, wasMerged],
   );
   const displayedBlocks =
-    isConflict && divergentBlocks.length > 0 && !wasMerged ? divergentBlocks : comparison?.blocks ?? [];
+    isConflict && divergentBlocks.length > 0 && !wasMerged ? divergentBlocks : (comparison?.blocks ?? []);
   const conflictStats = useMemo(
     () =>
       divergentBlocks.reduce(
@@ -317,8 +307,8 @@ export function SyncCenterScreen({
               <div>
                 <strong>Resolução manual obrigatória</strong>
                 <p>
-                  O auto-sync foi pausado porque local e nuvem divergem. Revise os blocos abaixo e
-                  escolha conscientemente qual lado deve prevalecer.
+                  O auto-sync foi pausado porque local e nuvem divergem. Revise os blocos abaixo e escolha
+                  conscientemente qual lado deve prevalecer.
                 </p>
               </div>
             </div>
@@ -328,15 +318,9 @@ export function SyncCenterScreen({
               <Pill tone="yellow">
                 {divergentBlocks.length} bloco{divergentBlocks.length === 1 ? "" : "s"} em conflito
               </Pill>
-              {conflictStats.localOnly > 0 ? (
-                <Pill tone="cyan">{conflictStats.localOnly} só local</Pill>
-              ) : null}
-              {conflictStats.cloudOnly > 0 ? (
-                <Pill tone="magenta">{conflictStats.cloudOnly} só nuvem</Pill>
-              ) : null}
-              {conflictStats.different > 0 ? (
-                <Pill tone="yellow">{conflictStats.different} divergentes</Pill>
-              ) : null}
+              {conflictStats.localOnly > 0 ? <Pill tone="cyan">{conflictStats.localOnly} só local</Pill> : null}
+              {conflictStats.cloudOnly > 0 ? <Pill tone="magenta">{conflictStats.cloudOnly} só nuvem</Pill> : null}
+              {conflictStats.different > 0 ? <Pill tone="yellow">{conflictStats.different} divergentes</Pill> : null}
             </div>
 
             <div className="sync-conflict-chip-list">
@@ -384,9 +368,7 @@ export function SyncCenterScreen({
         </div>
 
         <div className="sync-helper-row">
-          <Pill tone={isAuthEnabled ? "cyan" : "neutral"}>
-            {isAuthEnabled ? "Cloud auth pronta" : "Somente local"}
-          </Pill>
+          <Pill tone={isAuthEnabled ? "cyan" : "neutral"}>{isAuthEnabled ? "Cloud auth pronta" : "Somente local"}</Pill>
           <NotchButton variant="ghost" onClick={onOpenSettings}>
             <RefreshCcw size={15} />
             Abrir configurações
@@ -409,8 +391,8 @@ export function SyncCenterScreen({
             </Pill>
           </div>
           <p className="sync-danger-panel__hint">
-            Isso apaga jogos, biblioteca, sessões, reviews, listas, tags, metas, views salvas e
-            histórico de importação. Use apenas quando quiser começar novamente.
+            Isso apaga jogos, biblioteca, sessões, reviews, listas, tags, metas, views salvas e histórico de importação.
+            Use apenas quando quiser começar novamente.
           </p>
           {!canResetEverywhere ? (
             <p className="sync-danger-panel__hint">
@@ -453,13 +435,23 @@ export function SyncCenterScreen({
         />
 
         {wasMerged && (
-          <div className="sync-merged-banner" style={{ padding: 12, marginBottom: 16, background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.3)", borderRadius: 4 }}>
+          <div
+            className="sync-merged-banner"
+            style={{
+              padding: 12,
+              marginBottom: 16,
+              background: "rgba(34, 197, 94, 0.1)",
+              border: "1px solid rgba(34, 197, 94, 0.3)",
+              borderRadius: 4,
+            }}
+          >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <ShieldCheck size={18} color="#22c55e" />
               <div>
                 <strong style={{ color: "#22c55e" }}>Merge completado com sucesso</strong>
                 <p style={{ margin: 0, fontSize: 13, color: "#9ca3af" }}>
-                  Todos os blocos foram reconciliados. Última sync: {formatDateTime(comparison?.cloudExportedAt ?? null)}
+                  Todos os blocos foram reconciliados. Última sync:{" "}
+                  {formatDateTime(comparison?.cloudExportedAt ?? null)}
                 </p>
               </div>
             </div>
@@ -486,8 +478,12 @@ export function SyncCenterScreen({
                   const blockState = describeBlockState(block.state);
                   return (
                     <tr key={block.key}>
-                      <td><strong>{block.label}</strong></td>
-                      <td><Pill tone={blockState.tone}>{blockState.label}</Pill></td>
+                      <td>
+                        <strong>{block.label}</strong>
+                      </td>
+                      <td>
+                        <Pill tone={blockState.tone}>{blockState.label}</Pill>
+                      </td>
                       <td>{block.localCount}</td>
                       <td>{block.cloudCount}</td>
                     </tr>
@@ -601,8 +597,8 @@ export function SyncCenterScreen({
 
             <div className="sync-reset-confirmation__body">
               <p>
-                Depois da confirmação, a base local será zerada e o app voltará ao onboarding. Os
-                dados apagados não serão recuperados por merge, restore automático ou sync futura.
+                Depois da confirmação, a base local será zerada e o app voltará ao onboarding. Os dados apagados não
+                serão recuperados por merge, restore automático ou sync futura.
               </p>
               <div className="sync-reset-confirmation__impact">
                 <strong>Isso remove:</strong>

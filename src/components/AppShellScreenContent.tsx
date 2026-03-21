@@ -26,14 +26,8 @@ function lazyNamed<TModule extends Record<string, unknown>, TKey extends keyof T
   });
 }
 
-const DashboardScreen = lazyNamed(
-  () => import("../modules/dashboard/components/DashboardScreen"),
-  "DashboardScreen",
-);
-const LibraryScreen = lazyNamed(
-  () => import("../modules/library/components/LibraryScreen"),
-  "LibraryScreen",
-);
+const DashboardScreen = lazyNamed(() => import("../modules/dashboard/components/DashboardScreen"), "DashboardScreen");
+const LibraryScreen = lazyNamed(() => import("../modules/library/components/LibraryScreen"), "LibraryScreen");
 const CatalogMaintenanceScreen = lazyNamed(
   () => import("../modules/catalog-maintenance/components/CatalogMaintenanceScreen"),
   "CatalogMaintenanceScreen",
@@ -42,26 +36,11 @@ const SyncCenterScreen = lazyNamed(
   () => import("../modules/sync-center/components/SyncCenterScreen"),
   "SyncCenterScreen",
 );
-const SessionsScreen = lazyNamed(
-  () => import("../modules/sessions/components/SessionsScreen"),
-  "SessionsScreen",
-);
-const PlannerScreen = lazyNamed(
-  () => import("../modules/planner/components/PlannerScreen"),
-  "PlannerScreen",
-);
-const StatsScreen = lazyNamed(
-  () => import("../modules/stats/components/StatsScreen"),
-  "StatsScreen",
-);
-const ProfileScreen = lazyNamed(
-  () => import("../modules/settings/components/ProfileScreen"),
-  "ProfileScreen",
-);
-const GamePageScreen = lazyNamed(
-  () => import("../modules/game-page/components/GamePageScreen"),
-  "GamePageScreen",
-);
+const SessionsScreen = lazyNamed(() => import("../modules/sessions/components/SessionsScreen"), "SessionsScreen");
+const PlannerScreen = lazyNamed(() => import("../modules/planner/components/PlannerScreen"), "PlannerScreen");
+const StatsScreen = lazyNamed(() => import("../modules/stats/components/StatsScreen"), "StatsScreen");
+const ProfileScreen = lazyNamed(() => import("../modules/settings/components/ProfileScreen"), "ProfileScreen");
+const GamePageScreen = lazyNamed(() => import("../modules/game-page/components/GamePageScreen"), "GamePageScreen");
 
 function ModuleFallback({ message = "Carregando módulo..." }: { message?: string }) {
   return (
@@ -111,13 +90,9 @@ export function AppShellScreenContent({
   let screenContent = null;
 
   if (app.screen === "dashboard") {
-    screenContent = (
-      <DashboardScreenWithHooks app={app} />
-    );
+    screenContent = <DashboardScreenWithHooks app={app} />;
   } else if (app.screen === "library") {
-    screenContent = (
-      <LibraryScreenWithHooks app={app} />
-    );
+    screenContent = <LibraryScreenWithHooks app={app} />;
   } else if (app.screen === "maintenance") {
     screenContent = (
       <CatalogMaintenanceScreen
@@ -155,9 +130,7 @@ export function AppShellScreenContent({
       />
     );
   } else if (app.screen === "planner") {
-    screenContent = (
-      <PlannerScreenWithHooks app={app} />
-    );
+    screenContent = <PlannerScreenWithHooks app={app} />;
   } else if (app.screen === "sessions") {
     screenContent = (
       <SessionsScreen
@@ -171,13 +144,9 @@ export function AppShellScreenContent({
       />
     );
   } else if (app.screen === "stats") {
-    screenContent = (
-      <StatsScreenWithHooks app={app} />
-    );
+    screenContent = <StatsScreenWithHooks app={app} />;
   } else if (app.screen === "profile") {
-    screenContent = (
-      <ProfileScreenWithHooks app={app} />
-    );
+    screenContent = <ProfileScreenWithHooks app={app} />;
   } else if (app.screen === "game") {
     screenContent = (
       <GamePageScreenWithHooks
@@ -272,9 +241,7 @@ function LibraryScreenWithHooks({ app }: { app: BacklogAppState }) {
       savedViews={app.savedViewRows}
       activeSavedView={libraryState.activeSavedView}
       onFilterChange={(value: typeof app.filter) => app.setFilter(value)}
-      onListFilterChange={(value: typeof app.selectedListFilter) =>
-        app.setSelectedListFilter(value)
-      }
+      onListFilterChange={(value: typeof app.selectedListFilter) => app.setSelectedListFilter(value)}
       onSortByChange={app.setLibrarySortBy}
       onSortDirectionChange={app.setLibrarySortDirection}
       onGroupByChange={app.setLibraryGroupBy}
@@ -343,7 +310,12 @@ function StatsScreenWithHooks({ app }: { app: BacklogAppState }) {
   return (
     <StatsScreen
       durationBuckets={dashboardInsights.durationBuckets}
-      monthlyHours={dashboardInsights.monthlyProgress.map((mp: { month: string; started: number; finished: number }) => ({ month: mp.month, total: mp.started + mp.finished }))}
+      monthlyHours={dashboardInsights.monthlyProgress.map(
+        (mp: { month: string; started: number; finished: number }) => ({
+          month: mp.month,
+          total: mp.started + mp.finished,
+        }),
+      )}
       platformData={dashboardInsights.platformData}
       storeData={dashboardInsights.storeData}
       platforms={app.platformRows}
@@ -382,7 +354,9 @@ function ProfileScreenWithHooks({ app }: { app: BacklogAppState }) {
     <ProfileScreen
       personalBadges={dashboardInsights.personalBadges}
       totalGames={app.games.length}
-      totalHours={Math.round(app.sessionRows.reduce((totalMinutes, session) => totalMinutes + session.durationMinutes, 0) / 60)}
+      totalHours={Math.round(
+        app.sessionRows.reduce((totalMinutes, session) => totalMinutes + session.durationMinutes, 0) / 60,
+      )}
       preferences={app.preferences}
       listRows={app.listRows}
       catalogAuditReport={app.catalogAuditReport}
@@ -420,7 +394,15 @@ function GamePageScreenWithHooks({
   handleFavoriteSelectedGame: () => void;
   handleSendSelectedToPlanner: () => void;
   handleDeleteSelectedGame: () => void;
-  handleGameReviewSave: (payload: { score: string; recommend: "" | "yes" | "no"; shortReview: string; longReview: string; pros: string; cons: string; hasSpoiler: boolean }) => Promise<void>;
+  handleGameReviewSave: (payload: {
+    score: string;
+    recommend: "" | "yes" | "no";
+    shortReview: string;
+    longReview: string;
+    pros: string;
+    cons: string;
+    hasSpoiler: boolean;
+  }) => Promise<void>;
   handleGameTagsSave: (value: string) => Promise<void>;
   handleGameListsSave: (listIds: number[]) => Promise<void>;
   listOptions: Array<{ id: number | undefined; name: string }>;

@@ -1,29 +1,11 @@
 import type { FormEvent } from "react";
-import {
-  BarChart3,
-  CalendarDays,
-  Clock3,
-  Pause,
-  Pencil,
-  Play,
-  RotateCcw,
-  Save,
-  Timer,
-  Trash2,
-} from "lucide-react";
+import { BarChart3, CalendarDays, Clock3, Pause, Pencil, Play, RotateCcw, Save, Timer, Trash2 } from "lucide-react";
 import { VerticalBarChart } from "../../../charts";
 import { cx, formatDuration, type Game, type Status } from "../../../backlog/shared";
 import { getGamePlatforms, getGameStores } from "../../../backlog/structuredGameValues";
 import { formatDatePtBr } from "../../../core/utils";
 import type { PlaySession } from "../../../core/types";
-import {
-  ChartFrame,
-  EmptyState,
-  NotchButton,
-  Panel,
-  Pill,
-  SectionHeader,
-} from "../../../components/cyberpunk-ui";
+import { ChartFrame, EmptyState, NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 import { useSessionsScreenState } from "../hooks/useSessionsScreenState";
 import type { SessionPeriod } from "../utils/sessionAnalytics";
 
@@ -182,9 +164,7 @@ export function SessionsScreen({
                     min="0"
                     max="100"
                     value={draft.completionPercent}
-                    onChange={(event) =>
-                      setDraft((current) => ({ ...current, completionPercent: event.target.value }))
-                    }
+                    onChange={(event) => setDraft((current) => ({ ...current, completionPercent: event.target.value }))}
                   />
                 </label>
                 <label className="field">
@@ -337,7 +317,8 @@ export function SessionsScreen({
                       {group.game.title}
                     </button>
                     <p>
-                      {getGamePlatforms(group.game).join(", ")} • {getGameStores(group.game).join(", ")} • {group.game.status} • {group.sessions.length} sessões
+                      {getGamePlatforms(group.game).join(", ")} • {getGameStores(group.game).join(", ")} •{" "}
+                      {group.game.status} • {group.sessions.length} sessões
                     </p>
                   </div>
                   <div className="session-group__meta">

@@ -56,8 +56,7 @@ export const defaultGames: Partial<DbGameMetadata>[] = [
     title: "Hades",
     rawgId: 3498,
     coverUrl: "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1145360/library_600x900_2x.jpg",
-    description:
-      "Roguelike de ação com runs rápidas, progressão constante e forte reatividade para sessões curtas.",
+    description: "Roguelike de ação com runs rápidas, progressão constante e forte reatividade para sessões curtas.",
     genres: "Roguelike, Action",
     platforms: "PC, Switch",
     estimatedTime: "25h",
@@ -69,8 +68,7 @@ export const defaultGames: Partial<DbGameMetadata>[] = [
   {
     title: "Final Fantasy VII Rebirth",
     rawgId: 963310,
-    description:
-      "RPG de grande escala com foco em campanha longa, exploração e múltiplos sistemas de progressão.",
+    description: "RPG de grande escala com foco em campanha longa, exploração e múltiplos sistemas de progressão.",
     genres: "RPG",
     platforms: "PS5",
     estimatedTime: "100h",

@@ -42,7 +42,7 @@ export function PlatformList({ platforms, games, onSelect }: PlatformListProps) 
     () =>
       Array.from(
         new Map(
-          [...platforms, ...Array.from(summaryByPlatform.keys()).map((name) => ({ name } as Platform))].map(
+          [...platforms, ...Array.from(summaryByPlatform.keys()).map((name) => ({ name }) as Platform)].map(
             (platform) => [platform.name, platform] as const,
           ),
         ).values(),
@@ -52,11 +52,7 @@ export function PlatformList({ platforms, games, onSelect }: PlatformListProps) 
 
   return (
     <Panel className="platform-list-panel anim-fade-in">
-      <SectionHeader
-        icon={Monitor}
-        title="Minhas Plataformas"
-        description="Gerencie e visualize dados por hardware"
-      />
+      <SectionHeader icon={Monitor} title="Minhas Plataformas" description="Gerencie e visualize dados por hardware" />
 
       {visiblePlatforms.length === 0 ? (
         <EmptyState message="Nenhuma plataforma estruturada foi encontrada para exibir nesta visão." />

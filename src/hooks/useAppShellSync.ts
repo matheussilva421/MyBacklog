@@ -5,11 +5,7 @@ import { useCloudSync } from "./useCloudSync";
 
 type BacklogAppState = ReturnType<typeof useBacklogApp>;
 
-export function useAppShellSync(args: {
-  app: BacklogAppState;
-  user: User | null;
-  isAuthEnabled: boolean;
-}) {
+export function useAppShellSync(args: { app: BacklogAppState; user: User | null; isAuthEnabled: boolean }) {
   const sync = useCloudSync({
     user: args.isAuthEnabled ? args.user : null,
     isAuthEnabled: args.isAuthEnabled,
@@ -21,12 +17,7 @@ export function useAppShellSync(args: {
   const { debouncedTriggerSync } = sync;
 
   useEffect(() => {
-    if (
-      !args.isAuthEnabled ||
-      !args.user ||
-      args.app.loading ||
-      !args.app.preferences.autoSyncEnabled
-    ) {
+    if (!args.isAuthEnabled || !args.user || args.app.loading || !args.app.preferences.autoSyncEnabled) {
       return;
     }
 

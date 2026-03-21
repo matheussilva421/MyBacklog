@@ -37,7 +37,10 @@ describe("libraryEntryDerived", () => {
 
   it("derives ownership semantics from legacy ownershipStatus", () => {
     expect(resolveLibraryEntrySemantics(createEntry({ ownershipStatus: "owned" })).accessModel).toBe("purchase");
-    expect(resolveLibraryEntrySemantics(createEntry({ ownershipStatus: "subscription", sourceStore: "Game Pass" })).accessModel).toBe("subscription");
+    expect(
+      resolveLibraryEntrySemantics(createEntry({ ownershipStatus: "subscription", sourceStore: "Game Pass" }))
+        .accessModel,
+    ).toBe("subscription");
     expect(resolveLibraryEntrySemantics(createEntry({ ownershipStatus: "wishlist" })).possession).toBe("wishlist");
   });
 

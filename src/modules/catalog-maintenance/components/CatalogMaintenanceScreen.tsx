@@ -1,11 +1,4 @@
-import {
-  AlertTriangle,
-  CheckCircle2,
-  DatabaseZap,
-  GitMerge,
-  Sparkles,
-  Wrench,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, DatabaseZap, GitMerge, Sparkles, Wrench } from "lucide-react";
 import { cx } from "../../../backlog/shared";
 import { EmptyState, NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 import type { CatalogMaintenanceReport } from "../utils/catalogMaintenance";
@@ -109,7 +102,12 @@ export function CatalogMaintenanceScreen({
                           : "magenta"
                     }
                   >
-                    Sugerido: {group.suggestedAction === "merge" ? "Mesclar" : group.suggestedAction === "keep" ? "Manter" : "Ignorar"}
+                    Sugerido:{" "}
+                    {group.suggestedAction === "merge"
+                      ? "Mesclar"
+                      : group.suggestedAction === "keep"
+                        ? "Manter"
+                        : "Ignorar"}
                   </Pill>
                 </div>
 
@@ -131,14 +129,18 @@ export function CatalogMaintenanceScreen({
                       key={`${group.id}-${candidate.libraryEntryId}`}
                       tone={candidate.libraryEntryId === group.suggestedPrimaryEntryId ? "cyan" : "neutral"}
                     >
-                      {candidate.sourceStore} • {candidate.completionPercent}% • {Math.round(candidate.playtimeMinutes / 60)}h
+                      {candidate.sourceStore} • {candidate.completionPercent}% •{" "}
+                      {Math.round(candidate.playtimeMinutes / 60)}h
                     </Pill>
                   ))}
                 </div>
 
                 <div className="audit-list">
                   {group.candidates.map((candidate) => (
-                    <article className={cx("audit-card", "audit-card--compact", "app-card", "app-card--compact")} key={`${group.id}-candidate-${candidate.libraryEntryId}`}>
+                    <article
+                      className={cx("audit-card", "audit-card--compact", "app-card", "app-card--compact")}
+                      key={`${group.id}-candidate-${candidate.libraryEntryId}`}
+                    >
                       <div className="audit-card__head">
                         <div className="audit-card__title">
                           {candidate.libraryEntryId === group.suggestedPrimaryEntryId ? (
@@ -155,8 +157,8 @@ export function CatalogMaintenanceScreen({
                         </Pill>
                       </div>
                       <p>
-                        {candidate.progressStatus} • {candidate.completionPercent}% • {Math.round(candidate.playtimeMinutes / 60)}h •{" "}
-                        {candidate.sessionCount} sessão(ões)
+                        {candidate.progressStatus} • {candidate.completionPercent}% •{" "}
+                        {Math.round(candidate.playtimeMinutes / 60)}h • {candidate.sessionCount} sessão(ões)
                       </p>
                       <div className="detail-note__tags">
                         {candidate.platforms.map((platform) => (
@@ -198,7 +200,11 @@ export function CatalogMaintenanceScreen({
           title="Fila de metadado faltante"
           description="Jogos sem capa, gênero, estúdio, publisher, ano ou plataformas completas."
           action={
-            <NotchButton variant="secondary" onClick={onEnrichMetadataQueue} disabled={!hasRawgApiKey || report.metadataQueue.length === 0}>
+            <NotchButton
+              variant="secondary"
+              onClick={onEnrichMetadataQueue}
+              disabled={!hasRawgApiKey || report.metadataQueue.length === 0}
+            >
               Enriquecer confiáveis
             </NotchButton>
           }
@@ -340,7 +346,8 @@ export function CatalogMaintenanceScreen({
                   <Pill tone="neutral">{group.aliases.length} alias(es)</Pill>
                 </div>
                 <p>
-                  {group.aliases.join(", ")}. Impacto: {group.affectedEntries} entrada(s) e {group.affectedGames} jogo(s).
+                  {group.aliases.join(", ")}. Impacto: {group.affectedEntries} entrada(s) e {group.affectedGames}{" "}
+                  jogo(s).
                 </p>
                 <div className="modal-actions">
                   <NotchButton
@@ -419,8 +426,8 @@ export function CatalogMaintenanceScreen({
 
         {orphanIssues.length > 0 ? (
           <div className="detail-note">
-            <strong>Sessões órfãs:</strong> o reparo estrutural remove automaticamente essas linhas porque elas não têm mais item
-            correspondente na biblioteca.
+            <strong>Sessões órfãs:</strong> o reparo estrutural remove automaticamente essas linhas porque elas não têm
+            mais item correspondente na biblioteca.
           </div>
         ) : null}
       </Panel>

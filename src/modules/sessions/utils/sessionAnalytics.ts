@@ -156,7 +156,11 @@ export function buildSessionMonthlyHours(sessions: PlaySession[], months = 6, no
   return buckets.map(({ name, total }) => ({ name, total }));
 }
 
-export function filterSessionsByPeriod(sessions: PlaySession[], period: SessionPeriod, now = new Date()): PlaySession[] {
+export function filterSessionsByPeriod(
+  sessions: PlaySession[],
+  period: SessionPeriod,
+  now = new Date(),
+): PlaySession[] {
   const start = getPeriodStart(period, now);
   if (!start) return [...sessions];
   const startTime = start.getTime();
@@ -241,6 +245,5 @@ export function matchesSessionFilters(args: {
     session.mood ?? "",
     ...getGamePlatforms(game),
     ...getGameStores(game),
-  ]
-    .some((value) => value.toLowerCase().includes(normalizedQuery));
+  ].some((value) => value.toLowerCase().includes(normalizedQuery));
 }

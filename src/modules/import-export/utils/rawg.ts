@@ -97,11 +97,10 @@ export async function searchRawgCandidates(title: string, apiKey: string): Promi
   const normalizedTitle = title.trim();
   if (!apiKey || !normalizedTitle) return [];
 
-  const data = await rawgFetch<{ results?: Array<Record<string, unknown>> }>(
-    "/games",
-    apiKey,
-    { search: normalizedTitle, page_size: 5 },
-  );
+  const data = await rawgFetch<{ results?: Array<Record<string, unknown>> }>("/games", apiKey, {
+    search: normalizedTitle,
+    page_size: 5,
+  });
 
   const results = Array.isArray(data.results) ? data.results : [];
   const normalizedCandidates = results
@@ -141,9 +140,7 @@ export async function fetchRawgMetadata(rawgId: number, apiKey: string): Promise
     releaseYear: item.released ? Number(String(item.released).slice(0, 4)) || undefined : undefined,
     platforms: normalizeRawgPlatforms(item.platforms).join(", ") || undefined,
     description:
-      String(item.description_raw ?? "").trim() ||
-      stripHtml(String(item.description ?? "")).trim() ||
-      undefined,
+      String(item.description_raw ?? "").trim() || stripHtml(String(item.description ?? "")).trim() || undefined,
     developer:
       developers
         .map((developer) =>

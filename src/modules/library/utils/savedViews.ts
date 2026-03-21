@@ -7,6 +7,7 @@ import type {
   SavedView,
 } from "../../../core/types";
 import { resolveLibraryEntrySemantics } from "../../../core/libraryEntryDerived";
+import { generateUuid } from "../../../core/utils";
 
 export type LibraryViewState = {
   query: string;
@@ -73,6 +74,8 @@ export function buildSavedViewPayload(
   const now = new Date().toISOString();
   return {
     id: existing?.id,
+    uuid: existing?.uuid || generateUuid(),
+    version: existing?.version || 1,
     scope: "library",
     name: name.trim(),
     statusFilter: statusFilterToSavedStatus(current.filter),
@@ -83,6 +86,7 @@ export function buildSavedViewPayload(
     groupBy: current.groupBy,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
+    deletedAt: null,
   };
 }
 

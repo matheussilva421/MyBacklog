@@ -134,19 +134,13 @@ const metadataLabels: Record<string, string> = {
 };
 
 function summarizeMetadataGaps(game: Game): string[] {
-  return [
-    "coverUrl",
-    "genres",
-    "estimatedTime",
-    "platforms",
-    "developer",
-    "publisher",
-    "releaseYear",
-  ].filter((field) => {
-    const value = game[field as keyof Game];
-    if (typeof value === "number") return !Number.isFinite(value);
-    return !String(value || "").trim();
-  });
+  return ["coverUrl", "genres", "estimatedTime", "platforms", "developer", "publisher", "releaseYear"].filter(
+    (field) => {
+      const value = game[field as keyof Game];
+      if (typeof value === "number") return !Number.isFinite(value);
+      return !String(value || "").trim();
+    },
+  );
 }
 
 function buildMetadataQueue(args: {
@@ -171,11 +165,7 @@ function buildMetadataQueue(args: {
     const linkedEntries = entriesByGameId.get(game.id) ?? [];
     const representative = [...linkedEntries].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
     if (!representative?.id) continue;
-    const structuredPlatforms = resolveStructuredPlatforms(
-      game,
-      representative.platform,
-      platformNamesByGameId,
-    );
+    const structuredPlatforms = resolveStructuredPlatforms(game, representative.platform, platformNamesByGameId);
     const missingFields = summarizeMetadataGaps({
       ...game,
       platforms: structuredPlatforms.join(", "),
@@ -217,12 +207,7 @@ function countByLibraryEntry<T extends { libraryEntryId: number }>(rows: T[]): M
 function buildTokenIntersection(values: string[][]): string[] {
   if (values.length === 0) return [];
   return Array.from(
-    values
-      .slice(1)
-      .reduce(
-        (current, item) => new Set(item.filter((value) => current.has(value))),
-        new Set(values[0]),
-      ),
+    values.slice(1).reduce((current, item) => new Set(item.filter((value) => current.has(value))), new Set(values[0])),
   ).sort((left, right) => left.localeCompare(right, "pt-BR"));
 }
 
@@ -396,10 +381,7 @@ function buildNormalizationQueue(args: {
     );
   }
   for (const relation of args.gamePlatforms) {
-    platformRelationCountByGameId.set(
-      relation.gameId,
-      (platformRelationCountByGameId.get(relation.gameId) ?? 0) + 1,
-    );
+    platformRelationCountByGameId.set(relation.gameId, (platformRelationCountByGameId.get(relation.gameId) ?? 0) + 1);
   }
 
   return args.libraryEntries
@@ -447,7 +429,9 @@ function buildNormalizationQueue(args: {
       } satisfies CatalogNormalizationItem;
     })
     .filter((item): item is CatalogNormalizationItem => Boolean(item))
-    .sort((left, right) => right.reasons.length - left.reasons.length || left.title.localeCompare(right.title, "pt-BR"));
+    .sort(
+      (left, right) => right.reasons.length - left.reasons.length || left.title.localeCompare(right.title, "pt-BR"),
+    );
 }
 
 function buildAliasGroups(args: {
@@ -474,7 +458,8 @@ function buildAliasGroups(args: {
         .filter((relation) => ids.has(relation.storeId))
         .map((relation) => relation.libraryEntryId),
     ).size;
-    const canonicalName = [...rows].sort((left, right) => left.name.localeCompare(right.name, "pt-BR"))[0]?.name ?? normalizedName;
+    const canonicalName =
+      [...rows].sort((left, right) => left.name.localeCompare(right.name, "pt-BR"))[0]?.name ?? normalizedName;
     groups.push({
       id: `store-alias-${normalizedName}`,
       kind: "store",
@@ -498,11 +483,10 @@ function buildAliasGroups(args: {
     if (rows.length < 2) continue;
     const ids = new Set(rows.map((row) => row.id).filter((id): id is number => typeof id === "number"));
     const affectedGames = new Set(
-      args.gamePlatforms
-        .filter((relation) => ids.has(relation.platformId))
-        .map((relation) => relation.gameId),
+      args.gamePlatforms.filter((relation) => ids.has(relation.platformId)).map((relation) => relation.gameId),
     ).size;
-    const canonicalName = [...rows].sort((left, right) => left.name.localeCompare(right.name, "pt-BR"))[0]?.name ?? normalizedName;
+    const canonicalName =
+      [...rows].sort((left, right) => left.name.localeCompare(right.name, "pt-BR"))[0]?.name ?? normalizedName;
     groups.push({
       id: `platform-alias-${normalizedName}`,
       kind: "platform",
@@ -514,7 +498,10 @@ function buildAliasGroups(args: {
     });
   }
 
-  return groups.sort((left, right) => left.kind.localeCompare(right.kind) || left.canonicalName.localeCompare(right.canonicalName, "pt-BR"));
+  return groups.sort(
+    (left, right) =>
+      left.kind.localeCompare(right.kind) || left.canonicalName.localeCompare(right.canonicalName, "pt-BR"),
+  );
 }
 
 export function buildCatalogMaintenanceReport(args: {
@@ -695,11 +682,7 @@ export function mergeLibraryEntries(
 
 function mergeTextBlock(primary?: string, duplicate?: string): string | undefined {
   const parts = Array.from(
-    new Set(
-      [primary, duplicate]
-        .map((value) => value?.trim())
-        .filter((value): value is string => Boolean(value)),
-    ),
+    new Set([primary, duplicate].map((value) => value?.trim()).filter((value): value is string => Boolean(value))),
   );
   return parts.length > 0 ? parts.join("\n\n") : undefined;
 }

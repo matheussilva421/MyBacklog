@@ -447,14 +447,7 @@ export const priorityTone: Record<Priority, string> = {
   Baixa: "neutral",
 };
 
-export const filterOptions: StatusFilter[] = [
-  "Todos",
-  "Backlog",
-  "Jogando",
-  "Pausado",
-  "Terminado",
-  "Wishlist",
-];
+export const filterOptions: StatusFilter[] = ["Todos", "Backlog", "Jogando", "Pausado", "Terminado", "Wishlist"];
 export const gameStatuses: Status[] = ["Backlog", "Jogando", "Pausado", "Terminado", "Wishlist"];
 export const gamePriorities: Priority[] = ["Alta", "Média", "Baixa"];
 export const importSources: ImportSource[] = ["csv", "steam", "playnite", "notion"];

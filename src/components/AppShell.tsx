@@ -1,14 +1,4 @@
-import {
-  CalendarDays,
-  Cloud,
-  Cpu,
-  Download,
-  Orbit,
-  Plus,
-  Search,
-  Upload,
-  Zap,
-} from "lucide-react";
+import { CalendarDays, Cloud, Cpu, Download, Orbit, Plus, Search, Upload, Zap } from "lucide-react";
 import { useEffect } from "react";
 import type { User } from "firebase/auth";
 import { cx, navigationItems } from "../backlog/shared";
@@ -254,8 +244,8 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
                       {app.heroCopy.before} <span>{app.heroCopy.accent}</span>
                     </h2>
                     <p>
-                      Catálogo, backlog, planner e estatísticas em uma interface cyberpunk com
-                      leitura rápida, foco em decisão e sensação de produto premium.
+                      Catálogo, backlog, planner e estatísticas em uma interface cyberpunk com leitura rápida, foco em
+                      decisão e sensação de produto premium.
                     </p>
                   </div>
                 </div>

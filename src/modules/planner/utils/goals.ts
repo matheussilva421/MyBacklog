@@ -87,7 +87,10 @@ function computeGoalCurrent(
       );
       return libraryEntries.filter((entry) => {
         if (startedBySession.has(entry.id ?? -1)) return true;
-        return hasStarted(entry) && isWithinPeriod(entry.lastSessionAt ?? entry.updatedAt ?? entry.createdAt, goal.period, now);
+        return (
+          hasStarted(entry) &&
+          isWithinPeriod(entry.lastSessionAt ?? entry.updatedAt ?? entry.createdAt, goal.period, now)
+        );
       }).length;
     }
     case "playtime": {

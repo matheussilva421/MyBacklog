@@ -1,30 +1,22 @@
 import { db } from "./db";
 import { classifyAccessSource } from "./libraryEntryDerived";
 import { buildStructuredTablesFromLegacy, type StructuredTablesSnapshot } from "./structuredTables";
-import type {
-  Game,
-  GamePlatform,
-  LibraryEntry,
-  LibraryEntryStore,
-  Platform,
-  Store,
-} from "./types";
-import { normalizeToken, splitCsvTokens } from "./utils";
+import type { Game, GamePlatform, LibraryEntry, LibraryEntryStore, Platform, Store } from "./types";
+import { normalizeToken, splitCsvTokens, generateUuid } from "./utils";
+import { softDelete, getDeviceId } from "../lib/softDelete";
 
 function getStructuredSyncErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function insertNormalizedEntityRow<TRow extends { id?: number; name: string; normalizedName: string }>(
-  args: {
-    label: string;
-    name: string;
-    normalizedName: string;
-    loadExisting: () => Promise<TRow | undefined>;
-    insert: () => Promise<number>;
-    buildRow: (id: number) => TRow;
-  },
-): Promise<TRow> {
+async function insertNormalizedEntityRow<TRow extends { id?: number; name: string; normalizedName: string }>(args: {
+  label: string;
+  name: string;
+  normalizedName: string;
+  loadExisting: () => Promise<TRow | undefined>;
+  insert: () => Promise<number>;
+  buildRow: (id: number) => TRow;
+}): Promise<TRow> {
   try {
     const nextId = Number(await args.insert());
     return args.buildRow(nextId);
@@ -53,9 +45,7 @@ async function ensureNormalizedEntities<TRow extends { id?: number; name: string
   if (normalizedNames.length === 0) return new Map();
 
   const existingRows = await args.loadRows();
-  const existingByNormalizedName = new Map(
-    existingRows.map((row) => [row.normalizedName, row] as const),
-  );
+  const existingByNormalizedName = new Map(existingRows.map((row) => [row.normalizedName, row] as const));
   const now = new Date().toISOString();
 
   for (const name of names) {
@@ -83,11 +73,14 @@ async function ensureStores(storeNames: string[]): Promise<Map<string, Store>> {
     loadRows: () => db.stores.toArray(),
     loadExisting: (normalizedName) => db.stores.where("normalizedName").equals(normalizedName).first(),
     createDraft: (name, normalizedName, now) => ({
+      uuid: generateUuid(),
+      version: 1,
       name,
       normalizedName,
       sourceKey: classifyAccessSource(name),
       createdAt: now,
       updatedAt: now,
+      deletedAt: null,
     }),
     insertDraft: (draft) => db.stores.add(draft),
     buildRow: (draft, id) => ({ ...draft, id }),
@@ -98,13 +91,15 @@ async function ensurePlatforms(platformNames: string[]): Promise<Map<string, Pla
   return ensureNormalizedEntities(platformNames, {
     label: "plataforma",
     loadRows: () => db.platforms.toArray(),
-    loadExisting: (normalizedName) =>
-      db.platforms.where("normalizedName").equals(normalizedName).first(),
+    loadExisting: (normalizedName) => db.platforms.where("normalizedName").equals(normalizedName).first(),
     createDraft: (name, normalizedName, now) => ({
+      uuid: generateUuid(),
+      version: 1,
       name,
       normalizedName,
       createdAt: now,
       updatedAt: now,
+      deletedAt: null,
     }),
     insertDraft: (draft) => db.platforms.add(draft),
     buildRow: (draft, id) => ({ ...draft, id }),
@@ -118,14 +113,12 @@ export async function syncLibraryEntryStoreRelations(
   if (libraryEntry.id == null) return;
 
   const storeNames = splitCsvTokens([libraryEntry.sourceStore, ...extraStoreNames]);
-  const existingRelations = await db.libraryEntryStores
-    .where("libraryEntryId")
-    .equals(libraryEntry.id)
-    .toArray();
+  const existingRelations = await db.libraryEntryStores.where("libraryEntryId").equals(libraryEntry.id).toArray();
 
   if (storeNames.length === 0) {
+    const deviceId = await getDeviceId();
     for (const relation of existingRelations) {
-      if (relation.id != null) await db.libraryEntryStores.delete(relation.id);
+      if (relation.id != null) await softDelete("libraryEntryStores", relation.id, deviceId);
     }
     return;
   }
@@ -136,15 +129,14 @@ export async function syncLibraryEntryStoreRelations(
     .filter((storeId): storeId is number => typeof storeId === "number");
   const desiredStoreIdSet = new Set(desiredStoreIds);
 
+  const deviceId = await getDeviceId();
   for (const relation of existingRelations) {
     if (relation.storeId && !desiredStoreIdSet.has(relation.storeId) && relation.id != null) {
-      await db.libraryEntryStores.delete(relation.id);
+      await softDelete("libraryEntryStores", relation.id, deviceId);
     }
   }
 
-  const existingByStoreId = new Map(
-    existingRelations.map((relation) => [relation.storeId, relation] as const),
-  );
+  const existingByStoreId = new Map(existingRelations.map((relation) => [relation.storeId, relation] as const));
   const now = new Date().toISOString();
 
   for (const [index, storeId] of desiredStoreIds.entries()) {
@@ -157,10 +149,14 @@ export async function syncLibraryEntryStoreRelations(
     }
 
     await db.libraryEntryStores.add({
+      uuid: generateUuid(),
+      version: 1,
       libraryEntryId: libraryEntry.id,
       storeId,
       isPrimary: index === 0,
       createdAt: libraryEntry.createdAt || now,
+      updatedAt: now,
+      deletedAt: null,
     });
   }
 }
@@ -176,8 +172,9 @@ export async function syncGamePlatformRelations(
   const existingRelations = await db.gamePlatforms.where("gameId").equals(game.id).toArray();
 
   if (platformNames.length === 0) {
+    const deviceId = await getDeviceId();
     for (const relation of existingRelations) {
-      if (relation.id != null) await db.gamePlatforms.delete(relation.id);
+      if (relation.id != null) await softDelete("gamePlatforms", relation.id, deviceId);
     }
     return;
   }
@@ -188,23 +185,26 @@ export async function syncGamePlatformRelations(
     .filter((platformId): platformId is number => typeof platformId === "number");
   const desiredPlatformIdSet = new Set(desiredPlatformIds);
 
+  const deviceId = await getDeviceId();
   for (const relation of existingRelations) {
     if (relation.platformId && !desiredPlatformIdSet.has(relation.platformId) && relation.id != null) {
-      await db.gamePlatforms.delete(relation.id);
+      await softDelete("gamePlatforms", relation.id, deviceId);
     }
   }
 
-  const existingByPlatformId = new Map(
-    existingRelations.map((relation) => [relation.platformId, relation] as const),
-  );
+  const existingByPlatformId = new Map(existingRelations.map((relation) => [relation.platformId, relation] as const));
   const now = new Date().toISOString();
 
   for (const platformId of desiredPlatformIds) {
     if (existingByPlatformId.has(platformId)) continue;
     await db.gamePlatforms.add({
+      uuid: generateUuid(),
+      version: 1,
       gameId: game.id,
       platformId,
       createdAt: game.createdAt || now,
+      updatedAt: now,
+      deletedAt: null,
     });
   }
 }
@@ -215,14 +215,10 @@ export async function syncStructuredRelationsForRecord(args: {
   extraStoreNames?: string[];
   extraPlatformNames?: string[];
 }) {
-  await db.transaction(
-    "rw",
-    [db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
-    async () => {
-      await syncLibraryEntryStoreRelations(args.libraryEntry, args.extraStoreNames);
-      await syncGamePlatformRelations(args.game, args.libraryEntry.platform, args.extraPlatformNames);
-    },
-  );
+  await db.transaction("rw", [db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms], async () => {
+    await syncLibraryEntryStoreRelations(args.libraryEntry, args.extraStoreNames);
+    await syncGamePlatformRelations(args.game, args.libraryEntry.platform, args.extraPlatformNames);
+  });
 }
 
 export async function replaceStructuredTables(snapshot: StructuredTablesSnapshot) {
@@ -247,7 +243,11 @@ export async function rebuildStructuredTablesFromLegacy(args: {
   await replaceStructuredTables(snapshot);
 }
 
-export function buildExtraStoreMap(rows: Store[], relations: LibraryEntryStore[], entryIdMap = new Map<number, number>()) {
+export function buildExtraStoreMap(
+  rows: Store[],
+  relations: LibraryEntryStore[],
+  entryIdMap = new Map<number, number>(),
+) {
   const storeNameById = new Map(rows.map((store) => [store.id, store.name] as const));
   const extraStoresByEntryId = new Map<number, string[]>();
 

@@ -18,10 +18,7 @@ import type { useBacklogContext } from "./useBacklogContext";
 
 type BacklogContext = ReturnType<typeof useBacklogContext>;
 
-function createAutoSyncWatchKey(args: {
-  data: BacklogContext["data"];
-  preferences: BacklogContext["preferences"];
-}) {
+function createAutoSyncWatchKey(args: { data: BacklogContext["data"]; preferences: BacklogContext["preferences"] }) {
   const { data, preferences } = args;
   return JSON.stringify({
     games: data.gameRows.map((row) => [row.id, row.updatedAt, row.platforms]),
@@ -32,7 +29,12 @@ function createAutoSyncWatchKey(args: {
     goals: data.goalRows.map((row) => [row.id, row.type, row.current, row.target, row.period]),
     lists: data.listRows.map((row) => [row.id, row.name]),
     libraryEntryLists: data.libraryEntryListRows.map((row) => [row.id, row.libraryEntryId, row.listId]),
-    libraryEntryStores: data.libraryEntryStoreRows.map((row) => [row.id, row.libraryEntryId, row.storeId, row.isPrimary]),
+    libraryEntryStores: data.libraryEntryStoreRows.map((row) => [
+      row.id,
+      row.libraryEntryId,
+      row.storeId,
+      row.isPrimary,
+    ]),
     stores: data.storeRows.map((row) => [row.id, row.updatedAt, row.name]),
     platforms: data.platformRows.map((row) => [row.id, row.updatedAt, row.name]),
     gamePlatforms: data.gamePlatformRows.map((row) => [row.id, row.gameId, row.platformId]),
@@ -56,9 +58,7 @@ export function useBacklogSelectors(context: BacklogContext) {
 
   const effectiveSelectedListFilter = useMemo<LibraryListFilter>(() => {
     if (ui.selectedListFilter === "all") return "all";
-    return data.listRows.some((list) => list.id === ui.selectedListFilter)
-      ? ui.selectedListFilter
-      : "all";
+    return data.listRows.some((list) => list.id === ui.selectedListFilter) ? ui.selectedListFilter : "all";
   }, [data.listRows, ui.selectedListFilter]);
 
   const records = useMemo(
@@ -73,14 +73,8 @@ export function useBacklogSelectors(context: BacklogContext) {
     () => new Map(data.reviewRows.map((review) => [review.libraryEntryId, review] as const)),
     [data.reviewRows],
   );
-  const tagById = useMemo(
-    () => new Map(data.tagRows.map((tag) => [tag.id, tag] as const)),
-    [data.tagRows],
-  );
-  const listById = useMemo(
-    () => new Map(data.listRows.map((list) => [list.id, list] as const)),
-    [data.listRows],
-  );
+  const tagById = useMemo(() => new Map(data.tagRows.map((tag) => [tag.id, tag] as const)), [data.tagRows]);
+  const listById = useMemo(() => new Map(data.listRows.map((list) => [list.id, list] as const)), [data.listRows]);
   const storeNamesByEntryId = useMemo(
     () => buildStoreNamesByEntryId(data.storeRows, data.libraryEntryStoreRows),
     [data.libraryEntryStoreRows, data.storeRows],
@@ -94,11 +88,7 @@ export function useBacklogSelectors(context: BacklogContext) {
       records.map((record) =>
         dbGameToUiGame(record, {
           stores: resolveStructuredStores(record.libraryEntry, storeNamesByEntryId),
-          platforms: resolveStructuredPlatforms(
-            record.game,
-            record.libraryEntry.platform,
-            platformNamesByGameId,
-          ),
+          platforms: resolveStructuredPlatforms(record.game, record.libraryEntry.platform, platformNamesByGameId),
         }),
       ),
     [platformNamesByGameId, records, storeNamesByEntryId],
@@ -109,23 +99,16 @@ export function useBacklogSelectors(context: BacklogContext) {
   );
   const displayName = preferences.operatorName;
   const hasCompletedOnboarding = preferences.onboardingCompleted;
-  const onboardingInitialDraft = useMemo(
-    () => createPreferencesDraft(preferences),
-    [preferences],
-  );
+  const onboardingInitialDraft = useMemo(() => createPreferencesDraft(preferences), [preferences]);
   const onboardingInitialLists = useMemo(
     () =>
-      data.listRows.length > 0
-        ? data.listRows.map((list) => list.name)
-        : Array.from(suggestedStarterLists.slice(0, 3)),
+      data.listRows.length > 0 ? data.listRows.map((list) => list.name) : Array.from(suggestedStarterLists.slice(0, 3)),
     [data.listRows],
   );
   const onboardingInitialGoalIds = useMemo(() => {
     const matchingTemplates = onboardingGoalTemplates
       .filter((template) =>
-        data.goalRows.some(
-          (goal) => goal.type === template.type && goal.period === template.period,
-        ),
+        data.goalRows.some((goal) => goal.type === template.type && goal.period === template.period),
       )
       .map((template) => template.id);
 

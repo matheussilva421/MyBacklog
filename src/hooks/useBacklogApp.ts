@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import {
-  systemRules,
-} from "../backlog/shared";
+import { systemRules } from "../backlog/shared";
 import type { List } from "../core/types";
 import { useBacklogActions } from "./useBacklogActions";
 import { useCatalogMaintenanceState } from "../modules/catalog-maintenance/hooks/useCatalogMaintenanceState";
@@ -59,8 +57,7 @@ export function useBacklogApp() {
   const findGame = useCallback((id: number) => games.find((game) => game.id === id), [games]);
   const matchesQuery = useCallback(
     (values: Array<string | number>) =>
-      !ui.deferredQuery ||
-      values.some((value) => String(value).toLowerCase().includes(ui.deferredQuery)),
+      !ui.deferredQuery || values.some((value) => String(value).toLowerCase().includes(ui.deferredQuery)),
     [ui.deferredQuery],
   );
 

@@ -91,7 +91,8 @@ export const guidedTourSteps: GuidedTourStep[] = [
     screen: "stats",
     target: "stats",
     title: "Estatísticas operacionais",
-    description: "A área de estatísticas mostra distribuição do catálogo e comportamento das sessões ao longo do tempo.",
+    description:
+      "A área de estatísticas mostra distribuição do catálogo e comportamento das sessões ao longo do tempo.",
     bullets: [
       "É a tela para enxergar gargalos, plataformas mais usadas e padrões de duração.",
       "Ela ajuda a transformar sensação em leitura objetiva da sua rotina de jogo.",

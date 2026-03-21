@@ -116,9 +116,10 @@ describe("catalogIntegrity", () => {
     });
 
     it("sets completion date from the latest completed session", () => {
-      const recalculated = recalculateLibraryEntryFromSessions(createEntry({ completionPercent: 82, progressStatus: "playing" }), [
-        createSession({ date: "2026-03-19", durationMinutes: 60, completionPercent: 100 }),
-      ]);
+      const recalculated = recalculateLibraryEntryFromSessions(
+        createEntry({ completionPercent: 82, progressStatus: "playing" }),
+        [createSession({ date: "2026-03-19", durationMinutes: 60, completionPercent: 100 })],
+      );
 
       expect(recalculated.progressStatus).toBe("finished");
       expect(recalculated.completionDate).toBe("2026-03-19");

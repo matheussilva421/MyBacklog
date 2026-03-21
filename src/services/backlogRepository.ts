@@ -71,9 +71,7 @@ export function shouldSeedDefaultLibrary(args: {
 }) {
   if (!args.seedIfEmpty || args.libraryEntryCount > 0) return false;
 
-  return !args.settingRows.some(
-    (row) => row.key === syncSettingsKeys.skipDefaultSeed && row.value === "true",
-  );
+  return !args.settingRows.some((row) => row.key === syncSettingsKeys.skipDefaultSeed && row.value === "true");
 }
 
 export function createFreshStartLocalSettings(timestamp = new Date().toISOString()): DbSetting[] {
@@ -90,14 +88,7 @@ export async function seedDefaultLibrary() {
   try {
     await db.transaction(
       "rw",
-      [
-        db.games,
-        db.libraryEntries,
-        db.stores,
-        db.libraryEntryStores,
-        db.platforms,
-        db.gamePlatforms,
-      ],
+      [db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
       async () => {
         for (const template of defaultGames) {
           const game = defaultGameToDbGame(template);

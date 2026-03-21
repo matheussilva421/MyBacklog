@@ -2,6 +2,10 @@ export function normalizeGameTitle(title: string): string {
   return title.trim().toLowerCase();
 }
 
+export function generateUuid(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function repairLegacyText(value: string | undefined): string | undefined {
   if (typeof value !== "string") return value;
   const trimmed = value.trim();
@@ -32,10 +36,7 @@ export function splitCsvTokens(value: string | Array<string | undefined> | undef
   return Array.from(tokens);
 }
 
-export function getPrimaryCsvToken(
-  value: string | Array<string | undefined> | undefined,
-  fallback: string,
-): string {
+export function getPrimaryCsvToken(value: string | Array<string | undefined> | undefined, fallback: string): string {
   return splitCsvTokens(value)[0] || fallback;
 }
 

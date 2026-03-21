@@ -107,7 +107,8 @@ describe("Database Migrations", () => {
     it("should create initial tables with correct indexes", async () => {
       const testDb = createTestDb("test-v1");
       testDb.version(1).stores({
-        games: "++id, title, platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, rawgId, *genres",
+        games:
+          "++id, title, platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, rawgId, *genres",
         playSessions: "++id, gameId, date",
         reviews: "++id, gameId",
         lists: "++id, name",
@@ -166,7 +167,8 @@ describe("Database Migrations", () => {
       // Passo 1: Criar DB com v1 e adicionar dados
       const testDbV1 = createTestDb(dbNameV2);
       testDbV1.version(1).stores({
-        games: "++id, title, platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, rawgId, *genres",
+        games:
+          "++id, title, platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, rawgId, *genres",
         playSessions: "++id, gameId, date",
         reviews: "++id, gameId",
         lists: "++id, name",
@@ -206,7 +208,8 @@ describe("Database Migrations", () => {
       // Passo 2: Reabrir DB com v2 definida (trigger migration)
       const testDbV2 = new Dexie(dbNameV2);
       testDbV2.version(1).stores({
-        games: "++id, title, platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, rawgId, *genres",
+        games:
+          "++id, title, platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, rawgId, *genres",
         playSessions: "++id, gameId, date",
         reviews: "++id, gameId",
         lists: "++id, name",
@@ -214,10 +217,12 @@ describe("Database Migrations", () => {
         gameTags: "++id, gameId, tagId",
         goals: "++id, type, period",
       });
-      testDbV2.version(2)
+      testDbV2
+        .version(2)
         .stores({
           games: "++id, normalizedTitle, title, rawgId, releaseYear",
-          libraryEntries: "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt",
+          libraryEntries:
+            "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt",
           playSessions: "++id, libraryEntryId, date",
           reviews: "++id, libraryEntryId",
           lists: "++id, name",
@@ -236,7 +241,9 @@ describe("Database Migrations", () => {
           for (const legacy of legacyGames as any[]) {
             if (!legacy.id) continue;
 
-            const normalizedTitle = String(legacy.title || "").trim().toLowerCase();
+            const normalizedTitle = String(legacy.title || "")
+              .trim()
+              .toLowerCase();
             const existingGame = migratedGames.get(normalizedTitle);
 
             if (!existingGame) {
@@ -260,7 +267,8 @@ describe("Database Migrations", () => {
                   .filter(Boolean),
               );
               existingGame.platforms = Array.from(tokens).join(", ");
-              existingGame.updatedAt = legacy.updatedAt > existingGame.updatedAt ? legacy.updatedAt : existingGame.updatedAt;
+              existingGame.updatedAt =
+                legacy.updatedAt > existingGame.updatedAt ? legacy.updatedAt : existingGame.updatedAt;
             }
 
             const metadata = migratedGames.get(normalizedTitle);
@@ -287,20 +295,29 @@ describe("Database Migrations", () => {
             await tx.table("libraryEntries").bulkPut(validEntries);
           }
 
-          await tx.table("playSessions").toCollection().modify((session: any) => {
-            session.libraryEntryId = session.gameId;
-            delete session.gameId;
-          });
+          await tx
+            .table("playSessions")
+            .toCollection()
+            .modify((session: any) => {
+              session.libraryEntryId = session.gameId;
+              delete session.gameId;
+            });
 
-          await tx.table("reviews").toCollection().modify((review: any) => {
-            review.libraryEntryId = review.gameId;
-            delete review.gameId;
-          });
+          await tx
+            .table("reviews")
+            .toCollection()
+            .modify((review: any) => {
+              review.libraryEntryId = review.gameId;
+              delete review.gameId;
+            });
 
-          await tx.table("gameTags").toCollection().modify((entry: any) => {
-            entry.libraryEntryId = entry.gameId;
-            delete entry.gameId;
-          });
+          await tx
+            .table("gameTags")
+            .toCollection()
+            .modify((entry: any) => {
+              entry.libraryEntryId = entry.gameId;
+              delete entry.gameId;
+            });
         });
 
       await testDbV2.open();
@@ -340,9 +357,7 @@ describe("Database Migrations", () => {
 
       await testDb.open();
 
-      expect(testDb.tables.map((t) => t.name)).toEqual(
-        expect.arrayContaining(["libraryEntryLists"]),
-      );
+      expect(testDb.tables.map((t) => t.name)).toEqual(expect.arrayContaining(["libraryEntryLists"]));
 
       // Test libraryEntryLists operations
       const listId = await testDb.table("lists").add({ name: "Favorites", createdAt: new Date().toISOString() });
@@ -374,9 +389,11 @@ describe("Database Migrations", () => {
 
       testDb.version(4).stores({
         games: "++id, normalizedTitle, title, rawgId, releaseYear",
-        libraryEntries: "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
+        libraryEntries:
+          "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
         stores: "++id, normalizedName, name, updatedAt",
-        libraryEntryStores: "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
+        libraryEntryStores:
+          "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
         platforms: "++id, normalizedName, name, updatedAt",
         gamePlatforms: "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
         playSessions: "++id, libraryEntryId, date",
@@ -484,18 +501,22 @@ describe("Database Migrations", () => {
         games: "++id, normalizedTitle, title",
         libraryEntries: "++id, gameId, platform, sourceStore, progressStatus, updatedAt",
       });
-      testDbV4.version(4)
+      testDbV4
+        .version(4)
         .stores({
           games: "++id, normalizedTitle, title, rawgId, releaseYear",
-          libraryEntries: "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
+          libraryEntries:
+            "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
           stores: "++id, normalizedName, name, updatedAt",
-          libraryEntryStores: "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
+          libraryEntryStores:
+            "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
           platforms: "++id, normalizedName, name, updatedAt",
           gamePlatforms: "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
           playSessions: "++id, libraryEntryId, date",
           reviews: "++id, libraryEntryId",
           lists: "++id, name",
-          libraryEntryLists: "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
+          libraryEntryLists:
+            "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
           tags: "++id, name",
           gameTags: "++id, libraryEntryId, tagId",
           goals: "++id, type, period",
@@ -506,11 +527,11 @@ describe("Database Migrations", () => {
           const entries = await tx.table("libraryEntries").toArray();
           const migratedEntries = entries.map((entry: any) => ({
             ...entry,
-            completionDate: entry.completionDate || (
-              entry.progressStatus === "finished" || entry.progressStatus === "completed_100"
+            completionDate:
+              entry.completionDate ||
+              (entry.progressStatus === "finished" || entry.progressStatus === "completed_100"
                 ? entry.lastSessionAt?.substring(0, 10) || entry.updatedAt?.substring(0, 10)
-                : undefined
-            ),
+                : undefined),
           }));
           if (migratedEntries.length > 0) {
             await tx.table("libraryEntries").bulkPut(migratedEntries);
@@ -554,7 +575,8 @@ describe("Database Migrations", () => {
       testDbV5.version(4).stores({
         stores: "++id, normalizedName, name, updatedAt",
       });
-      testDbV5.version(5)
+      testDbV5
+        .version(5)
         .stores({
           stores: "++id, normalizedName, name, sourceKey, updatedAt",
           savedViews: "++id, scope, name, [scope+name], updatedAt",
@@ -565,15 +587,17 @@ describe("Database Migrations", () => {
             await tx.table("stores").bulkPut(
               stores.map((store: any) => ({
                 ...store,
-                sourceKey: store.sourceKey ?? (() => {
-                  const lower = String(store.name || "").toLowerCase();
-                  if (lower.includes("steam")) return "steam";
-                  if (lower.includes("epic")) return "epic";
-                  if (lower.includes("playstation")) return "playstation";
-                  if (lower.includes("xbox")) return "xbox";
-                  if (lower.includes("nintendo")) return "nintendo";
-                  return "other";
-                })(),
+                sourceKey:
+                  store.sourceKey ??
+                  (() => {
+                    const lower = String(store.name || "").toLowerCase();
+                    if (lower.includes("steam")) return "steam";
+                    if (lower.includes("epic")) return "epic";
+                    if (lower.includes("playstation")) return "playstation";
+                    if (lower.includes("xbox")) return "xbox";
+                    if (lower.includes("nintendo")) return "nintendo";
+                    return "other";
+                  })(),
               })),
             );
           }
@@ -604,9 +628,7 @@ describe("Database Migrations", () => {
 
       await testDb.open();
 
-      expect(testDb.tables.map((t) => t.name)).toEqual(
-        expect.arrayContaining(["savedViews"]),
-      );
+      expect(testDb.tables.map((t) => t.name)).toEqual(expect.arrayContaining(["savedViews"]));
 
       await testDb.table("savedViews").add({
         scope: "library",
@@ -634,7 +656,8 @@ describe("Database Migrations", () => {
       const testDbV5 = createTestDb(dbNameV6);
       testDbV5.version(5).stores({
         games: "++id, normalizedTitle, title, rawgId, releaseYear",
-        libraryEntries: "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
+        libraryEntries:
+          "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
       });
       await testDbV5.open();
 
@@ -660,12 +683,15 @@ describe("Database Migrations", () => {
       const testDbV6 = new Dexie(dbNameV6);
       testDbV6.version(5).stores({
         games: "++id, normalizedTitle, title, rawgId, releaseYear",
-        libraryEntries: "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
+        libraryEntries:
+          "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
       });
-      testDbV6.version(6)
+      testDbV6
+        .version(6)
         .stores({
           games: "++id, normalizedTitle, title, rawgId, releaseYear",
-          libraryEntries: "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
+          libraryEntries:
+            "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
         })
         .upgrade(async (tx) => {
           const { defaultGames } = await import("./defaults");
@@ -679,12 +705,18 @@ describe("Database Migrations", () => {
           const games = await tx.table("games").toArray();
 
           const sanitizedGames = games.map((game: any) => {
-            const curated = curatedMetadataByTitle.get(String(game.title || "").trim().toLowerCase());
+            const curated = curatedMetadataByTitle.get(
+              String(game.title || "")
+                .trim()
+                .toLowerCase(),
+            );
 
             return {
               ...game,
               title: game.title,
-              normalizedTitle: String(game.title || "").trim().toLowerCase(),
+              normalizedTitle: String(game.title || "")
+                .trim()
+                .toLowerCase(),
               coverUrl: game.coverUrl || curated?.coverUrl,
               rawgId: game.rawgId ?? curated?.rawgId,
             };
@@ -719,7 +751,8 @@ describe("Database Migrations", () => {
 
       // Setup full migration chain
       testDb.version(1).stores({
-        games: "++id, title, platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, rawgId, *genres",
+        games:
+          "++id, title, platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, rawgId, *genres",
         playSessions: "++id, gameId, date",
         reviews: "++id, gameId",
         lists: "++id, name",
@@ -728,10 +761,12 @@ describe("Database Migrations", () => {
         goals: "++id, type, period",
       });
 
-      testDb.version(2)
+      testDb
+        .version(2)
         .stores({
           games: "++id, normalizedTitle, title, rawgId, releaseYear",
-          libraryEntries: "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt",
+          libraryEntries:
+            "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt",
           playSessions: "++id, libraryEntryId, date",
           reviews: "++id, libraryEntryId",
           lists: "++id, name",
@@ -748,7 +783,9 @@ describe("Database Migrations", () => {
 
           for (const legacy of legacyGames as any[]) {
             if (!legacy.id) continue;
-            const normalizedTitle = String(legacy.title || "").trim().toLowerCase();
+            const normalizedTitle = String(legacy.title || "")
+              .trim()
+              .toLowerCase();
             const existingGame = migratedGames.get(normalizedTitle);
             if (!existingGame) {
               migratedGames.set(normalizedTitle, {
@@ -784,25 +821,35 @@ describe("Database Migrations", () => {
             await tx.table("libraryEntries").bulkPut(migratedEntries);
           }
 
-          await tx.table("playSessions").toCollection().modify((session: any) => {
-            session.libraryEntryId = session.gameId;
-            delete session.gameId;
-          });
+          await tx
+            .table("playSessions")
+            .toCollection()
+            .modify((session: any) => {
+              session.libraryEntryId = session.gameId;
+              delete session.gameId;
+            });
 
-          await tx.table("reviews").toCollection().modify((review: any) => {
-            review.libraryEntryId = review.gameId;
-            delete review.gameId;
-          });
+          await tx
+            .table("reviews")
+            .toCollection()
+            .modify((review: any) => {
+              review.libraryEntryId = review.gameId;
+              delete review.gameId;
+            });
 
-          await tx.table("gameTags").toCollection().modify((entry: any) => {
-            entry.libraryEntryId = entry.gameId;
-            delete entry.gameId;
-          });
+          await tx
+            .table("gameTags")
+            .toCollection()
+            .modify((entry: any) => {
+              entry.libraryEntryId = entry.gameId;
+              delete entry.gameId;
+            });
         });
 
       testDb.version(3).stores({
         games: "++id, normalizedTitle, title, rawgId, releaseYear",
-        libraryEntries: "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt",
+        libraryEntries:
+          "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt",
         playSessions: "++id, libraryEntryId, date",
         reviews: "++id, libraryEntryId",
         lists: "++id, name",
@@ -816,9 +863,11 @@ describe("Database Migrations", () => {
 
       testDb.version(4).stores({
         games: "++id, normalizedTitle, title, rawgId, releaseYear",
-        libraryEntries: "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
+        libraryEntries:
+          "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
         stores: "++id, normalizedName, name, updatedAt",
-        libraryEntryStores: "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
+        libraryEntryStores:
+          "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
         platforms: "++id, normalizedName, name, updatedAt",
         gamePlatforms: "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
         playSessions: "++id, libraryEntryId, date",
@@ -834,9 +883,11 @@ describe("Database Migrations", () => {
 
       testDb.version(5).stores({
         games: "++id, normalizedTitle, title, rawgId, releaseYear",
-        libraryEntries: "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
+        libraryEntries:
+          "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
         stores: "++id, normalizedName, name, sourceKey, updatedAt",
-        libraryEntryStores: "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
+        libraryEntryStores:
+          "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
         platforms: "++id, normalizedName, name, updatedAt",
         gamePlatforms: "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
         playSessions: "++id, libraryEntryId, date",
@@ -853,9 +904,11 @@ describe("Database Migrations", () => {
 
       testDb.version(6).stores({
         games: "++id, normalizedTitle, title, rawgId, releaseYear",
-        libraryEntries: "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
+        libraryEntries:
+          "++id, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate",
         stores: "++id, normalizedName, name, sourceKey, updatedAt",
-        libraryEntryStores: "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
+        libraryEntryStores:
+          "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
         platforms: "++id, normalizedName, name, updatedAt",
         gamePlatforms: "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
         playSessions: "++id, libraryEntryId, date",
@@ -892,9 +945,7 @@ describe("Database Migrations", () => {
         "importJobs",
       ];
 
-      expect(testDb.tables.map((t) => t.name)).toEqual(
-        expect.arrayContaining(expectedTables),
-      );
+      expect(testDb.tables.map((t) => t.name)).toEqual(expect.arrayContaining(expectedTables));
 
       await testDb.close();
     });

@@ -62,12 +62,7 @@ type GamePageScreenProps = {
 
 function createReviewFormState(data: GamePageData): ReviewFormState {
   return {
-    score:
-      data.review?.score != null
-        ? String(data.review.score)
-        : data.game.score > 0
-          ? String(data.game.score)
-          : "",
+    score: data.review?.score != null ? String(data.review.score) : data.game.score > 0 ? String(data.game.score) : "",
     recommend: data.review?.recommend ?? "",
     shortReview: data.review?.shortReview ?? "",
     longReview: data.review?.longReview ?? "",
@@ -94,8 +89,8 @@ export function GamePageScreen({
 }: GamePageScreenProps) {
   const [reviewForm, setReviewForm] = useState<ReviewFormState>(() => createReviewFormState(data));
   const [tagsValue, setTagsValue] = useState(() => data.tags.map((tag) => tag.name).join(", "));
-  const [selectedListIds, setSelectedListIds] = useState<number[]>(
-    () => data.lists.map((list) => list.id).filter((listId): listId is number => listId != null),
+  const [selectedListIds, setSelectedListIds] = useState<number[]>(() =>
+    data.lists.map((list) => list.id).filter((listId): listId is number => listId != null),
   );
 
   const openStoreLink = () => {
@@ -213,7 +208,6 @@ export function GamePageScreen({
               <img src={data.record.game.coverUrl} alt={`Capa de ${data.game.title}`} />
             </div>
           ) : null}
-
 
           <div className="game-page-metadata-grid">
             <div className="detail-stat">
@@ -339,10 +333,7 @@ export function GamePageScreen({
                         <NotchButton variant="ghost" onClick={() => onEditSession(session)}>
                           <Pencil size={12} />
                         </NotchButton>
-                        <NotchButton
-                          variant="ghost"
-                          onClick={() => session.id != null && onDeleteSession(session.id)}
-                        >
+                        <NotchButton variant="ghost" onClick={() => session.id != null && onDeleteSession(session.id)}>
                           <Trash2 size={12} />
                         </NotchButton>
                       </div>
@@ -396,9 +387,7 @@ export function GamePageScreen({
                   max="10"
                   step="0.1"
                   value={reviewForm.score}
-                  onChange={(event) =>
-                    setReviewForm((current) => ({ ...current, score: event.target.value }))
-                  }
+                  onChange={(event) => setReviewForm((current) => ({ ...current, score: event.target.value }))}
                 />
               </label>
               <label className="field">
@@ -422,9 +411,7 @@ export function GamePageScreen({
                 <textarea
                   rows={3}
                   value={reviewForm.shortReview}
-                  onChange={(event) =>
-                    setReviewForm((current) => ({ ...current, shortReview: event.target.value }))
-                  }
+                  onChange={(event) => setReviewForm((current) => ({ ...current, shortReview: event.target.value }))}
                 />
               </label>
               <label className="field">
@@ -432,9 +419,7 @@ export function GamePageScreen({
                 <textarea
                   rows={4}
                   value={reviewForm.pros}
-                  onChange={(event) =>
-                    setReviewForm((current) => ({ ...current, pros: event.target.value }))
-                  }
+                  onChange={(event) => setReviewForm((current) => ({ ...current, pros: event.target.value }))}
                 />
               </label>
               <label className="field">
@@ -442,9 +427,7 @@ export function GamePageScreen({
                 <textarea
                   rows={4}
                   value={reviewForm.cons}
-                  onChange={(event) =>
-                    setReviewForm((current) => ({ ...current, cons: event.target.value }))
-                  }
+                  onChange={(event) => setReviewForm((current) => ({ ...current, cons: event.target.value }))}
                 />
               </label>
               <label className="field field--wide">
@@ -452,9 +435,7 @@ export function GamePageScreen({
                 <textarea
                   rows={6}
                   value={reviewForm.longReview}
-                  onChange={(event) =>
-                    setReviewForm((current) => ({ ...current, longReview: event.target.value }))
-                  }
+                  onChange={(event) => setReviewForm((current) => ({ ...current, longReview: event.target.value }))}
                 />
               </label>
             </div>
@@ -463,9 +444,7 @@ export function GamePageScreen({
               <input
                 type="checkbox"
                 checked={reviewForm.hasSpoiler}
-                onChange={(event) =>
-                  setReviewForm((current) => ({ ...current, hasSpoiler: event.target.checked }))
-                }
+                onChange={(event) => setReviewForm((current) => ({ ...current, hasSpoiler: event.target.checked }))}
               />
               <span>Marcar review como contendo spoiler</span>
             </label>

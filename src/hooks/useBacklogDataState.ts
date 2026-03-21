@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  emptyBacklogDataSnapshot,
-  readBacklogDataSnapshot,
-} from "../services/backlogRepository";
+import { emptyBacklogDataSnapshot, readBacklogDataSnapshot } from "../services/backlogRepository";
 
 export function useBacklogDataState() {
   const [snapshot, setSnapshot] = useState(emptyBacklogDataSnapshot);

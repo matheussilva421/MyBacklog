@@ -110,15 +110,9 @@ export function useSessionsScreenState({
     [gameMap, period, platform, query, sessions, status, store],
   );
 
-  const filteredGroups = useMemo(
-    () => buildSessionHistoryGroups(games, filteredSessions),
-    [filteredSessions, games],
-  );
+  const filteredGroups = useMemo(() => buildSessionHistoryGroups(games, filteredSessions), [filteredSessions, games]);
   const overview = useMemo(() => buildSessionOverview(filteredGroups), [filteredGroups]);
-  const monthlyHours = useMemo(
-    () => buildSessionMonthlyHours(filterSessionsByPeriod(sessions, "90d")),
-    [sessions],
-  );
+  const monthlyHours = useMemo(() => buildSessionMonthlyHours(filterSessionsByPeriod(sessions, "90d")), [sessions]);
 
   const timerLabel = useMemo(() => formatTimerValue(elapsedSeconds), [elapsedSeconds]);
 

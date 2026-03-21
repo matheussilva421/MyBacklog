@@ -56,8 +56,8 @@ export function useSelectedGamePage({
       storeNames: storeNamesByEntryId.get(entryId) ?? selectedGame.stores ?? [selectedGame.sourceStore],
       platformNames:
         selectedRecord.game.id != null
-          ? platformNamesByGameId.get(selectedRecord.game.id) ?? selectedGame.platforms ?? [selectedGame.platform]
-          : selectedGame.platforms ?? [selectedGame.platform],
+          ? (platformNamesByGameId.get(selectedRecord.game.id) ?? selectedGame.platforms ?? [selectedGame.platform])
+          : (selectedGame.platforms ?? [selectedGame.platform]),
       sessions,
       review: reviewByEntryId.get(entryId),
       tags,

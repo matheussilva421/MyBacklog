@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BackupPayload } from "../../../backlog/shared";
-import type {
-  Game,
-  LibraryEntry,
-  LibraryEntryList,
-  List,
-  Setting,
-} from "../../../core/types";
+import type { Game, LibraryEntry, LibraryEntryList, List, Setting } from "../../../core/types";
 import { applyRawgMetadataToImportPayload } from "./rawg";
 import {
   buildImportPreview,

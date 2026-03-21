@@ -109,98 +109,109 @@ export function useImportExportState(setNotice: (value: string | null) => void) 
   };
 
   const handleImportPreviewActionChange = (entryId: string, action: ImportPreviewAction) => {
-    setImportPreview((current) => current?.map((entry) => (entry.id === entryId ? { ...entry, action } : entry)) ?? null);
+    setImportPreview(
+      (current) => current?.map((entry) => (entry.id === entryId ? { ...entry, action } : entry)) ?? null,
+    );
   };
 
   const handleImportPreviewMatchChange = (entryId: string, matchId: number | null) => {
-    setImportPreview((current) =>
-      current?.map((entry) =>
-        entry.id === entryId
-          ? {
-              ...entry,
-              selectedMatchId: matchId,
-              selectedGameId: matchId != null ? null : entry.selectedGameId,
-              action: matchId != null ? "update" : entry.action === "ignore" ? "ignore" : "create",
-            }
-          : entry,
-      ) ?? null,
+    setImportPreview(
+      (current) =>
+        current?.map((entry) =>
+          entry.id === entryId
+            ? {
+                ...entry,
+                selectedMatchId: matchId,
+                selectedGameId: matchId != null ? null : entry.selectedGameId,
+                action: matchId != null ? "update" : entry.action === "ignore" ? "ignore" : "create",
+              }
+            : entry,
+        ) ?? null,
     );
   };
 
   const handleImportPreviewGameChange = (entryId: string, gameId: number | null) => {
-    setImportPreview((current) =>
-      current?.map((entry) =>
-        entry.id === entryId
-          ? {
-              ...entry,
-              selectedGameId: gameId,
-              selectedMatchId: gameId != null ? null : entry.selectedMatchId,
-              action: gameId != null && entry.action === "update" ? "create" : entry.action,
-            }
-          : entry,
-      ) ?? null,
+    setImportPreview(
+      (current) =>
+        current?.map((entry) =>
+          entry.id === entryId
+            ? {
+                ...entry,
+                selectedGameId: gameId,
+                selectedMatchId: gameId != null ? null : entry.selectedMatchId,
+                action: gameId != null && entry.action === "update" ? "create" : entry.action,
+              }
+            : entry,
+        ) ?? null,
     );
   };
 
   const handleImportPreviewRawgChange = (entryId: string, rawgId: number | null) => {
-    setImportPreview((current) =>
-      current?.map((entry) =>
-        entry.id === entryId
-          ? {
-              ...entry,
-              selectedRawgId: rawgId,
-            }
-          : entry,
-      ) ?? null,
+    setImportPreview(
+      (current) =>
+        current?.map((entry) =>
+          entry.id === entryId
+            ? {
+                ...entry,
+                selectedRawgId: rawgId,
+              }
+            : entry,
+        ) ?? null,
     );
   };
 
   const handleImportPreviewApplySuggested = () => {
-    setImportPreview((current) =>
-      current?.map((entry) => ({
-        ...entry,
-        action: entry.suggestedAction,
-        selectedMatchId:
-          entry.suggestedAction === "update"
-            ? entry.selectedMatchId ??
-              (entry.matchCandidates.length === 1 ? entry.matchCandidates[0]?.entryId ?? null : null)
-            : entry.selectedMatchId,
-        selectedGameId:
-          entry.suggestedAction === "create" && entry.gameCandidates.length === 1
-            ? entry.selectedGameId ?? entry.gameCandidates[0]?.gameId ?? null
-            : entry.selectedGameId,
-      })) ?? null,
+    setImportPreview(
+      (current) =>
+        current?.map((entry) => ({
+          ...entry,
+          action: entry.suggestedAction,
+          selectedMatchId:
+            entry.suggestedAction === "update"
+              ? (entry.selectedMatchId ??
+                (entry.matchCandidates.length === 1 ? (entry.matchCandidates[0]?.entryId ?? null) : null))
+              : entry.selectedMatchId,
+          selectedGameId:
+            entry.suggestedAction === "create" && entry.gameCandidates.length === 1
+              ? (entry.selectedGameId ?? entry.gameCandidates[0]?.gameId ?? null)
+              : entry.selectedGameId,
+        })) ?? null,
     );
   };
 
   const handleImportPreviewAutoMergeSafe = () => {
-    setImportPreview((current) =>
-      current?.map((entry) =>
-        entry.status === "review" &&
-        entry.matchCandidates.length === 1 &&
-        entry.confidenceScore >= 78 &&
-        entry.matchCandidates[0]
-          ? {
-              ...entry,
-              action: "update",
-              selectedMatchId: entry.matchCandidates[0].entryId,
-              selectedGameId: null,
-            }
-          : entry,
-      ) ?? null,
+    setImportPreview(
+      (current) =>
+        current?.map((entry) =>
+          entry.status === "review" &&
+          entry.matchCandidates.length === 1 &&
+          entry.confidenceScore >= 78 &&
+          entry.matchCandidates[0]
+            ? {
+                ...entry,
+                action: "update",
+                selectedMatchId: entry.matchCandidates[0].entryId,
+                selectedGameId: null,
+              }
+            : entry,
+        ) ?? null,
     );
   };
 
   const handleImportPreviewIgnoreUnsafe = () => {
-    setImportPreview((current) =>
-      current?.map((entry) =>
-        entry.status === "review" && entry.confidenceScore < 78 && entry.selectedMatchId == null && entry.action !== "ignore"
-          ? {
-              ...entry,
-              action: "ignore",
-            }
-          : entry,
-      ) ?? null,
+    setImportPreview(
+      (current) =>
+        current?.map((entry) =>
+          entry.status === "review" &&
+          entry.confidenceScore < 78 &&
+          entry.selectedMatchId == null &&
+          entry.action !== "ignore"
+            ? {
+                ...entry,
+                action: "ignore",
+              }
+            : entry,
+        ) ?? null,
     );
   };
 

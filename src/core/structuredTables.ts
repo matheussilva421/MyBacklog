@@ -1,13 +1,6 @@
-import type {
-  Game,
-  GamePlatform,
-  LibraryEntry,
-  LibraryEntryStore,
-  Platform,
-  Store,
-} from "./types";
+import type { Game, GamePlatform, LibraryEntry, LibraryEntryStore, Platform, Store } from "./types";
 import { classifyAccessSource } from "./libraryEntryDerived";
-import { normalizeToken, splitCsvTokens } from "./utils";
+import { normalizeToken, splitCsvTokens, generateUuid } from "./utils";
 
 export type StructuredTablesSnapshot = {
   stores: Store[];
@@ -43,10 +36,7 @@ export function buildStructuredTablesFromLegacy({
 
   const storeNamesByEntryId = new Map<number, string[]>();
   for (const entry of entryRows) {
-    const storeNames = splitCsvTokens([
-      entry.sourceStore,
-      ...(extraStoresByEntryId?.get(entry.id) ?? []),
-    ]);
+    const storeNames = splitCsvTokens([entry.sourceStore, ...(extraStoresByEntryId?.get(entry.id) ?? [])]);
     if (storeNames.length > 0) storeNamesByEntryId.set(entry.id, storeNames);
   }
 
@@ -63,15 +53,16 @@ export function buildStructuredTablesFromLegacy({
   const now = new Date().toISOString();
   const stores: Store[] = uniqueStoreNames.map((name, index) => ({
     id: index + 1,
+    uuid: generateUuid(),
+    version: 1,
     name,
     normalizedName: normalizeToken(name),
     sourceKey: classifyAccessSource(name),
     createdAt: now,
     updatedAt: now,
+    deletedAt: null,
   }));
-  const storeIdByNormalizedName = new Map(
-    stores.map((store) => [store.normalizedName, store.id ?? 0] as const),
-  );
+  const storeIdByNormalizedName = new Map(stores.map((store) => [store.normalizedName, store.id ?? 0] as const));
 
   const libraryEntryStores: LibraryEntryStore[] = [];
   let nextLibraryEntryStoreId = 1;
@@ -82,10 +73,14 @@ export function buildStructuredTablesFromLegacy({
       if (!storeId) return;
       libraryEntryStores.push({
         id: nextLibraryEntryStoreId++,
+        uuid: generateUuid(),
+        version: 1,
         libraryEntryId: entry.id,
         storeId,
         isPrimary: index === 0,
         createdAt: entry.createdAt || now,
+        updatedAt: now,
+        deletedAt: null,
       });
     });
   }
@@ -115,10 +110,13 @@ export function buildStructuredTablesFromLegacy({
 
   const platforms: Platform[] = uniquePlatformNames.map((name, index) => ({
     id: index + 1,
+    uuid: generateUuid(),
+    version: 1,
     name,
     normalizedName: normalizeToken(name),
     createdAt: now,
     updatedAt: now,
+    deletedAt: null,
   }));
   const platformIdByNormalizedName = new Map(
     platforms.map((platform) => [platform.normalizedName, platform.id ?? 0] as const),
@@ -133,9 +131,13 @@ export function buildStructuredTablesFromLegacy({
       if (!platformId) return;
       gamePlatforms.push({
         id: nextGamePlatformId++,
+        uuid: generateUuid(),
+        version: 1,
         gameId: game.id,
         platformId,
         createdAt: game.createdAt || now,
+        updatedAt: now,
+        deletedAt: null,
       });
     });
   }

@@ -322,9 +322,7 @@ describe("backlogRepository", () => {
       const result = shouldSeedDefaultLibrary({
         seedIfEmpty: true,
         libraryEntryCount: 0,
-        settingRows: [
-          { key: syncSettingsKeys.skipDefaultSeed, value: "true" },
-        ],
+        settingRows: [{ key: syncSettingsKeys.skipDefaultSeed, value: "true" }],
       });
 
       expect(result).toBe(false);
@@ -334,9 +332,7 @@ describe("backlogRepository", () => {
       const result = shouldSeedDefaultLibrary({
         seedIfEmpty: true,
         libraryEntryCount: 0,
-        settingRows: [
-          { key: syncSettingsKeys.skipDefaultSeed, value: "false" },
-        ],
+        settingRows: [{ key: syncSettingsKeys.skipDefaultSeed, value: "false" }],
       });
 
       expect(result).toBe(true);
@@ -486,7 +482,8 @@ describe("backlogRepository", () => {
 
       vi.mocked(db.libraryEntries.orderBy).mockReturnValue({
         reverse: vi.fn().mockReturnValue({
-          toArray: vi.fn()
+          toArray: vi
+            .fn()
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce([{ id: 1, gameId: 1, updatedAt: "2024-01-01T00:00:00.000Z" }]),
         }),

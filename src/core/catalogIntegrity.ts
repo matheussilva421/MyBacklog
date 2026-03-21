@@ -75,9 +75,7 @@ export function deriveCompletionDate(args: {
 }): string | undefined {
   const completionPercent = clampCompletionPercent(args.completionPercent);
   const isCompleted =
-    completionPercent >= 100 ||
-    args.progressStatus === "finished" ||
-    args.progressStatus === "completed_100";
+    completionPercent >= 100 || args.progressStatus === "finished" || args.progressStatus === "completed_100";
 
   if (!isCompleted) return undefined;
 

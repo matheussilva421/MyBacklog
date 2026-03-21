@@ -41,15 +41,7 @@ vi.mock("../modules/game-page/components/GamePageScreen", () => ({
   GamePageScreen: () => <div>game-screen</div>,
 }));
 vi.mock("../modules/onboarding/components/GuidedTourModal", () => ({
-  GuidedTourModal: ({
-    open,
-    onNext,
-    onClose,
-  }: {
-    open: boolean;
-    onNext: () => void;
-    onClose: () => void;
-  }) =>
+  GuidedTourModal: ({ open, onNext, onClose }: { open: boolean; onNext: () => void; onClose: () => void }) =>
     open ? (
       <div>
         <div>guided-tour</div>
@@ -158,7 +150,17 @@ function createAppState(overrides: Record<string, unknown> = {}) {
     gameModalMode: null,
     gameForm: { libraryEntryId: 0 },
     batchEditModalOpen: false,
-    batchEditForm: { applyMode: "merge", status: "", priority: "", primaryPlatform: "", platforms: [], primaryStore: "", stores: [], tags: "", listIds: [] },
+    batchEditForm: {
+      applyMode: "merge",
+      status: "",
+      priority: "",
+      primaryPlatform: "",
+      platforms: [],
+      primaryStore: "",
+      stores: [],
+      tags: "",
+      listIds: [],
+    },
     sessionModalOpen: false,
     sessionForm: {},
     sessionEditId: null,
@@ -236,12 +238,42 @@ function createAppState(overrides: Record<string, unknown> = {}) {
 
     // Catalog maintenance
     catalogMaintenanceReport: {
-      summary: { totalIssues: 0, structuralIssues: 0, repairableStructuralIssues: 0, duplicateGroups: 0, duplicateEntries: 0, metadataQueue: 0, orphanSessions: 0 },
+      summary: {
+        totalIssues: 0,
+        structuralIssues: 0,
+        repairableStructuralIssues: 0,
+        duplicateGroups: 0,
+        duplicateEntries: 0,
+        metadataQueue: 0,
+        orphanSessions: 0,
+      },
       duplicateGroups: [],
       metadataQueue: [],
-      audit: { summary: { totalIssues: 0, repairableIssues: 0, metadataIssues: 0, orphanSessions: 0, playtimeIssues: 0, progressIssues: 0 }, issues: [], repairPlan: { entryUpdates: [], orphanSessionIds: [] } },
+      audit: {
+        summary: {
+          totalIssues: 0,
+          repairableIssues: 0,
+          metadataIssues: 0,
+          orphanSessions: 0,
+          playtimeIssues: 0,
+          progressIssues: 0,
+        },
+        issues: [],
+        repairPlan: { entryUpdates: [], orphanSessionIds: [] },
+      },
     },
-    catalogAuditReport: { summary: { totalIssues: 0, repairableIssues: 0, metadataIssues: 0, orphanSessions: 0, playtimeIssues: 0, progressIssues: 0 }, issues: [], repairPlan: { entryUpdates: [], orphanSessionIds: [] } },
+    catalogAuditReport: {
+      summary: {
+        totalIssues: 0,
+        repairableIssues: 0,
+        metadataIssues: 0,
+        orphanSessions: 0,
+        playtimeIssues: 0,
+        progressIssues: 0,
+      },
+      issues: [],
+      repairPlan: { entryUpdates: [], orphanSessionIds: [] },
+    },
 
     // Handlers de ação
     handleOnboardingSubmit: vi.fn(),
@@ -276,7 +308,18 @@ function createAppState(overrides: Record<string, unknown> = {}) {
     setNotice: vi.fn(),
 
     // Propriedades calculadas (para retrocompatibilidade com testes)
-    stats: { total: 12, hours: 120, backlog: 5, playing: 2, finished: 5, totalDelta: "", backlogDelta: "", playingDelta: "", finishedDelta: "", hoursDelta: "" },
+    stats: {
+      total: 12,
+      hours: 120,
+      backlog: 5,
+      playing: 2,
+      finished: 5,
+      totalDelta: "",
+      backlogDelta: "",
+      playingDelta: "",
+      finishedDelta: "",
+      hoursDelta: "",
+    },
     monthlyProgress: [],
     platformData: [],
     storeData: [],
@@ -284,7 +327,20 @@ function createAppState(overrides: Record<string, unknown> = {}) {
     continuePlayingGames: [],
     visiblePlannerQueue: [],
     personalBadges: [],
-    monthlyRecap: { title: "Recap", isMonthEnd: false, periodLabel: "Jan", summary: "", totalHours: 0, totalSessions: 0, activeGames: 0, activeDays: 0, topGameTitle: "", topGameHours: 0, completedGames: 0, addedGames: 0 },
+    monthlyRecap: {
+      title: "Recap",
+      isMonthEnd: false,
+      periodLabel: "Jan",
+      summary: "",
+      totalHours: 0,
+      totalSessions: 0,
+      activeGames: 0,
+      activeDays: 0,
+      topGameTitle: "",
+      topGameHours: 0,
+      completedGames: 0,
+      addedGames: 0,
+    },
     goalProgress: [],
     libraryGames: [],
     groupedLibraryGames: [{ key: "all", label: "Todos", games: [] }],

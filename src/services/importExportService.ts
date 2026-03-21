@@ -29,15 +29,10 @@ import {
   resolveStructuredPlatforms,
   resolveStructuredStores,
 } from "../core/structuredRelations";
-import {
-  buildStructuredEntryLookupAliases,
-  createStructuredEntryIdentity,
-} from "../core/structuredEntryIdentity";
-import type {
-  Goal as DbGoal,
-  SavedView as DbSavedView,
-} from "../core/types";
+import { buildStructuredEntryLookupAliases, createStructuredEntryIdentity } from "../core/structuredEntryIdentity";
+import type { Goal as DbGoal, SavedView as DbSavedView } from "../core/types";
 import type { AppPreferences } from "../modules/settings/utils/preferences";
+import { generateUuid } from "../core/utils";
 import {
   applyRawgMetadataToImportPayload,
   fetchRawgMetadata,
@@ -63,11 +58,7 @@ function buildStructuredEntryLookup(
       title: record.game.title,
       primaryPlatform: record.libraryEntry.platform,
       primaryStore: record.libraryEntry.sourceStore,
-      platforms: resolveStructuredPlatforms(
-        record.game,
-        record.libraryEntry.platform,
-        args.platformNamesByGameId,
-      ),
+      platforms: resolveStructuredPlatforms(record.game, record.libraryEntry.platform, args.platformNamesByGameId),
       stores: resolveStructuredStores(record.libraryEntry, args.storeNamesByEntryId),
     });
 
@@ -92,7 +83,7 @@ function findStructuredLibraryRecordMatch(
       matches.set(record.libraryEntry.id, record);
     }
   }
-  return matches.size === 1 ? Array.from(matches.values())[0] ?? null : null;
+  return matches.size === 1 ? (Array.from(matches.values())[0] ?? null) : null;
 }
 
 function registerStructuredLibraryRecordMatch(
@@ -107,29 +98,20 @@ function registerStructuredLibraryRecordMatch(
     title: record.game.title,
     primaryPlatform: record.libraryEntry.platform,
     primaryStore: record.libraryEntry.sourceStore,
-    platforms: resolveStructuredPlatforms(
-      record.game,
-      record.libraryEntry.platform,
-      args.platformNamesByGameId,
-    ),
+    platforms: resolveStructuredPlatforms(record.game, record.libraryEntry.platform, args.platformNamesByGameId),
     stores: resolveStructuredStores(record.libraryEntry, args.storeNamesByEntryId),
   });
 
   for (const alias of buildStructuredEntryLookupAliases(identity)) {
     const current = lookup.get(alias) ?? [];
-    const hasRecord = current.some(
-      (currentRecord) => currentRecord.libraryEntry.id === record.libraryEntry.id,
-    );
+    const hasRecord = current.some((currentRecord) => currentRecord.libraryEntry.id === record.libraryEntry.id);
     if (hasRecord) continue;
     current.push(record);
     lookup.set(alias, current);
   }
 }
 
-async function fetchRawgCandidateMap(
-  preview: Array<{ key: string; payload: { title: string } }>,
-  apiKey: string,
-) {
+async function fetchRawgCandidateMap(preview: Array<{ key: string; payload: { title: string } }>, apiKey: string) {
   const candidateMap = new Map<string, Awaited<ReturnType<typeof searchRawgCandidates>>>();
   const results = await Promise.allSettled(
     preview.map(async (entry) => ({
@@ -149,10 +131,7 @@ async function fetchRawgCandidateMap(
   return candidateMap;
 }
 
-async function fetchSelectedRawgMetadata(
-  preview: Array<{ selectedRawgId: number | null }>,
-  apiKey: string,
-) {
+async function fetchSelectedRawgMetadata(preview: Array<{ selectedRawgId: number | null }>, apiKey: string) {
   const uniqueRawgIds = Array.from(
     new Set(
       preview
@@ -204,11 +183,7 @@ export async function prepareImportPreview(args: {
     parsed,
     args.records.map((record) => ({
       ...record,
-      structuredPlatforms: resolveStructuredPlatforms(
-        record.game,
-        record.libraryEntry.platform,
-        platformNamesByGameId,
-      ),
+      structuredPlatforms: resolveStructuredPlatforms(record.game, record.libraryEntry.platform, platformNamesByGameId),
       structuredStores: resolveStructuredStores(record.libraryEntry, storeNamesByEntryId),
     })),
   );
@@ -240,14 +215,7 @@ export async function applyImportPreview(args: {
 
   await db.transaction(
     "rw",
-    [
-      db.games,
-      db.libraryEntries,
-      db.stores,
-      db.libraryEntryStores,
-      db.platforms,
-      db.gamePlatforms,
-    ],
+    [db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
     async () => {
       for (const previewEntry of args.importPreview) {
         if (previewEntry.action === "ignore") {
@@ -257,24 +225,15 @@ export async function applyImportPreview(args: {
 
         let payload: ImportPayload = previewEntry.payload;
         if (previewEntry.selectedRawgId) {
-          payload = applyRawgMetadataToImportPayload(
-            payload,
-            rawgMetadataMap.get(previewEntry.selectedRawgId) ?? null,
-          );
+          payload = applyRawgMetadataToImportPayload(payload, rawgMetadataMap.get(previewEntry.selectedRawgId) ?? null);
         }
 
         const targetEntryId = previewEntry.selectedMatchId ?? previewEntry.existingId;
         if (previewEntry.action === "create" || targetEntryId == null) {
           const selectedGame =
-            previewEntry.selectedGameId != null
-              ? await db.games.get(previewEntry.selectedGameId)
-              : undefined;
+            previewEntry.selectedGameId != null ? await db.games.get(previewEntry.selectedGameId) : undefined;
           const existingMetadata =
-            selectedGame ??
-            (await db.games
-              .where("normalizedTitle")
-              .equals(normalizeGameTitle(payload.title))
-              .first());
+            selectedGame ?? (await db.games.where("normalizedTitle").equals(normalizeGameTitle(payload.title)).first());
           const createdRecord = createDbGameFromImport(payload, existingMetadata);
           let gameId = existingMetadata?.id;
           let persistedGame = createdRecord.game;
@@ -287,17 +246,12 @@ export async function applyImportPreview(args: {
               ...existingMetadata,
               ...createdRecord.game,
               id: existingMetadata.id,
-              platforms: mergePlatformList(
-                existingMetadata.platforms,
-                createdRecord.libraryEntry.platform,
-              ),
+              platforms: mergePlatformList(existingMetadata.platforms, createdRecord.libraryEntry.platform),
             };
             await db.games.put(persistedGame);
           }
 
-          const libraryEntryId = Number(
-            await db.libraryEntries.add({ ...createdRecord.libraryEntry, gameId }),
-          );
+          const libraryEntryId = Number(await db.libraryEntries.add({ ...createdRecord.libraryEntry, gameId }));
           await syncStructuredRelationsForRecord({
             game: { ...persistedGame, id: gameId },
             libraryEntry: { ...createdRecord.libraryEntry, id: libraryEntryId },
@@ -315,10 +269,7 @@ export async function applyImportPreview(args: {
           continue;
         }
 
-        const merged = mergeImportedGame(
-          { game: currentGame, libraryEntry: currentEntry },
-          payload,
-        );
+        const merged = mergeImportedGame({ game: currentGame, libraryEntry: currentEntry }, payload);
         await db.games.put(merged.game);
         const libraryEntryId = Number(
           await db.libraryEntries.put({
@@ -344,6 +295,8 @@ export async function applyImportPreview(args: {
 
   await db.importJobs
     .add({
+      uuid: generateUuid(),
+      version: 1,
       source: args.importSource,
       status: "completed",
       totalItems: args.importPreview.length,
@@ -352,25 +305,16 @@ export async function applyImportPreview(args: {
       changes: JSON.stringify(changeList),
       createdAt: now,
       updatedAt: now,
+      deletedAt: null,
     })
     .catch(() => {});
 
   return { created, updated, ignored };
 }
 
-export function exportLibraryCsv(args: {
-  records: LibraryRecord[];
-  tables: BackupTables;
-  exportedAt?: string;
-}) {
-  const storeNamesByEntryId = buildStoreNamesByEntryId(
-    args.tables.stores,
-    args.tables.libraryEntryStores,
-  );
-  const platformNamesByGameId = buildPlatformNamesByGameId(
-    args.tables.platforms,
-    args.tables.gamePlatforms,
-  );
+export function exportLibraryCsv(args: { records: LibraryRecord[]; tables: BackupTables; exportedAt?: string }) {
+  const storeNamesByEntryId = buildStoreNamesByEntryId(args.tables.stores, args.tables.libraryEntryStores);
+  const platformNamesByGameId = buildPlatformNamesByGameId(args.tables.platforms, args.tables.gamePlatforms);
   const content = gamesToCsv(
     args.records.map((record) =>
       recordToImportPayload(record, {
@@ -387,10 +331,13 @@ export function exportLibraryCsv(args: {
   };
 }
 
-export function exportBackupPayload(args: {
-  tables: BackupTables;
-  exportedAt?: string;
-}): { totalRecords: number; payload: BackupPayload; filename: string; content: string; mimeType: string } {
+export function exportBackupPayload(args: { tables: BackupTables; exportedAt?: string }): {
+  totalRecords: number;
+  payload: BackupPayload;
+  filename: string;
+  content: string;
+  mimeType: string;
+} {
   const totalRecords =
     args.tables.games.length +
     args.tables.libraryEntries.length +
@@ -535,71 +482,44 @@ export async function applyRestorePreview(preview: RestorePreview) {
       const existingGamesByTitle = new Map(
         existingGames.map((game) => [game.normalizedTitle || normalizeGameTitle(game.title), game] as const),
       );
-      const existingStoreNamesByEntryId = buildStoreNamesByEntryId(
-        existingStores,
-        existingLibraryEntryStores,
-      );
-      const existingPlatformNamesByGameId = buildPlatformNamesByGameId(
-        existingPlatforms,
-        existingGamePlatforms,
-      );
+      const existingStoreNamesByEntryId = buildStoreNamesByEntryId(existingStores, existingLibraryEntryStores);
+      const existingPlatformNamesByGameId = buildPlatformNamesByGameId(existingPlatforms, existingGamePlatforms);
       const existingStoreMap = new Map(
         existingStores.map((store) => [store.name.trim().toLowerCase(), store] as const),
       );
       const existingPlatformMap = new Map(
         existingPlatforms.map((platform) => [platform.name.trim().toLowerCase(), platform] as const),
       );
-      const existingEntryLookup = buildStructuredEntryLookup(
-        composeLibraryRecords(existingGames, existingEntries),
-        {
-          storeNamesByEntryId: existingStoreNamesByEntryId,
-          platformNamesByGameId: existingPlatformNamesByGameId,
-        },
-      );
-      const existingTagMap = new Map(
-        existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag] as const),
-      );
-      const existingListMap = new Map(
-        existingLists.map((list) => [list.name.trim().toLowerCase(), list] as const),
-      );
+      const existingEntryLookup = buildStructuredEntryLookup(composeLibraryRecords(existingGames, existingEntries), {
+        storeNamesByEntryId: existingStoreNamesByEntryId,
+        platformNamesByGameId: existingPlatformNamesByGameId,
+      });
+      const existingTagMap = new Map(existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag] as const));
+      const existingListMap = new Map(existingLists.map((list) => [list.name.trim().toLowerCase(), list] as const));
       const libraryEntryListSet = new Set(
         existingLibraryEntryLists.map((entry) => `${entry.libraryEntryId}::${entry.listId}`),
       );
       const existingGoalMap = new Map<string, DbGoal>(
         existingGoals.map((goal) => [`${goal.type}::${goal.period}`, goal] as const),
       );
-      const existingReviewMap = new Map(
-        existingReviews.map((review) => [review.libraryEntryId, review] as const),
-      );
+      const existingReviewMap = new Map(existingReviews.map((review) => [review.libraryEntryId, review] as const));
       const sessionSet = new Set(
-        existingSessions.map((session) =>
-          buildPlaySessionDedupKey(session.libraryEntryId, session),
-        ),
+        existingSessions.map((session) => buildPlaySessionDedupKey(session.libraryEntryId, session)),
       );
-      const gameTagSet = new Set(
-        existingGameTags.map((entry) => `${entry.libraryEntryId}::${entry.tagId}`),
-      );
+      const gameTagSet = new Set(existingGameTags.map((entry) => `${entry.libraryEntryId}::${entry.tagId}`));
       const libraryEntryStoreSet = new Set(
         existingLibraryEntryStores.map((relation) => `${relation.libraryEntryId}::${relation.storeId}`),
       );
       const gamePlatformSet = new Set(
         existingGamePlatforms.map((relation) => `${relation.gameId}::${relation.platformId}`),
       );
-      const existingSettingMap = new Map(
-        existingSettings.map((setting) => [setting.key, setting] as const),
-      );
+      const existingSettingMap = new Map(existingSettings.map((setting) => [setting.key, setting] as const));
       const existingSavedViewMap = new Map<string, DbSavedView>(
         existingSavedViews.map((view) => [`${view.scope}::${view.name.trim().toLowerCase()}`, view] as const),
       );
       const payloadGamesById = new Map(payload.games.map((game) => [game.id, game] as const));
-      const payloadStoreNamesByEntryId = buildStoreNamesByEntryId(
-        payload.stores,
-        payload.libraryEntryStores,
-      );
-      const payloadPlatformNamesByGameId = buildPlatformNamesByGameId(
-        payload.platforms,
-        payload.gamePlatforms,
-      );
+      const payloadStoreNamesByEntryId = buildStoreNamesByEntryId(payload.stores, payload.libraryEntryStores);
+      const payloadPlatformNamesByGameId = buildPlatformNamesByGameId(payload.platforms, payload.gamePlatforms);
       const resolvedGameIdByPayloadId = new Map<number, number>();
       const resolvedEntryIdByPayloadId = new Map<number, number>();
       const resolvedStoreIdByPayloadId = new Map<number, number>();
@@ -637,11 +557,7 @@ export async function applyRestorePreview(preview: RestorePreview) {
             title: payloadGame.title,
             primaryPlatform: entry.platform,
             primaryStore: entry.sourceStore,
-            platforms: resolveStructuredPlatforms(
-              payloadGame,
-              entry.platform,
-              payloadPlatformNamesByGameId,
-            ),
+            platforms: resolveStructuredPlatforms(payloadGame, entry.platform, payloadPlatformNamesByGameId),
             stores: resolveStructuredStores(entry, payloadStoreNamesByEntryId),
           }),
         )?.libraryEntry;
@@ -748,10 +664,7 @@ export async function applyRestorePreview(preview: RestorePreview) {
           continue;
         }
         if (relation.isPrimary) {
-          const existingPrimary = await db.libraryEntryStores
-            .where("libraryEntryId")
-            .equals(libraryEntryId)
-            .toArray();
+          const existingPrimary = await db.libraryEntryStores.where("libraryEntryId").equals(libraryEntryId).toArray();
           for (const item of existingPrimary) {
             if (item.id != null && item.isPrimary) {
               await db.libraryEntryStores.update(item.id, { isPrimary: false });
@@ -759,11 +672,16 @@ export async function applyRestorePreview(preview: RestorePreview) {
           }
         }
         libraryEntryStoreSet.add(key);
+        const now = new Date().toISOString();
         await db.libraryEntryStores.add({
+          uuid: generateUuid(),
+          version: 1,
           libraryEntryId,
           storeId,
           isPrimary: relation.isPrimary,
-          createdAt: relation.createdAt || new Date().toISOString(),
+          createdAt: relation.createdAt || now,
+          updatedAt: now,
+          deletedAt: null,
         });
       }
 
@@ -774,10 +692,15 @@ export async function applyRestorePreview(preview: RestorePreview) {
         const key = `${gameId}::${platformId}`;
         if (gamePlatformSet.has(key)) continue;
         gamePlatformSet.add(key);
+        const now = new Date().toISOString();
         await db.gamePlatforms.add({
+          uuid: generateUuid(),
+          version: 1,
           gameId,
           platformId,
-          createdAt: relation.createdAt || new Date().toISOString(),
+          createdAt: relation.createdAt || now,
+          updatedAt: now,
+          deletedAt: null,
         });
       }
 
@@ -802,10 +725,15 @@ export async function applyRestorePreview(preview: RestorePreview) {
         const key = `${libraryEntryId}::${listId}`;
         if (libraryEntryListSet.has(key)) continue;
         libraryEntryListSet.add(key);
+        const now = new Date().toISOString();
         await db.libraryEntryLists.add({
+          uuid: generateUuid(),
+          version: 1,
           libraryEntryId,
           listId,
-          createdAt: relation.createdAt || new Date().toISOString(),
+          createdAt: relation.createdAt || now,
+          updatedAt: now,
+          deletedAt: null,
         });
       }
 
@@ -873,7 +801,16 @@ export async function applyRestorePreview(preview: RestorePreview) {
         const key = `${libraryEntryId}::${tagId}`;
         if (gameTagSet.has(key)) continue;
         gameTagSet.add(key);
-        await db.gameTags.add({ libraryEntryId, tagId });
+        const now = new Date().toISOString();
+        await db.gameTags.add({
+          uuid: generateUuid(),
+          version: 1,
+          libraryEntryId,
+          tagId,
+          createdAt: relation.createdAt || now,
+          updatedAt: now,
+          deletedAt: null,
+        });
       }
 
       for (const setting of payload.settings) {

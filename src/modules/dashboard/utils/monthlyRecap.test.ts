@@ -54,10 +54,7 @@ function createSession(partial: Partial<PlaySession>): PlaySession {
 describe("buildMonthlyRecap", () => {
   it("summarizes current month hours, completions and top game", () => {
     const recap = buildMonthlyRecap(
-      [
-        createGame({ id: 1, title: "Cyberpunk 2077" }),
-        createGame({ id: 2, title: "Balatro" }),
-      ],
+      [createGame({ id: 1, title: "Cyberpunk 2077" }), createGame({ id: 2, title: "Balatro" })],
       [
         createEntry({
           id: 1,

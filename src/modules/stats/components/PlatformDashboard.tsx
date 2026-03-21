@@ -60,7 +60,9 @@ export function PlatformDashboard({ platform, games, onBack }: PlatformDashboard
           <SectionHeader icon={Trophy} title="Conclusão" description="Taxa de finalização" />
           <div className="stat-card__value">{completionRate}%</div>
           <div className="stat-card__label">
-            {activeGames > 0 ? `${finishedGames} terminados de ${activeGames} ativos` : "Sem jogos ativos fora da wishlist"}
+            {activeGames > 0
+              ? `${finishedGames} terminados de ${activeGames} ativos`
+              : "Sem jogos ativos fora da wishlist"}
           </div>
         </Panel>
 
@@ -74,13 +76,17 @@ export function PlatformDashboard({ platform, games, onBack }: PlatformDashboard
       <div className="dashboard-grid platform-dashboard__summary-grid">
         <Panel className="stat-card stat-card--accent">
           <SectionHeader icon={Coins} title="Investimento" description="Valor total pago" />
-          <div className="stat-card__value">{currency} {totalSpent.toFixed(2)}</div>
+          <div className="stat-card__value">
+            {currency} {totalSpent.toFixed(2)}
+          </div>
           <div className="stat-card__label">em {investmentGames} jogos</div>
         </Panel>
 
         <Panel className="stat-card stat-card--dim">
           <SectionHeader icon={Target} title="Wishlist" description="Custo projetado de desejos" />
-          <div className="stat-card__value">{currency} {totalTarget.toFixed(2)}</div>
+          <div className="stat-card__value">
+            {currency} {totalTarget.toFixed(2)}
+          </div>
           <div className="stat-card__label">para {wishlistGames} jogos desejados</div>
         </Panel>
       </div>
@@ -101,7 +107,9 @@ export function PlatformDashboard({ platform, games, onBack }: PlatformDashboard
                         {game.genre} • {getGameStores(game).join(", ")}
                       </div>
                     </div>
-                    <Pill tone={game.status === "Terminado" ? "emerald" : game.status === "Jogando" ? "cyan" : "neutral"}>
+                    <Pill
+                      tone={game.status === "Terminado" ? "emerald" : game.status === "Jogando" ? "cyan" : "neutral"}
+                    >
                       {game.status}
                     </Pill>
                   </div>

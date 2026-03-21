@@ -30,10 +30,7 @@ export function usePlannerInsights({
     [goalRows, libraryEntryRows, sessionRows],
   );
 
-  const plannerGoalSignals = useMemo(
-    () => createPlannerGoalSignals(resolvedGoalRows),
-    [resolvedGoalRows],
-  );
+  const plannerGoalSignals = useMemo(() => createPlannerGoalSignals(resolvedGoalRows), [resolvedGoalRows]);
 
   const computedPlannerQueue = useMemo<PlannerEntry[]>(() => {
     return games

@@ -1,14 +1,8 @@
 import { useState } from "react";
-import {
-  createGameFormState,
-  type GameFormState,
-} from "../../backlog/shared";
+import { createGameFormState, type GameFormState } from "../../backlog/shared";
 import type { Game } from "../../backlog/shared";
 
-export function useGameModalState(args: {
-  defaultPlatform?: string;
-  defaultStore?: string;
-}) {
+export function useGameModalState(args: { defaultPlatform?: string; defaultStore?: string }) {
   const [gameModalMode, setGameModalMode] = useState<"create" | "edit" | null>(null);
   const [gameForm, setGameForm] = useState<GameFormState>(() => createGameFormState());
 
@@ -35,10 +29,8 @@ export function useGameModalState(args: {
 
   const closeGameModal = () => setGameModalMode(null);
 
-  const handleGameFormChange = <K extends keyof GameFormState>(
-    field: K,
-    value: GameFormState[K],
-  ) => setGameForm((current) => ({ ...current, [field]: value }));
+  const handleGameFormChange = <K extends keyof GameFormState>(field: K, value: GameFormState[K]) =>
+    setGameForm((current) => ({ ...current, [field]: value }));
 
   return {
     gameModalMode,

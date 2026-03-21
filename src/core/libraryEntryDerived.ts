@@ -82,9 +82,7 @@ export function resolveLibraryEntrySemantics(entry: EntryOwnershipShape): Librar
 
 export function isCompleted(entry: Pick<LibraryEntry, "progressStatus" | "completionPercent">): boolean {
   return (
-    entry.progressStatus === "finished" ||
-    entry.progressStatus === "completed_100" ||
-    entry.completionPercent >= 100
+    entry.progressStatus === "finished" || entry.progressStatus === "completed_100" || entry.completionPercent >= 100
   );
 }
 
@@ -100,7 +98,9 @@ export function isWishlistEntry(entry: Pick<LibraryEntry, "ownershipStatus">): b
   return entry.ownershipStatus === "wishlist";
 }
 
-export function hasStarted(entry: Pick<LibraryEntry, "progressStatus" | "completionPercent" | "playtimeMinutes">): boolean {
+export function hasStarted(
+  entry: Pick<LibraryEntry, "progressStatus" | "completionPercent" | "playtimeMinutes">,
+): boolean {
   return (
     isCurrentlyPlaying(entry) ||
     isPaused(entry) ||

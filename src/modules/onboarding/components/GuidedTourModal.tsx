@@ -88,7 +88,7 @@ export function GuidedTourModal({
               <NotchButton variant="ghost" onClick={onClose} disabled={completing}>
                 Pular tutorial
               </NotchButton>
-            <div className="guided-tour__actions">
+              <div className="guided-tour__actions">
                 <NotchButton variant="secondary" onClick={onPrevious} disabled={isFirstStep || completing}>
                   <ChevronLeft size={14} />
                   Anterior

@@ -3,10 +3,7 @@ import { getPrimaryCsvToken, repairLegacyText } from "../../core/utils";
 import type { Game, LibraryRecord } from "../../backlog/shared";
 import type { Game as DbGameMetadata, LibraryEntry as DbLibraryEntry } from "../../core/types";
 
-export function composeLibraryRecords(
-  games: DbGameMetadata[],
-  libraryEntries: DbLibraryEntry[],
-): LibraryRecord[] {
+export function composeLibraryRecords(games: DbGameMetadata[], libraryEntries: DbLibraryEntry[]): LibraryRecord[] {
   const gameMap = new Map(games.map((game) => [game.id, game]));
   return libraryEntries
     .map((libraryEntry) => {
@@ -26,14 +23,16 @@ export function dbGameToUiGame(
 ): Game {
   const { game, libraryEntry } = record;
   const title = repairLegacyText(game.title) || game.title;
-  const structuredPlatforms = structured?.platforms?.map((value) => repairLegacyText(value) || value).filter(Boolean) ?? [];
+  const structuredPlatforms =
+    structured?.platforms?.map((value) => repairLegacyText(value) || value).filter(Boolean) ?? [];
   const structuredStores = structured?.stores?.map((value) => repairLegacyText(value) || value).filter(Boolean) ?? [];
   const platform =
     repairLegacyText(libraryEntry.platform) ||
     repairLegacyText(getPrimaryCsvToken(structuredPlatforms, getPrimaryCsvToken(game.platforms, "PC"))) ||
     "PC";
   const genre = repairLegacyText(getPrimaryCsvToken(game.genres, "Catálogo tático")) || "Catálogo tático";
-  const catalogPlatforms = structuredPlatforms.length > 0 ? structuredPlatforms.join(", ") : repairLegacyText(game.platforms) || undefined;
+  const catalogPlatforms =
+    structuredPlatforms.length > 0 ? structuredPlatforms.join(", ") : repairLegacyText(game.platforms) || undefined;
   const sourceStore =
     repairLegacyText(getPrimaryCsvToken(structuredStores, libraryEntry.sourceStore)) ||
     repairLegacyText(libraryEntry.sourceStore) ||
@@ -61,8 +60,7 @@ export function dbGameToUiGame(
     eta,
     priority: dbPriorityToPriority(libraryEntry.priority),
     mood,
-    score:
-      typeof libraryEntry.personalRating === "number" ? Number(libraryEntry.personalRating) : 0,
+    score: typeof libraryEntry.personalRating === "number" ? Number(libraryEntry.personalRating) : 0,
     year: game.releaseYear || new Date(game.createdAt || Date.now()).getFullYear(),
     notes,
     description,

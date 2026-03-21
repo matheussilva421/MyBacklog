@@ -1,5 +1,7 @@
 import { recalculateLibraryEntryFromSessions } from "../../../core/catalogIntegrity";
 import { db } from "../../../core/db";
+import { generateUuid } from "../../../core/utils";
+import { softDelete, getDeviceId } from "../../../lib/softDelete";
 
 export type SessionMutationInput = {
   sessionId?: number | null;
@@ -18,7 +20,9 @@ async function readEntrySessionSnapshot(libraryEntryId: number, forceActive = fa
   return recalculateLibraryEntryFromSessions(entry, sessions, { forceActive });
 }
 
-export async function savePlaySession(input: SessionMutationInput): Promise<{ libraryEntryId: number; mode: "create" | "edit" }> {
+export async function savePlaySession(
+  input: SessionMutationInput,
+): Promise<{ libraryEntryId: number; mode: "create" | "edit" }> {
   const currentEntry = await db.libraryEntries.get(input.libraryEntryId);
   if (!currentEntry?.id) {
     throw new Error("Jogo da sessão não encontrado.");
@@ -62,7 +66,10 @@ export async function savePlaySession(input: SessionMutationInput): Promise<{ li
     });
   } else {
     await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
+      const now = new Date().toISOString();
       await db.playSessions.add({
+        uuid: generateUuid(),
+        version: 1,
         libraryEntryId: input.libraryEntryId,
         date: input.date,
         platform: currentEntry.platform,
@@ -70,6 +77,8 @@ export async function savePlaySession(input: SessionMutationInput): Promise<{ li
         completionPercent,
         mood: input.mood?.trim() || currentEntry.mood,
         note: input.note?.trim() || undefined,
+        createdAt: now,
+        updatedAt: now,
       });
 
       const snapshot = await readEntrySessionSnapshot(input.libraryEntryId, true);
@@ -100,12 +109,14 @@ export async function deletePlaySession(sessionId: number): Promise<number | nul
 
   const currentEntry = await db.libraryEntries.get(session.libraryEntryId);
   if (!currentEntry?.id) {
-    await db.playSessions.delete(sessionId);
+    const deviceId = await getDeviceId();
+    await softDelete("playSessions", sessionId, deviceId);
     return null;
   }
 
+  const deviceId = await getDeviceId();
   await db.transaction("rw", db.playSessions, db.libraryEntries, async () => {
-    await db.playSessions.delete(sessionId);
+    await softDelete("playSessions", session.id!, deviceId);
     const snapshot = await readEntrySessionSnapshot(session.libraryEntryId);
     if (!snapshot) return;
 

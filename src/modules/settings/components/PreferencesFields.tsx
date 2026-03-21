@@ -1,12 +1,5 @@
 import type { ChangeEvent } from "react";
-import {
-  Cloud,
-  DatabaseZap,
-  KeyRound,
-  Layers2,
-  Store,
-  User,
-} from "lucide-react";
+import { Cloud, DatabaseZap, KeyRound, Layers2, Store, User } from "lucide-react";
 import { cx } from "../../../backlog/shared";
 import { Pill } from "../../../components/cyberpunk-ui";
 import type { PreferencesDraft } from "../utils/preferences";
@@ -23,11 +16,7 @@ type PreferencesFieldsProps = {
   onChange: <K extends keyof PreferencesDraft>(field: K, value: PreferencesDraft[K]) => void;
 };
 
-function createToggleHandler(
-  currentValue: string,
-  onChange: (value: string) => void,
-  token: string,
-) {
+function createToggleHandler(currentValue: string, onChange: (value: string) => void, token: string) {
   onChange(toggleTokenInText(currentValue, token));
 }
 
@@ -67,16 +56,9 @@ export function PreferencesFields({ draft, onChange }: PreferencesFieldsProps) {
             <button
               key={platform}
               type="button"
-              className={cx(
-                "filter-chip",
-                isTokenSelected(draft.primaryPlatforms, platform) && "filter-chip--active",
-              )}
+              className={cx("filter-chip", isTokenSelected(draft.primaryPlatforms, platform) && "filter-chip--active")}
               onClick={() =>
-                createToggleHandler(
-                  draft.primaryPlatforms,
-                  (value) => onChange("primaryPlatforms", value),
-                  platform,
-                )
+                createToggleHandler(draft.primaryPlatforms, (value) => onChange("primaryPlatforms", value), platform)
               }
             >
               {platform}
@@ -100,16 +82,9 @@ export function PreferencesFields({ draft, onChange }: PreferencesFieldsProps) {
             <button
               key={store}
               type="button"
-              className={cx(
-                "filter-chip",
-                isTokenSelected(draft.defaultStores, store) && "filter-chip--active",
-              )}
+              className={cx("filter-chip", isTokenSelected(draft.defaultStores, store) && "filter-chip--active")}
               onClick={() =>
-                createToggleHandler(
-                  draft.defaultStores,
-                  (value) => onChange("defaultStores", value),
-                  store,
-                )
+                createToggleHandler(draft.defaultStores, (value) => onChange("defaultStores", value), store)
               }
             >
               {store}
@@ -130,10 +105,7 @@ export function PreferencesFields({ draft, onChange }: PreferencesFieldsProps) {
           ))}
         </select>
         <small>
-          {
-            plannerPreferenceOptions.find((option) => option.value === draft.plannerPreference)
-              ?.description
-          }
+          {plannerPreferenceOptions.find((option) => option.value === draft.plannerPreference)?.description}
         </small>
       </label>
 
@@ -164,8 +136,8 @@ export function PreferencesFields({ draft, onChange }: PreferencesFieldsProps) {
           <div>
             <strong>Auto-sync com a nuvem</strong>
             <p>
-              Quando ativo, o app tenta enviar alterações automaticamente depois da autenticação e
-              quando não há conflito.
+              Quando ativo, o app tenta enviar alterações automaticamente depois da autenticação e quando não há
+              conflito.
             </p>
           </div>
           <button

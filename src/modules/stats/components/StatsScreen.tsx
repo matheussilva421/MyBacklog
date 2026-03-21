@@ -1,18 +1,7 @@
 import { useState } from "react";
 import { PlatformDashboard } from "./PlatformDashboard";
 import { PlatformList } from "./PlatformList";
-import {
-  Activity,
-  BarChart3,
-  Calendar,
-  Clock3,
-  FileText,
-  Monitor,
-  Pencil,
-  Trash2,
-  Trophy,
-  Wrench,
-} from "lucide-react";
+import { Activity, BarChart3, Calendar, Clock3, FileText, Monitor, Pencil, Trash2, Trophy, Wrench } from "lucide-react";
 import { DonutChart, VerticalBarChart } from "../../../charts";
 import { cx } from "../../../backlog/shared";
 import {
@@ -24,14 +13,7 @@ import {
   type Platform,
 } from "../../../backlog/shared";
 import type { ImportJob, PlaySession } from "../../../core/types";
-import {
-  ChartFrame,
-  EmptyState,
-  NotchButton,
-  Panel,
-  Pill,
-  SectionHeader,
-} from "../../../components/cyberpunk-ui";
+import { ChartFrame, EmptyState, NotchButton, Panel, Pill, SectionHeader } from "../../../components/cyberpunk-ui";
 
 const SESSION_PAGE_SIZE = 30;
 
@@ -76,13 +58,7 @@ export function StatsScreen({
   const hasStoreData = storeData.some((entry) => entry.value > 0);
 
   if (selectedPlatform) {
-    return (
-      <PlatformDashboard
-        platform={selectedPlatform}
-        games={games}
-        onBack={() => setSelectedPlatform(null)}
-      />
-    );
+    return <PlatformDashboard platform={selectedPlatform} games={games} onBack={() => setSelectedPlatform(null)} />;
   }
 
   return (
@@ -107,11 +83,7 @@ export function StatsScreen({
 
         <Panel>
           <div className="panel-inline-header">
-            <SectionHeader
-              icon={Monitor}
-              title="Distribuição"
-              description="Sua biblioteca por hardware"
-            />
+            <SectionHeader icon={Monitor} title="Distribuição" description="Sua biblioteca por hardware" />
             <NotchButton variant="ghost" onClick={onManagePlatforms} title="Configurar hardware">
               <Wrench size={16} />
             </NotchButton>
@@ -128,16 +100,10 @@ export function StatsScreen({
         </Panel>
 
         <Panel>
-          <SectionHeader
-            icon={FileText}
-            title="Stores"
-            description="Distribuição estrutural por loja/origem"
-          />
+          <SectionHeader icon={FileText} title="Stores" description="Distribuição estrutural por loja/origem" />
           {hasStoreData ? (
             <ChartFrame className="chart-area--pie">
-              {({ width, height }) => (
-                <DonutChart width={width} height={height} data={storeData} colors={pieColors} />
-              )}
+              {({ width, height }) => <DonutChart width={width} height={height} data={storeData} colors={pieColors} />}
             </ChartFrame>
           ) : (
             <EmptyState message="A distribuição por store aparece quando o catálogo tiver origens estruturadas suficientes." />
@@ -148,16 +114,10 @@ export function StatsScreen({
       <PlatformList platforms={platforms} games={games} onSelect={setSelectedPlatform} />
 
       <Panel>
-        <SectionHeader
-          icon={BarChart3}
-          title="Backlog por duração"
-          description="Onde está o gargalo do seu acervo"
-        />
+        <SectionHeader icon={BarChart3} title="Backlog por duração" description="Onde está o gargalo do seu acervo" />
         {hasDurationBuckets ? (
           <ChartFrame className="chart-area--bar">
-            {({ width, height }) => (
-              <VerticalBarChart width={width} height={height} data={durationBuckets} />
-            )}
+            {({ width, height }) => <VerticalBarChart width={width} height={height} data={durationBuckets} />}
           </ChartFrame>
         ) : (
           <EmptyState message="As faixas de duração serão exibidas quando a biblioteca tiver estimativas consolidadas." />
@@ -199,7 +159,9 @@ export function StatsScreen({
                   </div>
                   <strong className="import-job-card__count">
                     {job.totalItems != null ? (
-                      <span>{job.processedItems ?? 0}/{job.totalItems} itens</span>
+                      <span>
+                        {job.processedItems ?? 0}/{job.totalItems} itens
+                      </span>
                     ) : (
                       <span>{job.status === "completed" ? "Sucesso" : "Falha"}</span>
                     )}
@@ -213,11 +175,7 @@ export function StatsScreen({
       </Panel>
 
       <Panel>
-        <SectionHeader
-          icon={Calendar}
-          title="Sessões recentes"
-          description="Diário rápido de jogo"
-        />
+        <SectionHeader icon={Calendar} title="Sessões recentes" description="Diário rápido de jogo" />
         <div className="session-list">
           {displayedSessions.length === 0 ? (
             <EmptyState message="Nenhuma sessão recente corresponde à busca global." />
@@ -237,10 +195,7 @@ export function StatsScreen({
                           <NotchButton variant="ghost" onClick={() => entry.id != null && onEditSession(entry.id)}>
                             <Pencil size={12} />
                           </NotchButton>
-                          <NotchButton
-                            variant="ghost"
-                            onClick={() => entry.id != null && onDeleteSession(entry.id)}
-                          >
+                          <NotchButton variant="ghost" onClick={() => entry.id != null && onDeleteSession(entry.id)}>
                             <Trash2 size={12} />
                           </NotchButton>
                         </div>

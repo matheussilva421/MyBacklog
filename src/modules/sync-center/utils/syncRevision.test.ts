@@ -21,7 +21,7 @@ describe("syncRevision", () => {
     expect(rev2).toBe(2);
 
     // Aguardar um microtask para garantir que o DB foi atualizado
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const stored = await getLocalRevision();
     expect(stored).toBe(2);
@@ -32,7 +32,7 @@ describe("syncRevision", () => {
     await incrementLocalRevision();
 
     // Aguardar um microtask para garantir que o DB foi atualizado
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Nova "instância" - simular leitura fresca do DB
     const revision = await getLocalRevision();

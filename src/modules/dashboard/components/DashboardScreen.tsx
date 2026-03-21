@@ -1,14 +1,4 @@
-import {
-  Activity,
-  Clock3,
-  Flame,
-  Gamepad2,
-  LibraryBig,
-  ListTodo,
-  Monitor,
-  Target,
-  Trophy,
-} from "lucide-react";
+import { Activity, Clock3, Flame, Gamepad2, LibraryBig, ListTodo, Monitor, Target, Trophy } from "lucide-react";
 import { DonutChart, TrendLineChart } from "../../../charts";
 import {
   formatRemainingEta,
@@ -131,9 +121,7 @@ export function DashboardScreen({
           />
           {hasMonthlyProgress ? (
             <ChartFrame className="chart-area--line">
-              {({ width, height }) => (
-                <TrendLineChart width={width} height={height} data={monthlyProgress} />
-              )}
+              {({ width, height }) => <TrendLineChart width={width} height={height} data={monthlyProgress} />}
             </ChartFrame>
           ) : (
             <EmptyState message="A evolução anual aparecerá aqui quando houver progresso registrado por mês." />
@@ -141,11 +129,7 @@ export function DashboardScreen({
         </Panel>
 
         <Panel>
-          <SectionHeader
-            icon={Monitor}
-            title="Plataformas"
-            description="Distribuição estrutural da sua coleção"
-          />
+          <SectionHeader icon={Monitor} title="Plataformas" description="Distribuição estrutural da sua coleção" />
           {hasPlatformData ? (
             <>
               <ChartFrame className="chart-area--pie">
@@ -232,9 +216,7 @@ export function DashboardScreen({
                       </p>
                     </div>
                     <div className="continue-card__actions">
-                      <Pill tone="magenta">
-                        {formatRemainingEta(game.eta, game.progress, game.hours)}
-                      </Pill>
+                      <Pill tone="magenta">{formatRemainingEta(game.eta, game.progress, game.hours)}</Pill>
                       <NotchButton variant="primary" onClick={() => onOpenGamePage(game.id)}>
                         Detalhes
                       </NotchButton>
@@ -254,11 +236,7 @@ export function DashboardScreen({
         </Panel>
 
         <Panel>
-          <SectionHeader
-            icon={Target}
-            title="Radar de prioridade"
-            description="O sistema sugere sua fila ideal"
-          />
+          <SectionHeader icon={Target} title="Radar de prioridade" description="O sistema sugere sua fila ideal" />
           <div className="priority-stack">
             {visiblePlannerQueue.slice(0, 3).map((entry) => {
               const game = findGame(entry.gameId);
@@ -350,10 +328,7 @@ export function DashboardScreen({
                 badge.target > 0 ? Math.max(0, Math.min(100, (badge.progress / badge.target) * 100)) : 0;
 
               return (
-                <article
-                  className={`badge-card ${badge.unlocked ? "" : "badge-card--locked"}`}
-                  key={badge.key}
-                >
+                <article className={`badge-card ${badge.unlocked ? "" : "badge-card--locked"}`} key={badge.key}>
                   <div className="badge-card__head">
                     <div className="badge-card__title">
                       <Icon size={18} />

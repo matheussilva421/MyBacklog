@@ -121,7 +121,8 @@ export function computePlannerScore(
     }
 
     if (goalSignals.backlogPressure > 0) {
-      if (game.status !== "Wishlist" && game.status !== "Terminado") score += Math.round(8 * goalSignals.backlogPressure);
+      if (game.status !== "Wishlist" && game.status !== "Terminado")
+        score += Math.round(8 * goalSignals.backlogPressure);
       if (game.progress > 0) score += Math.round(10 * goalSignals.backlogPressure);
       if (etaHours <= 25) score += Math.round(6 * goalSignals.backlogPressure);
       if (game.status === "Backlog" && game.progress === 0 && etaHours > 30) {
@@ -152,29 +153,36 @@ export function buildPlannerReason(
   if (goalSignals?.finishPressure && goalSignals.finishPressure >= 0.35 && game.progress > 0) {
     reasons.push("Empurra a meta de conclusão com progresso já acumulado.");
   }
-  if (goalSignals?.startPressure && goalSignals.startPressure >= 0.35 && game.status === "Backlog" && game.progress === 0) {
+  if (
+    goalSignals?.startPressure &&
+    goalSignals.startPressure >= 0.35 &&
+    game.status === "Backlog" &&
+    game.progress === 0
+  ) {
     reasons.push("Ajuda a meta de iniciar jogos sem abrir um projeto longo demais.");
   }
-  if (goalSignals?.playtimePressure && goalSignals.playtimePressure >= 0.35 && (game.status === "Jogando" || game.status === "Pausado")) {
+  if (
+    goalSignals?.playtimePressure &&
+    goalSignals.playtimePressure >= 0.35 &&
+    (game.status === "Jogando" || game.status === "Pausado")
+  ) {
     reasons.push("Contribui direto para a meta de horas com baixo atrito.");
   }
-  if (goalSignals?.backlogPressure && goalSignals.backlogPressure >= 0.35 && game.status !== "Wishlist" && game.status !== "Terminado") {
+  if (
+    goalSignals?.backlogPressure &&
+    goalSignals.backlogPressure >= 0.35 &&
+    game.status !== "Wishlist" &&
+    game.status !== "Terminado"
+  ) {
     reasons.push("Reduz backlog parado ao transformar fila em avanço real.");
   }
   if (
     preferredPlatforms &&
-    Array.from(getStructuredPlatformTokens(game)).some((platform) =>
-      preferredPlatforms.has(platform),
-    )
+    Array.from(getStructuredPlatformTokens(game)).some((platform) => preferredPlatforms.has(platform))
   ) {
     reasons.push("Roda na sua plataforma principal, com baixo atrito operacional.");
   }
-  if (
-    preferredStores &&
-    Array.from(getStructuredStoreTokens(game)).some((store) =>
-      preferredStores.has(store),
-    )
-  ) {
+  if (preferredStores && Array.from(getStructuredStoreTokens(game)).some((store) => preferredStores.has(store))) {
     reasons.push("Está dentro das suas fontes padrão e entra fácil no fluxo atual.");
   }
   if (cadence?.sessions30d && cadence.sessions30d >= 3) {
@@ -211,7 +219,12 @@ export function buildPlannerFit(
   if (goalSignals?.finishPressure && goalSignals.finishPressure >= 0.35 && game.progress > 0) {
     return "Fechamento tático";
   }
-  if (goalSignals?.startPressure && goalSignals.startPressure >= 0.35 && game.status === "Backlog" && game.progress === 0) {
+  if (
+    goalSignals?.startPressure &&
+    goalSignals.startPressure >= 0.35 &&
+    game.status === "Backlog" &&
+    game.progress === 0
+  ) {
     return "Meta de início";
   }
   if (goalSignals?.playtimePressure && goalSignals.playtimePressure >= 0.35 && game.status !== "Backlog") {

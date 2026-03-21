@@ -68,7 +68,14 @@ describe("catalogMaintenance", () => {
 
     const libraryEntries: LibraryEntry[] = [
       createEntry({ id: 11, gameId: 1, platform: "PC", sourceStore: "Steam", favorite: true }),
-      createEntry({ id: 12, gameId: 2, platform: "PC", sourceStore: "GOG", completionPercent: 62, playtimeMinutes: 320 }),
+      createEntry({
+        id: 12,
+        gameId: 2,
+        platform: "PC",
+        sourceStore: "GOG",
+        completionPercent: 62,
+        playtimeMinutes: 320,
+      }),
     ];
 
     const sessions: PlaySession[] = [
@@ -78,11 +85,31 @@ describe("catalogMaintenance", () => {
 
     const reviews: Review[] = [{ id: 10, libraryEntryId: 11, score: 9.5, shortReview: "Excelente" }];
     const lists: List[] = [];
-    const libraryEntryLists: LibraryEntryList[] = [{ id: 1, libraryEntryId: 11, listId: 2, createdAt: "2026-03-01T00:00:00.000Z" }];
+    const libraryEntryLists: LibraryEntryList[] = [
+      { id: 1, libraryEntryId: 11, listId: 2, createdAt: "2026-03-01T00:00:00.000Z" },
+    ];
     const stores: Store[] = [
-      { id: 1, name: "Steam", normalizedName: "steam", createdAt: "2026-03-01T00:00:00.000Z", updatedAt: "2026-03-01T00:00:00.000Z" },
-      { id: 2, name: "STEAM", normalizedName: "steam", createdAt: "2026-03-01T00:00:00.000Z", updatedAt: "2026-03-01T00:00:00.000Z" },
-      { id: 3, name: "GOG", normalizedName: "gog", createdAt: "2026-03-01T00:00:00.000Z", updatedAt: "2026-03-01T00:00:00.000Z" },
+      {
+        id: 1,
+        name: "Steam",
+        normalizedName: "steam",
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        id: 2,
+        name: "STEAM",
+        normalizedName: "steam",
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        id: 3,
+        name: "GOG",
+        normalizedName: "gog",
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
     ];
     const libraryEntryStores: LibraryEntryStore[] = [
       { id: 1, libraryEntryId: 11, storeId: 1, isPrimary: true, createdAt: "2026-03-01T00:00:00.000Z" },
@@ -90,8 +117,20 @@ describe("catalogMaintenance", () => {
       { id: 3, libraryEntryId: 12, storeId: 3, isPrimary: true, createdAt: "2026-03-01T00:00:00.000Z" },
     ];
     const platforms: Platform[] = [
-      { id: 1, name: "PC", normalizedName: "pc", createdAt: "2026-03-01T00:00:00.000Z", updatedAt: "2026-03-01T00:00:00.000Z" },
-      { id: 2, name: "Steam Deck", normalizedName: "steam_deck", createdAt: "2026-03-01T00:00:00.000Z", updatedAt: "2026-03-01T00:00:00.000Z" },
+      {
+        id: 1,
+        name: "PC",
+        normalizedName: "pc",
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        id: 2,
+        name: "Steam Deck",
+        normalizedName: "steam_deck",
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
     ];
     const gamePlatforms: GamePlatform[] = [
       { id: 1, gameId: 1, platformId: 1, createdAt: "2026-03-01T00:00:00.000Z" },

@@ -32,7 +32,11 @@ export function PlannerScreen({
   return (
     <div className="planner-layout">
       <Panel>
-        <SectionHeader icon={FolderKanban} title="Backlog planner" description="Fila de execução, metas e inteligência de prioridade" />
+        <SectionHeader
+          icon={FolderKanban}
+          title="Backlog planner"
+          description="Fila de execução, metas e inteligência de prioridade"
+        />
         <div className="planner-list">
           {visiblePlannerQueue.length === 0 ? (
             <EmptyState message="Nenhuma recomendação encontrada para a busca atual." />
@@ -42,7 +46,12 @@ export function PlannerScreen({
               if (!game) return null;
 
               return (
-                <button type="button" className={cx("planner-card", "app-card", "app-card--interactive")} key={entry.rank} onClick={() => onOpenGamePage(game.id)}>
+                <button
+                  type="button"
+                  className={cx("planner-card", "app-card", "app-card--interactive")}
+                  key={entry.rank}
+                  onClick={() => onOpenGamePage(game.id)}
+                >
                   <div className="planner-card__slot">
                     <span>Slot</span>
                     <strong>{entry.rank}</strong>
@@ -70,7 +79,9 @@ export function PlannerScreen({
           <SectionHeader
             icon={Target}
             title="Metas táticas"
-            description={hasDbGoals ? "Metas persistidas e calculadas em tempo real" : "Pequenas vitórias para reduzir o acúmulo"}
+            description={
+              hasDbGoals ? "Metas persistidas e calculadas em tempo real" : "Pequenas vitórias para reduzir o acúmulo"
+            }
             action={
               <NotchButton variant="secondary" onClick={onCreateGoal}>
                 <Plus size={14} />
@@ -79,36 +90,34 @@ export function PlannerScreen({
             }
           />
           <div className="goal-stack">
-            {hasDbGoals ? (
-              goalRows.map((goal) => (
-                <div className="goal-row" key={goal.id}>
-                  <div className="goal-row__head">
-                    <span>{goal.label}</span>
-                    <div className="goal-row__actions">
-                      <Pill tone="neutral">{goal.periodLabel}</Pill>
-                      <strong>{goal.currentLabel}</strong>
-                      <NotchButton variant="ghost" onClick={() => onEditGoal(goal)}>
-                        <Pencil size={12} />
-                      </NotchButton>
-                      <NotchButton variant="ghost" onClick={() => goal.id != null && onDeleteGoal(goal.id)}>
-                        <Trash2 size={12} />
-                      </NotchButton>
+            {hasDbGoals
+              ? goalRows.map((goal) => (
+                  <div className="goal-row" key={goal.id}>
+                    <div className="goal-row__head">
+                      <span>{goal.label}</span>
+                      <div className="goal-row__actions">
+                        <Pill tone="neutral">{goal.periodLabel}</Pill>
+                        <strong>{goal.currentLabel}</strong>
+                        <NotchButton variant="ghost" onClick={() => onEditGoal(goal)}>
+                          <Pencil size={12} />
+                        </NotchButton>
+                        <NotchButton variant="ghost" onClick={() => goal.id != null && onDeleteGoal(goal.id)}>
+                          <Trash2 size={12} />
+                        </NotchButton>
+                      </div>
                     </div>
+                    <ProgressBar value={goal.progressPercent} tone={goal.tone} thin />
                   </div>
-                  <ProgressBar value={goal.progressPercent} tone={goal.tone} thin />
-                </div>
-              ))
-            ) : (
-              goalProgress.map((goal) => (
-                <div className="goal-row" key={goal.label}>
-                  <div className="goal-row__head">
-                    <span>{goal.label}</span>
-                    <strong>{goal.value}%</strong>
+                ))
+              : goalProgress.map((goal) => (
+                  <div className="goal-row" key={goal.label}>
+                    <div className="goal-row__head">
+                      <span>{goal.label}</span>
+                      <strong>{goal.value}%</strong>
+                    </div>
+                    <ProgressBar value={goal.value} tone={goal.tone} thin />
                   </div>
-                  <ProgressBar value={goal.value} tone={goal.tone} thin />
-                </div>
-              ))
-            )}
+                ))}
           </div>
         </Panel>
 

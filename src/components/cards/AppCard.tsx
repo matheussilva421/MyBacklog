@@ -14,14 +14,7 @@ export type AppCardType =
 
 export type AppCardDensity = "normal" | "compact" | "relaxed";
 
-export type AppCardTone =
-  | "default"
-  | "cyan"
-  | "yellow"
-  | "magenta"
-  | "emerald"
-  | "orange"
-  | "violet";
+export type AppCardTone = "default" | "cyan" | "yellow" | "magenta" | "emerald" | "orange" | "violet";
 
 export interface AppCardProps {
   /** Tipo funcional do card (afeta semântica e alguns estilos) */
@@ -124,13 +117,7 @@ export const AppCard = React.memo(function AppCard({
 /**
  * Subcomponente para cabeçalho de card
  */
-export function AppCardHeader({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function AppCardHeader({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={cx("app-card__head", className)}>{children}</div>;
 }
 
@@ -157,38 +144,20 @@ export function AppCardTitle({
 /**
  * Subcomponente para corpo/conteúdo principal do card
  */
-export function AppCardBody({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function AppCardBody({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={cx("app-card__body", className)}>{children}</div>;
 }
 
 /**
  * Subcomponente para rodapé/metadados do card
  */
-export function AppCardFooter({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function AppCardFooter({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={cx("app-card__footer", className)}>{children}</div>;
 }
 
 /**
  * Subcomponente para ações do card (botões)
  */
-export function AppCardActions({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function AppCardActions({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={cx("app-card__actions", className)}>{children}</div>;
 }

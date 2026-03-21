@@ -6,11 +6,7 @@ function clamp(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-export function buildDynamicTacticalGoals(
-  games: Game[],
-  sessionRows: PlaySession[],
-  now = new Date(),
-): Goal[] {
+export function buildDynamicTacticalGoals(games: Game[], sessionRows: PlaySession[], now = new Date()): Goal[] {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   // 1. "Finalizar jogo curto" — progresso médio dos jogos curtos ativos
@@ -34,22 +30,16 @@ export function buildDynamicTacticalGoals(
   const sessionProgress = clamp((sessionsThisMonth.length / sessionTarget) * 100);
 
   // 3. "Redução de backlog" — jogos que saíram do backlog puro (progresso > 0 ou concluídos) vs total owned
-  const ownedGames = games.filter(
-    (game) => game.status !== "Wishlist",
-  );
-  const advancedGames = ownedGames.filter(
-    (game) => game.status === "Terminado" || game.progress > 0,
-  );
-  const backlogProgress =
-    ownedGames.length > 0
-      ? clamp((advancedGames.length / ownedGames.length) * 100)
-      : 0;
+  const ownedGames = games.filter((game) => game.status !== "Wishlist");
+  const advancedGames = ownedGames.filter((game) => game.status === "Terminado" || game.progress > 0);
+  const backlogProgress = ownedGames.length > 0 ? clamp((advancedGames.length / ownedGames.length) * 100) : 0;
 
   return [
     {
-      label: shortActiveGames.length > 0
-        ? `Fechar ${shortActiveGames.length} jogo${shortActiveGames.length > 1 ? "s" : ""} curto${shortActiveGames.length > 1 ? "s" : ""}`
-        : "Iniciar 1 jogo curto",
+      label:
+        shortActiveGames.length > 0
+          ? `Fechar ${shortActiveGames.length} jogo${shortActiveGames.length > 1 ? "s" : ""} curto${shortActiveGames.length > 1 ? "s" : ""}`
+          : "Iniciar 1 jogo curto",
       value: Math.round(shortGameProgress),
       tone: "sunset",
     },

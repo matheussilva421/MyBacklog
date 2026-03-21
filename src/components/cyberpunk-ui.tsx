@@ -70,7 +70,13 @@ export function useDocumentScrollLock(active = true) {
   }, [active]);
 }
 
-export const Panel = React.memo(function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
+export const Panel = React.memo(function Panel({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
     <section className={cx("cp-panel", className)}>
       <span className="cp-panel__accent" aria-hidden="true" />
@@ -303,8 +309,7 @@ export function Modal({
   useEffect(() => {
     if (typeof document === "undefined") return;
 
-    previousActiveElementRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    previousActiveElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     modalStack.push(modalId);
 
     const focusInitialElement = () => {

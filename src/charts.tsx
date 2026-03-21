@@ -67,13 +67,7 @@ function polarToCartesian(cx: number, cy: number, radius: number, angleInDegrees
   };
 }
 
-function buildArcPath(
-  cx: number,
-  cy: number,
-  radius: number,
-  startAngle: number,
-  endAngle: number,
-): string {
+function buildArcPath(cx: number, cy: number, radius: number, startAngle: number, endAngle: number): string {
   const start = polarToCartesian(cx, cy, radius, endAngle);
   const end = polarToCartesian(cx, cy, radius, startAngle);
   const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
@@ -118,15 +112,7 @@ function buildDonutSegments(params: {
   return segments;
 }
 
-export function TrendLineChart({
-  width,
-  height,
-  data,
-}: {
-  width: number;
-  height: number;
-  data: TrendPoint[];
-}) {
+export function TrendLineChart({ width, height, data }: { width: number; height: number; data: TrendPoint[] }) {
   const margins = { top: 18, right: 14, bottom: 34, left: 38 };
   const innerWidth = Math.max(1, width - margins.left - margins.right);
   const innerHeight = Math.max(1, height - margins.top - margins.bottom);
@@ -139,8 +125,7 @@ export function TrendLineChart({
   const stepX = data.length > 1 ? innerWidth / (data.length - 1) : innerWidth;
   const labelStep = buildLabelStep(innerWidth, data.length, 54);
   const toY = (value: number) => margins.top + innerHeight - (value / scaleMax) * innerHeight;
-  const toX = (index: number) =>
-    data.length <= 1 ? margins.left + innerWidth / 2 : margins.left + stepX * index;
+  const toX = (index: number) => (data.length <= 1 ? margins.left + innerWidth / 2 : margins.left + stepX * index);
   const finishedPoints = data.map((entry, index) => ({ x: toX(index), y: toY(entry.finished), value: entry.finished }));
   const startedPoints = data.map((entry, index) => ({ x: toX(index), y: toY(entry.started), value: entry.started }));
 
@@ -150,13 +135,7 @@ export function TrendLineChart({
         const y = toY(tick);
         return (
           <g key={tick}>
-            <line
-              className="chart-svg__grid"
-              x1={margins.left}
-              y1={y}
-              x2={width - margins.right}
-              y2={y}
-            />
+            <line className="chart-svg__grid" x1={margins.left} y1={y} x2={width - margins.right} y2={y} />
             <text className="chart-svg__label" x={margins.left - 10} y={y + 4} textAnchor="end">
               {formatTick(tick)}
             </text>
@@ -166,13 +145,7 @@ export function TrendLineChart({
 
       {data.map((entry, index) =>
         index % labelStep === 0 || index === data.length - 1 ? (
-          <text
-            key={entry.month}
-            className="chart-svg__label"
-            x={toX(index)}
-            y={height - 8}
-            textAnchor="middle"
-          >
+          <text key={entry.month} className="chart-svg__label" x={toX(index)} y={height - 8} textAnchor="middle">
             {entry.month}
           </text>
         ) : null,
@@ -215,7 +188,10 @@ export function DonutChart({
   data: PiePoint[];
   colors?: string[];
 }) {
-  const total = Math.max(1, data.reduce((sum, entry) => sum + entry.value, 0));
+  const total = Math.max(
+    1,
+    data.reduce((sum, entry) => sum + entry.value, 0),
+  );
   const strokeWidth = Math.max(18, Math.min(width, height) * 0.12);
   const radius = Math.max(24, Math.min(width, height) / 2 - strokeWidth);
   const centerX = width / 2;
@@ -231,13 +207,7 @@ export function DonutChart({
 
   return (
     <svg className="chart-svg" viewBox={`0 0 ${width} ${height}`} aria-label="Distribuição por plataformas">
-      <circle
-        className="chart-svg__arc-track"
-        cx={centerX}
-        cy={centerY}
-        r={radius}
-        strokeWidth={strokeWidth}
-      />
+      <circle className="chart-svg__arc-track" cx={centerX} cy={centerY} r={radius} strokeWidth={strokeWidth} />
 
       {segments.map((segment) =>
         segment.path ? (
@@ -293,13 +263,7 @@ export function VerticalBarChart({
         const y = toY(tick);
         return (
           <g key={tick}>
-            <line
-              className="chart-svg__grid"
-              x1={margins.left}
-              y1={y}
-              x2={width - margins.right}
-              y2={y}
-            />
+            <line className="chart-svg__grid" x1={margins.left} y1={y} x2={width - margins.right} y2={y} />
             <text className="chart-svg__label" x={margins.left - 10} y={y + 4} textAnchor="end">
               {formatTick(tick)}
             </text>
@@ -322,12 +286,7 @@ export function VerticalBarChart({
               fill={color}
             />
             {index % labelStep === 0 || index === data.length - 1 ? (
-              <text
-                className="chart-svg__label"
-                x={x + barWidth / 2}
-                y={height - 10}
-                textAnchor="middle"
-              >
+              <text className="chart-svg__label" x={x + barWidth / 2} y={height - 10} textAnchor="middle">
                 {entry.name}
               </text>
             ) : null}

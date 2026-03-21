@@ -1,17 +1,6 @@
 import { Download, Library, Plus, Upload } from "lucide-react";
-import {
-  cx,
-  filterOptions,
-  type Game,
-  type LibraryListFilter,
-  type StatusFilter,
-} from "../../../backlog/shared";
-import type {
-  LibraryViewGroupBy,
-  LibraryViewSortBy,
-  LibraryViewSortDirection,
-  SavedView,
-} from "../../../core/types";
+import { cx, filterOptions, type Game, type LibraryListFilter, type StatusFilter } from "../../../backlog/shared";
+import type { LibraryViewGroupBy, LibraryViewSortBy, LibraryViewSortDirection, SavedView } from "../../../core/types";
 import { EmptyState, NotchButton, Panel, SectionHeader } from "../../../components/cyberpunk-ui";
 import type { GroupedLibraryGames } from "../utils/savedViews";
 import { LibraryCard } from "./LibraryCard";
@@ -126,7 +115,11 @@ export function LibraryScreen({
               </span>
             </div>
             <div className="panel-toolbar">
-              <NotchButton variant="secondary" onClick={() => onSelectVisibleLibraryGames(visibleLibraryIds)} disabled={visibleLibraryIds.length === 0}>
+              <NotchButton
+                variant="secondary"
+                onClick={() => onSelectVisibleLibraryGames(visibleLibraryIds)}
+                disabled={visibleLibraryIds.length === 0}
+              >
                 Selecionar filtrados
               </NotchButton>
               <NotchButton variant="ghost" onClick={onClearLibrarySelection} disabled={selectedCount === 0}>
@@ -194,7 +187,10 @@ export function LibraryScreen({
               </label>
               <label className="filter-select">
                 <span>Direção</span>
-                <select value={sortDirection} onChange={(event) => onSortDirectionChange(event.target.value as LibraryViewSortDirection)}>
+                <select
+                  value={sortDirection}
+                  onChange={(event) => onSortDirectionChange(event.target.value as LibraryViewSortDirection)}
+                >
                   <option value="desc">Descendente</option>
                   <option value="asc">Ascendente</option>
                 </select>
@@ -227,29 +223,34 @@ export function LibraryScreen({
                 {savedViews.map((view) => {
                   const savedViewId = view.id;
                   return (
-                  <div
-                    key={savedViewId ?? `${view.scope}-${view.name}`}
-                    className={cx(
-                      "saved-view-card",
-                      "app-card",
-                      "app-card--compact",
-                      activeSavedView?.id === savedViewId && "saved-view-card--active",
-                      activeSavedView?.id === savedViewId && "app-card--selected",
-                    )}
-                  >
-                    <button type="button" className="saved-view-card__main" onClick={() => onApplySavedView(view)}>
-                      <strong>{view.name}</strong>
-                      <span>
-                        {view.query ? `Busca: ${view.query}` : "Sem busca"} •{" "}
-                        {view.groupBy === "none" ? "Sem agrupamento" : `Grupo: ${view.groupBy}`}
-                      </span>
-                    </button>
-                    {view.id != null ? (
-                      <button type="button" className="saved-view-card__delete" onClick={() => savedViewId != null && onDeleteSavedView(savedViewId)} aria-label={`Excluir view ${view.name}`}>
-                        ×
+                    <div
+                      key={savedViewId ?? `${view.scope}-${view.name}`}
+                      className={cx(
+                        "saved-view-card",
+                        "app-card",
+                        "app-card--compact",
+                        activeSavedView?.id === savedViewId && "saved-view-card--active",
+                        activeSavedView?.id === savedViewId && "app-card--selected",
+                      )}
+                    >
+                      <button type="button" className="saved-view-card__main" onClick={() => onApplySavedView(view)}>
+                        <strong>{view.name}</strong>
+                        <span>
+                          {view.query ? `Busca: ${view.query}` : "Sem busca"} •{" "}
+                          {view.groupBy === "none" ? "Sem agrupamento" : `Grupo: ${view.groupBy}`}
+                        </span>
                       </button>
-                    ) : null}
-                  </div>
+                      {view.id != null ? (
+                        <button
+                          type="button"
+                          className="saved-view-card__delete"
+                          onClick={() => savedViewId != null && onDeleteSavedView(savedViewId)}
+                          aria-label={`Excluir view ${view.name}`}
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </div>
                   );
                 })}
               </div>

@@ -1,30 +1,8 @@
 import { useEffect, useState } from "react";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  List,
-  Plus,
-  Save,
-  Settings,
-  ShieldAlert,
-  User,
-  Wrench,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, List, Plus, Save, Settings, ShieldAlert, User, Wrench } from "lucide-react";
 import type { DbList, UserBadge } from "../../../backlog/shared";
-import {
-  createPreferencesDraft,
-  cx,
-  type AppPreferences,
-  type PreferencesDraft,
-} from "../../../backlog/shared";
-import {
-  EmptyState,
-  NotchButton,
-  Panel,
-  Pill,
-  ProgressBar,
-  SectionHeader,
-} from "../../../components/cyberpunk-ui";
+import { createPreferencesDraft, cx, type AppPreferences, type PreferencesDraft } from "../../../backlog/shared";
+import { EmptyState, NotchButton, Panel, Pill, ProgressBar, SectionHeader } from "../../../components/cyberpunk-ui";
 import type { CatalogAuditReport } from "../utils/catalogAudit";
 import { PreferencesFields } from "./PreferencesFields";
 
@@ -77,11 +55,7 @@ export function ProfileScreen({
   return (
     <div className="profile-layout">
       <Panel>
-        <SectionHeader
-          icon={User}
-          title="Perfil"
-          description="Sua camada pessoal dentro do backlog OS"
-        />
+        <SectionHeader icon={User} title="Perfil" description="Sua camada pessoal dentro do backlog OS" />
         <div className="profile-card">
           <div className="profile-card__main">
             <span>Operador</span>
@@ -214,11 +188,7 @@ export function ProfileScreen({
       </Panel>
 
       <Panel>
-        <SectionHeader
-          icon={List}
-          title="Listas"
-          description="Organize jogos em coleções personalizadas"
-        />
+        <SectionHeader icon={List} title="Listas" description="Organize jogos em coleções personalizadas" />
         <div className="modal-form">
           <div className="form-grid">
             <label className="field field--wide">
@@ -269,10 +239,7 @@ export function ProfileScreen({
               badge.target > 0 ? Math.max(0, Math.min(100, (badge.progress / badge.target) * 100)) : 0;
 
             return (
-              <article
-                className={cx("badge-card", !badge.unlocked && "badge-card--locked")}
-                key={badge.key}
-              >
+              <article className={cx("badge-card", !badge.unlocked && "badge-card--locked")} key={badge.key}>
                 <div className="badge-card__head">
                   <div className="badge-card__title">
                     <Icon size={18} />

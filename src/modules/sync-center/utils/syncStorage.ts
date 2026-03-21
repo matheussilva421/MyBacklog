@@ -68,7 +68,5 @@ export function parseSyncHistory(settingRows: DbSetting[]): SyncHistoryEntry[] {
 }
 
 export function normalizeSyncHistory(history: SyncHistoryEntry[], limit = 12): SyncHistoryEntry[] {
-  return [...history]
-    .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
-    .slice(0, limit);
+  return [...history].sort((left, right) => right.timestamp.localeCompare(left.timestamp)).slice(0, limit);
 }

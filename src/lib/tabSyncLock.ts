@@ -27,15 +27,11 @@ export class TabSyncLock {
     this.abortController = new AbortController();
 
     try {
-      return await navigator.locks.request(
-        LOCK_NAME,
-        { signal: this.abortController.signal },
-        async (lock) => {
-          if (!lock) return null;
-          this.isHeld = true;
-          return operation(this.abortController!.signal);
-        }
-      ) as T;
+      return (await navigator.locks.request(LOCK_NAME, { signal: this.abortController.signal }, async (lock) => {
+        if (!lock) return null;
+        this.isHeld = true;
+        return operation(this.abortController!.signal);
+      })) as T;
     } catch (error) {
       if ((error as DOMException).name === "AbortError") {
         return null;

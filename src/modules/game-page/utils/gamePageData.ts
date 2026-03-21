@@ -3,7 +3,11 @@ import type { Goal as DbGoal, List, PlaySession, Review, Tag } from "../../../co
 import type { AppPreferences } from "../../settings/utils/preferences";
 import { buildPlannerFit, buildPlannerReason, computePlannerScore } from "../../planner/utils/scoring";
 import type { PlannerGoalSignals } from "../../planner/utils/goals";
-import { buildSessionCadence, buildSessionMonthlyHours, type SessionCadence } from "../../sessions/utils/sessionAnalytics";
+import {
+  buildSessionCadence,
+  buildSessionMonthlyHours,
+  type SessionCadence,
+} from "../../sessions/utils/sessionAnalytics";
 
 export type GamePageGoal = {
   id: string;
@@ -123,9 +127,7 @@ export function buildGamePageData(input: {
     lastSession: sessions[0],
     cadence,
     frequencyLabel:
-      cadence.sessions30d > 0
-        ? `${cadence.sessions30d} sessões em 30 dias`
-        : "Sem sessões nos últimos 30 dias",
+      cadence.sessions30d > 0 ? `${cadence.sessions30d} sessões em 30 dias` : "Sem sessões nos últimos 30 dias",
     streakLabel: cadence.streakWeeks > 0 ? `${cadence.streakWeeks} semana(s)` : "Sem streak",
     hoursThisMonthLabel: formatDurationHours(cadence.minutesThisMonth),
     hoursPerMonth,

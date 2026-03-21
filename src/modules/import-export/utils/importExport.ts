@@ -21,6 +21,7 @@ import { deriveCompletionDate } from "../../../core/catalogIntegrity";
 import { buildPlaySessionDedupKey } from "../../../core/playSessionIdentity";
 import {
   getPrimaryCsvToken,
+  generateUuid,
   mergePlatformList,
   normalizeGameTitle,
   normalizeToken,
@@ -126,7 +127,7 @@ function findStructuredRecordMatch(
       matches.set(record.libraryEntry.id, record);
     }
   }
-  return matches.size === 1 ? Array.from(matches.values())[0] ?? null : null;
+  return matches.size === 1 ? (Array.from(matches.values())[0] ?? null) : null;
 }
 
 function splitCsvLine(line: string): string[] {
@@ -250,7 +251,11 @@ function applyImportDefaults(payload: ImportPayload, defaults?: ImportDefaults):
   };
 }
 
-function fromCsvRows(rows: Array<Record<string, string>>, source: ImportSource, defaults?: ImportDefaults): ImportPayload[] {
+function fromCsvRows(
+  rows: Array<Record<string, string>>,
+  source: ImportSource,
+  defaults?: ImportDefaults,
+): ImportPayload[] {
   const fallbackStore = defaultStoreForSource(source, defaults);
   return rows
     .map((row) => {
@@ -258,33 +263,73 @@ function fromCsvRows(rows: Array<Record<string, string>>, source: ImportSource, 
       if (!title) return null;
 
       const payload = defaultPayload(title, defaults);
-      payload.platform = row.platform || row.plataforma || getPrimaryCsvToken(row.platforms || row.plataformas, payload.platform);
+      payload.platform =
+        row.platform || row.plataforma || getPrimaryCsvToken(row.platforms || row.plataformas, payload.platform);
       payload.platforms = splitCsvTokens(row.platforms || row.plataformas || payload.platform);
-      payload.sourceStore = row.sourcestore || row.loja || row.source || getPrimaryCsvToken(row.stores || row.lojas, fallbackStore);
+      payload.sourceStore =
+        row.sourcestore || row.loja || row.source || getPrimaryCsvToken(row.stores || row.lojas, fallbackStore);
       payload.stores = splitCsvTokens(row.stores || row.lojas || payload.sourceStore);
-      payload.ownershipStatus = mapOwnership(row.ownershipstatus || row.ownership || row.posse || row.propriedade || "");
-      payload.progressStatus = mapProgress(row.progressstatus || row.progress || row.status || row.estado || row.progresso || "");
+      payload.ownershipStatus = mapOwnership(
+        row.ownershipstatus || row.ownership || row.posse || row.propriedade || "",
+      );
+      payload.progressStatus = mapProgress(
+        row.progressstatus || row.progress || row.status || row.estado || row.progresso || "",
+      );
       payload.priority = mapPriority(row.priority || row.prioridade || "");
       payload.genres = row.genres || row.generos || row.gêneros || "";
       payload.notes = row.notes || row.notas || row.observações || "";
-      payload.personalRating = Number(row.personalrating || row.rating || row.userscore || row.score || row.nota || 0) || undefined;
-      payload.playtimeMinutes = parseMinutes(row.playtimeminutes || row.playtime_forever || row.playtime || row.tempo || 0);
-      if (!payload.playtimeMinutes && row.playtimehours) payload.playtimeMinutes = parseHoursToMinutes(row.playtimehours);
+      payload.personalRating =
+        Number(row.personalrating || row.rating || row.userscore || row.score || row.nota || 0) || undefined;
+      payload.playtimeMinutes = parseMinutes(
+        row.playtimeminutes || row.playtime_forever || row.playtime || row.tempo || 0,
+      );
+      if (!payload.playtimeMinutes && row.playtimehours)
+        payload.playtimeMinutes = parseHoursToMinutes(row.playtimehours);
       payload.completionPercent = Number(row.completionpercent || row.progresspercent || row.porcentagem || 0) || 0;
       payload.estimatedTime = row.estimatedtime || row.eta || row.estimativa || undefined;
       payload.difficulty = row.difficulty || row.dificuldade || undefined;
       payload.releaseYear = Number(row.releaseyear || row.year || row.ano || 0) || undefined;
-      payload.completionDate = parseOptionalDate(row.completiondate || row.dataconclusao || row.finishedat || row.conclusão || row['date finished'] || row['finished on'] || row['finalizado em']);
+      payload.completionDate = parseOptionalDate(
+        row.completiondate ||
+          row.dataconclusao ||
+          row.finishedat ||
+          row.conclusão ||
+          row["date finished"] ||
+          row["finished on"] ||
+          row["finalizado em"],
+      );
       payload.coverUrl = row.coverurl || row.cover || row.capa || undefined;
       payload.developer = row.developer || row.studio || row.desenvolvedora || undefined;
       payload.publisher = row.publisher || row.publishers || row.publicadora || undefined;
       payload.description = row.description || row.descricao || row.descrição || undefined;
-      payload.startedAt = parseOptionalDate(row.startedat || row.comecou || row.começou || row.comeco || row.início || row.inicio || row['date started'] || row['started on'] || row['começou em']);
-      payload.purchaseDate = parseOptionalDate(row.purchasedate || row.dataaquisicao || row.data_aquisicao || row.data_compra || row.datacompra || row['date purchased'] || row['purchase date']);
-      payload.pricePaid = Number(row.pricepaid || row.valorpago || row.valor_pago || row.price || row.amount || row.valor || 0) || undefined;
-      payload.targetPrice = Number(row.targetprice || row.valordesejado || row.valor_desejado || row.target || 0) || undefined;
+      payload.startedAt = parseOptionalDate(
+        row.startedat ||
+          row.comecou ||
+          row.começou ||
+          row.comeco ||
+          row.início ||
+          row.inicio ||
+          row["date started"] ||
+          row["started on"] ||
+          row["começou em"],
+      );
+      payload.purchaseDate = parseOptionalDate(
+        row.purchasedate ||
+          row.dataaquisicao ||
+          row.data_aquisicao ||
+          row.data_compra ||
+          row.datacompra ||
+          row["date purchased"] ||
+          row["purchase date"],
+      );
+      payload.pricePaid =
+        Number(row.pricepaid || row.valorpago || row.valor_pago || row.price || row.amount || row.valor || 0) ||
+        undefined;
+      payload.targetPrice =
+        Number(row.targetprice || row.valordesejado || row.valor_desejado || row.target || 0) || undefined;
       payload.currency = row.currency || row.moeda || undefined;
-      payload.storeLink = row.storelink || row.link || row.linkloja || row.link_loja || row.url || row['store link'] || undefined;
+      payload.storeLink =
+        row.storelink || row.link || row.linkloja || row.link_loja || row.url || row["store link"] || undefined;
       return applyImportDefaults(payload, defaults);
     })
     .filter((value): value is ImportPayload => Boolean(value));
@@ -298,7 +343,7 @@ function parseNotionCsv(rows: Array<Record<string, string>>, defaults?: ImportDe
       if (!title) return null;
 
       const payload = defaultPayload(title, defaults);
-      
+
       // Mapeamento de Plataforma (Notion permite Multi-select)
       const platformRaw = row.platform || row.plataforma || row.Platform || "";
       payload.platform = getPrimaryCsvToken(platformRaw, payload.platform);
@@ -307,22 +352,23 @@ function parseNotionCsv(rows: Array<Record<string, string>>, defaults?: ImportDe
       // Mapeamento de Status
       const statusRaw = row.status || row.state || row.estado || row.progresso || row.Status || "";
       payload.progressStatus = mapProgress(statusRaw);
-      
+
       // Mapeamento de Loja/Fonte
       const sourceRaw = row.source || row.store || row.loja || row.origem || row.Source || "";
       payload.sourceStore = getPrimaryCsvToken(sourceRaw, payload.sourceStore);
       payload.stores = splitCsvTokens(sourceRaw || payload.sourceStore);
 
       // Novos campos ricos (se existirem na tabela do Notion do usuário)
-      payload.pricePaid = Number(row.price || row.cost || row.preço || row.custo || row['Price Paid'] || 0) || undefined;
-      payload.purchaseDate = parseOptionalDate(row['Purchase Date'] || row['Data de Compra'] || row.aquisicao || "");
-      payload.startedAt = parseOptionalDate(row['Started At'] || row['Comecei em'] || row.inicio || "");
-      payload.completionDate = parseOptionalDate(row['Finished At'] || row['Data de Conclusão'] || row.termino || "");
-      
+      payload.pricePaid =
+        Number(row.price || row.cost || row.preço || row.custo || row["Price Paid"] || 0) || undefined;
+      payload.purchaseDate = parseOptionalDate(row["Purchase Date"] || row["Data de Compra"] || row.aquisicao || "");
+      payload.startedAt = parseOptionalDate(row["Started At"] || row["Comecei em"] || row.inicio || "");
+      payload.completionDate = parseOptionalDate(row["Finished At"] || row["Data de Conclusão"] || row.termino || "");
+
       // Notas e outros
       payload.notes = row.notes || row.comments || row.notas || row.comentários || row.Note || "";
       payload.personalRating = Number(row.rating || row.score || row.nota || 0) || undefined;
-      
+
       return applyImportDefaults(payload, defaults);
     })
     .filter((value): value is ImportPayload => Boolean(value));
@@ -334,7 +380,7 @@ export function parseImportText(source: ImportSource, text: string, defaults?: I
 
   if ((source === "playnite" || source === "steam") && (trimmed.startsWith("[") || trimmed.startsWith("{"))) {
     const jsonData = JSON.parse(trimmed);
-    const list = Array.isArray(jsonData) ? jsonData : jsonData.games ?? jsonData.items ?? [];
+    const list = Array.isArray(jsonData) ? jsonData : (jsonData.games ?? jsonData.items ?? []);
     if (!Array.isArray(list)) return [];
     return list
       .map((item: Record<string, unknown>) => {
@@ -346,8 +392,7 @@ export function parseImportText(source: ImportSource, text: string, defaults?: I
           getPrimaryCsvToken(
             String(item.platform ?? item.platforms ?? item.Platforms ?? payload.platform),
             payload.platform,
-          ) ||
-          payload.platform;
+          ) || payload.platform;
         payload.platforms = splitCsvTokens(
           Array.isArray(item.platforms)
             ? item.platforms.map((value) => String(value))
@@ -464,7 +509,7 @@ export function recordToImportPayload(
     ? structured.platformNamesByGameId
     : structured?.platformRows && structured.gamePlatformRows
       ? buildPlatformNamesByGameId(structured.platformRows, structured.gamePlatformRows)
-    : new Map<number, string[]>();
+      : new Map<number, string[]>();
   const platforms = structured
     ? resolveStructuredPlatforms(game, libraryEntry.platform, platformNamesByGameId)
     : splitCsvTokens(game.platforms);
@@ -549,12 +594,22 @@ function mergeImportPayloads(current: ImportPayload, incoming: ImportPayload): I
     ...incoming,
     title: current.title || incoming.title,
     platform: getPrimaryCsvToken([current.platform, incoming.platform], current.platform || incoming.platform || "PC"),
-    platforms: splitCsvTokens([...(current.platforms ?? []), ...(incoming.platforms ?? []), current.platform, incoming.platform]),
+    platforms: splitCsvTokens([
+      ...(current.platforms ?? []),
+      ...(incoming.platforms ?? []),
+      current.platform,
+      incoming.platform,
+    ]),
     sourceStore: getPrimaryCsvToken(
       [current.sourceStore, incoming.sourceStore],
       current.sourceStore || incoming.sourceStore || "Manual",
     ),
-    stores: splitCsvTokens([...(current.stores ?? []), ...(incoming.stores ?? []), current.sourceStore, incoming.sourceStore]),
+    stores: splitCsvTokens([
+      ...(current.stores ?? []),
+      ...(incoming.stores ?? []),
+      current.sourceStore,
+      incoming.sourceStore,
+    ]),
     format: incoming.format || current.format,
     ownershipStatus: mergeOwnershipStatus(current.ownershipStatus, incoming.ownershipStatus),
     progressStatus,
@@ -566,7 +621,8 @@ function mergeImportPayloads(current: ImportPayload, incoming: ImportPayload): I
       progressStatus,
       completedAt: incoming.completionDate,
     }),
-    priority: priorityWeight(incoming.priority) > priorityWeight(current.priority) ? incoming.priority : current.priority,
+    priority:
+      priorityWeight(incoming.priority) > priorityWeight(current.priority) ? incoming.priority : current.priority,
     personalRating: incoming.personalRating ?? current.personalRating,
     notes: incoming.notes || current.notes,
     rawgId: incoming.rawgId ?? current.rawgId,
@@ -644,21 +700,23 @@ function summarizeGameMetadataGaps(game: DbGameMetadata): string[] {
     releaseYear: "ano",
   } as const;
 
-  return (Object.keys(labels) as Array<keyof typeof labels>).filter((field) => {
-    const value = game[field as keyof DbGameMetadata];
-    if (typeof value === "number") return !Number.isFinite(value);
-    return !String(value || "").trim();
-  }).map((field) => labels[field]);
+  return (Object.keys(labels) as Array<keyof typeof labels>)
+    .filter((field) => {
+      const value = game[field as keyof DbGameMetadata];
+      if (typeof value === "number") return !Number.isFinite(value);
+      return !String(value || "").trim();
+    })
+    .map((field) => labels[field]);
 }
 
 function hasUsefulImportMetadata(payload: ImportPayload): boolean {
   return Boolean(
     payload.coverUrl ||
-      payload.genres ||
-      payload.developer ||
-      payload.publisher ||
-      payload.releaseYear ||
-      payload.description,
+    payload.genres ||
+    payload.developer ||
+    payload.publisher ||
+    payload.releaseYear ||
+    payload.description,
   );
 }
 
@@ -758,18 +816,14 @@ export function buildImportPreview(
 ): ImportPreviewEntry[] {
   const existingExactMap = indexRecordsByStructuredLookup(existingRecords);
   const existingByTitle = new Map<string, StructuredImportRecord[]>();
-  const uniqueGamesByTitle = new Map<
-    string,
-    Map<number, StructuredImportRecord>
-  >();
+  const uniqueGamesByTitle = new Map<string, Map<number, StructuredImportRecord>>();
   for (const record of existingRecords) {
     const normalizedTitle = normalizeGameTitle(record.game.title);
     const current = existingByTitle.get(normalizedTitle) ?? [];
     current.push(record);
     existingByTitle.set(normalizedTitle, current);
 
-    const currentGames =
-      uniqueGamesByTitle.get(normalizedTitle) ?? new Map<number, StructuredImportRecord>();
+    const currentGames = uniqueGamesByTitle.get(normalizedTitle) ?? new Map<number, StructuredImportRecord>();
     if ((record.game.id ?? 0) > 0 && !currentGames.has(record.game.id!)) {
       currentGames.set(record.game.id!, record);
     }
@@ -810,16 +864,15 @@ export function buildImportPreview(
     const bestMatchCandidate = titleCandidates[0];
     const bestGameCandidate = gameCandidates[0];
     const confidentTitleMatch =
-      !hasExactMatch &&
-      titleCandidates.length === 1 &&
-      (bestMatchCandidate?.score ?? 0) >= 78;
+      !hasExactMatch && titleCandidates.length === 1 && (bestMatchCandidate?.score ?? 0) >= 78;
     const confidentGameLink =
       !hasExactMatch &&
       titleCandidates.length === 0 &&
       gameCandidates.length === 1 &&
       (bestGameCandidate?.score ?? 0) >= 72;
     const reviewReasons: string[] = [];
-    if (hasExactMatch) reviewReasons.push("Já existe uma entrada compatível com o mesmo título e plataforma estruturada.");
+    if (hasExactMatch)
+      reviewReasons.push("Já existe uma entrada compatível com o mesmo título e plataforma estruturada.");
     if (!hasExactMatch && titleCandidates.length > 0) {
       reviewReasons.push("Há entradas parecidas na biblioteca que podem ser atualizadas.");
     }
@@ -851,19 +904,21 @@ export function buildImportPreview(
       ),
     );
 
-    const selectedGameId = confidentGameLink ? bestGameCandidate?.gameId ?? null : null;
-    const selectedMatchId =
-      hasExactMatch ? exactRecord?.libraryEntry.id ?? null : confidentTitleMatch ? bestMatchCandidate?.entryId ?? null : null;
+    const selectedGameId = confidentGameLink ? (bestGameCandidate?.gameId ?? null) : null;
+    const selectedMatchId = hasExactMatch
+      ? (exactRecord?.libraryEntry.id ?? null)
+      : confidentTitleMatch
+        ? (bestMatchCandidate?.entryId ?? null)
+        : null;
     const suggestedAction = hasExactMatch || confidentTitleMatch ? "update" : "create";
     const confidenceScore = hasExactMatch
       ? 100
       : Math.max(bestMatchCandidate?.score ?? 0, Math.max(0, (bestGameCandidate?.score ?? 0) - 6));
-    const status =
-      hasExactMatch
-        ? "existing"
-        : titleCandidates.length > 0 || gameCandidates.length > 0 || maintenanceSignals.length > 0
-          ? "review"
-          : "new";
+    const status = hasExactMatch
+      ? "existing"
+      : titleCandidates.length > 0 || gameCandidates.length > 0 || maintenanceSignals.length > 0
+        ? "review"
+        : "new";
     previewMap.set(key, {
       id: `${key}-${previewMap.size + 1}`,
       key,
@@ -910,12 +965,7 @@ export function attachRawgCandidatesToPreview(
       ...entry,
       rawgCandidates: candidates,
       selectedRawgId,
-      enrichmentStatus:
-        candidates.length === 0
-          ? "missing"
-          : selectedRawgId != null
-            ? "matched"
-            : "ambiguous",
+      enrichmentStatus: candidates.length === 0 ? "missing" : selectedRawgId != null ? "matched" : "ambiguous",
     };
   });
 }
@@ -933,6 +983,8 @@ export function createDbGameFromImport(
   return {
     game: {
       id: currentGame?.id,
+      uuid: currentGame?.uuid || generateUuid(),
+      version: currentGame?.version || 1,
       title: item.title.trim(),
       normalizedTitle: normalizeGameTitle(item.title),
       slug: currentGame?.slug,
@@ -954,6 +1006,8 @@ export function createDbGameFromImport(
     },
     libraryEntry: {
       id: currentEntry?.id,
+      uuid: currentEntry?.uuid || generateUuid(),
+      version: currentEntry?.version || 1,
       gameId: currentGame?.id as number,
       platform: getPrimaryCsvToken(platforms, currentEntry?.platform || "PC"),
       sourceStore: getPrimaryCsvToken(stores, currentEntry?.sourceStore || "Importado"),
@@ -995,10 +1049,15 @@ export function mergeImportedGame(
 ): { game: DbGameMetadata; libraryEntry: DbLibraryEntry } {
   const merged = createDbGameFromImport(incoming, existing.game, existing.libraryEntry);
   const completionPercent = Math.max(existing.libraryEntry.completionPercent || 0, incoming.completionPercent || 0);
-  const priority = priorityWeight(incoming.priority) > priorityWeight(existing.libraryEntry.priority)
-    ? incoming.priority
-    : existing.libraryEntry.priority;
-  const progressStatus = pickProgressStatus(existing.libraryEntry.progressStatus, incoming.progressStatus, completionPercent);
+  const priority =
+    priorityWeight(incoming.priority) > priorityWeight(existing.libraryEntry.priority)
+      ? incoming.priority
+      : existing.libraryEntry.priority;
+  const progressStatus = pickProgressStatus(
+    existing.libraryEntry.progressStatus,
+    incoming.progressStatus,
+    completionPercent,
+  );
   const completionDate = deriveCompletionDate({
     currentCompletionDate: existing.libraryEntry.completionDate ?? incoming.completionDate,
     completionPercent,
@@ -1086,7 +1145,9 @@ export function buildRestorePreview(payload: BackupPayload, mode: RestoreMode, t
     currentGamePlatforms.map((relation) => `${relation.gameId}::${relation.platformId}`),
   );
   const currentListsByName = new Map(lists.map((list) => [list.name.trim().toLowerCase(), list]));
-  const currentLibraryEntryLists = new Set(libraryEntryLists.map((entry) => `${entry.libraryEntryId}::${entry.listId}`));
+  const currentLibraryEntryLists = new Set(
+    libraryEntryLists.map((entry) => `${entry.libraryEntryId}::${entry.listId}`),
+  );
   const currentTagsByName = new Map(tags.map((tag) => [tag.name.trim().toLowerCase(), tag]));
   const currentGameTags = new Set(gameTags.map((entry) => `${entry.libraryEntryId}::${entry.tagId}`));
   const currentGoalsByKey = new Map(goals.map((goal) => [`${goal.type}::${goal.period}`, goal]));

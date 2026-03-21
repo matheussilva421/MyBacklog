@@ -17,9 +17,7 @@ function createBatchEditDraft(): LibraryBatchEditState {
 
 export function useBatchEditModalState() {
   const [batchEditModalOpen, setBatchEditModalOpen] = useState(false);
-  const [batchEditForm, setBatchEditForm] = useState<LibraryBatchEditState>(() =>
-    createBatchEditDraft(),
-  );
+  const [batchEditForm, setBatchEditForm] = useState<LibraryBatchEditState>(() => createBatchEditDraft());
 
   const openBatchEditModal = () => {
     setBatchEditForm(createBatchEditDraft());

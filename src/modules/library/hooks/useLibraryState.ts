@@ -10,11 +10,7 @@ import type {
   SavedView,
   Tag,
 } from "../../../core/types";
-import {
-  doesSavedViewMatchLibraryState,
-  groupLibraryGames,
-  sortLibraryGames,
-} from "../utils/savedViews";
+import { doesSavedViewMatchLibraryState, groupLibraryGames, sortLibraryGames } from "../utils/savedViews";
 
 type UseLibraryStateArgs = {
   games: Game[];

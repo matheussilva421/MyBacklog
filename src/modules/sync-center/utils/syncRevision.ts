@@ -34,9 +34,7 @@ export async function incrementLocalRevision(): Promise<number> {
   return next!;
 }
 
-export function createRevisionWatcher(
-  callback: (revision: number) => void,
-): () => void {
+export function createRevisionWatcher(callback: (revision: number) => void): () => void {
   let lastRevision: number | null = null;
   let cancelled = false;
 

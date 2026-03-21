@@ -103,9 +103,7 @@ describe("syncEngine helpers", () => {
     const first = createPayload({ exportedAt: "2026-03-19T12:00:00.000Z" });
     const second = createPayload({ exportedAt: "2026-03-19T13:00:00.000Z" });
 
-    expect(buildSyncFingerprint(stripBackupMeta(first))).toBe(
-      buildSyncFingerprint(stripBackupMeta(second)),
-    );
+    expect(buildSyncFingerprint(stripBackupMeta(first))).toBe(buildSyncFingerprint(stripBackupMeta(second)));
   });
 
   it("ignora settings operacionais locais no fingerprint", () => {

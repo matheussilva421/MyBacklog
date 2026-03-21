@@ -1,13 +1,4 @@
-import {
-  Suspense,
-  lazy,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ComponentType,
-  type ReactNode,
-} from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import type { useBacklogApp } from "../hooks/useBacklogApp";
 import { useDocumentScrollLock } from "./cyberpunk-ui";
 
