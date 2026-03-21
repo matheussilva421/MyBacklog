@@ -7,3 +7,4 @@
 - [Incremental Sync Structure](memory/incremental-sync-structure.md) - Estrutura de documentos por entidade no Firestore para sync incremental (Phase 3 Task 9)
 - [Mutation Queue Implementation](memory/mutation-queue-implementation.md) - Fila local de mutações pendentes para sync incremental (Phase 3 Task 10)
 - [Sync Engine Backoff](memory/sync-engine-backoff.md) - Retry com backoff exponencial e polling de 30s para fila de mutações
+- [Sync Phase 4 UI](memory/sync-engine-backoff.md) - UI para falhas permanentes na Central de Sync com retry manual e telemetria (Fase 4 Task 12-15)
