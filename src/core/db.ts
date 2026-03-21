@@ -10,6 +10,8 @@ import type {
   LibraryEntryStore,
   LibraryEntryList,
   List,
+  LocalRevision,
+  PendingMutation,
   Platform,
   PlaySession,
   Review,
@@ -70,6 +72,8 @@ class MyBacklogDB extends Dexie {
   settings!: Table<Setting, number>;
   savedViews!: Table<SavedView, number>;
   importJobs!: Table<ImportJob, number>;
+  localRevision!: Table<LocalRevision, number>;
+  pendingMutations!: Table<PendingMutation, number>;
 
   constructor() {
     super("mybacklog");
@@ -123,7 +127,7 @@ class MyBacklogDB extends Dexie {
               platforms: legacy.platform,
               createdAt: legacy.createdAt,
               updatedAt: legacy.updatedAt,
-            });
+            } as unknown as Game);
           } else {
             existingGame.platforms = mergePlatforms(existingGame.platforms, legacy.platform);
             existingGame.genres = existingGame.genres || legacy.genres;
@@ -131,7 +135,8 @@ class MyBacklogDB extends Dexie {
             existingGame.difficulty = existingGame.difficulty || legacy.difficulty;
             existingGame.rawgId = existingGame.rawgId ?? legacy.rawgId;
             existingGame.coverUrl = existingGame.coverUrl || legacy.coverUrl;
-            existingGame.updatedAt = existingGame.updatedAt > legacy.updatedAt ? existingGame.updatedAt : legacy.updatedAt;
+            existingGame.updatedAt =
+              existingGame.updatedAt > legacy.updatedAt ? existingGame.updatedAt : legacy.updatedAt;
           }
 
           const metadata = migratedGames.get(normalizedTitle);
@@ -158,7 +163,7 @@ class MyBacklogDB extends Dexie {
             favorite: legacy.favorite,
             createdAt: legacy.createdAt,
             updatedAt: legacy.updatedAt,
-          });
+          } as unknown as LibraryEntry);
         }
 
         await tx.table("games").clear();
@@ -201,8 +206,7 @@ class MyBacklogDB extends Dexie {
       playSessions: "++id, libraryEntryId, date",
       reviews: "++id, libraryEntryId",
       lists: "++id, name",
-      libraryEntryLists:
-        "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
+      libraryEntryLists: "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
       tags: "++id, name",
       gameTags: "++id, libraryEntryId, tagId",
       goals: "++id, type, period",
@@ -219,13 +223,11 @@ class MyBacklogDB extends Dexie {
         libraryEntryStores:
           "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
         platforms: "++id, normalizedName, name, updatedAt",
-        gamePlatforms:
-          "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
+        gamePlatforms: "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
         playSessions: "++id, libraryEntryId, date",
         reviews: "++id, libraryEntryId",
         lists: "++id, name",
-        libraryEntryLists:
-          "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
+        libraryEntryLists: "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
         tags: "++id, name",
         gameTags: "++id, libraryEntryId, tagId",
         goals: "++id, type, period",
@@ -242,7 +244,9 @@ class MyBacklogDB extends Dexie {
           ...entry,
           completionDate:
             entry.completionDate ||
-            (entry.completionPercent >= 100 || entry.progressStatus === "finished" || entry.progressStatus === "completed_100"
+            (entry.completionPercent >= 100 ||
+            entry.progressStatus === "finished" ||
+            entry.progressStatus === "completed_100"
               ? toDateOnly(entry.lastSessionAt || entry.updatedAt)
               : undefined),
         }));
@@ -279,13 +283,11 @@ class MyBacklogDB extends Dexie {
         libraryEntryStores:
           "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
         platforms: "++id, normalizedName, name, updatedAt",
-        gamePlatforms:
-          "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
+        gamePlatforms: "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
         playSessions: "++id, libraryEntryId, date",
         reviews: "++id, libraryEntryId",
         lists: "++id, name",
-        libraryEntryLists:
-          "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
+        libraryEntryLists: "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
         tags: "++id, name",
         gameTags: "++id, libraryEntryId, tagId",
         goals: "++id, type, period",
@@ -314,13 +316,11 @@ class MyBacklogDB extends Dexie {
         libraryEntryStores:
           "++id, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt",
         platforms: "++id, normalizedName, name, updatedAt",
-        gamePlatforms:
-          "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
+        gamePlatforms: "++id, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt",
         playSessions: "++id, libraryEntryId, date",
         reviews: "++id, libraryEntryId",
         lists: "++id, name",
-        libraryEntryLists:
-          "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
+        libraryEntryLists: "++id, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt",
         tags: "++id, name",
         gameTags: "++id, libraryEntryId, tagId",
         goals: "++id, type, period",
@@ -377,6 +377,87 @@ class MyBacklogDB extends Dexie {
         if (sanitizedEntries.length > 0) {
           await tx.table("libraryEntries").bulkPut(sanitizedEntries);
         }
+      });
+
+    this.version(7)
+      .stores({
+        games: "++id, &uuid, normalizedTitle, title, rawgId, releaseYear, updatedAt, deletedAt",
+        libraryEntries:
+          "++id, &uuid, gameId, [gameId+platform], platform, sourceStore, ownershipStatus, progressStatus, priority, updatedAt, favorite, lastSessionAt, completionDate, deletedAt",
+        stores: "++id, &uuid, normalizedName, name, sourceKey, updatedAt, deletedAt",
+        libraryEntryStores:
+          "++id, &uuid, libraryEntryId, storeId, [libraryEntryId+storeId], [storeId+libraryEntryId], isPrimary, createdAt, updatedAt, deletedAt",
+        platforms: "++id, &uuid, normalizedName, name, updatedAt, deletedAt",
+        gamePlatforms:
+          "++id, &uuid, gameId, platformId, [gameId+platformId], [platformId+gameId], createdAt, updatedAt, deletedAt",
+        playSessions: "++id, &uuid, libraryEntryId, date, updatedAt, deletedAt",
+        reviews: "++id, &uuid, libraryEntryId, updatedAt, deletedAt",
+        lists: "++id, &uuid, name, updatedAt, deletedAt",
+        libraryEntryLists:
+          "++id, &uuid, libraryEntryId, listId, [libraryEntryId+listId], [listId+libraryEntryId], createdAt, updatedAt, deletedAt",
+        tags: "++id, &uuid, name, updatedAt, deletedAt",
+        gameTags: "++id, &uuid, libraryEntryId, tagId, createdAt, updatedAt, deletedAt",
+        goals: "++id, &uuid, type, period, updatedAt, deletedAt",
+        settings: "++id, key, updatedAt",
+        savedViews: "++id, &uuid, scope, name, [scope+name], updatedAt, deletedAt",
+        importJobs: "++id, &uuid, source, status, createdAt, updatedAt, deletedAt",
+        localRevision: "++id, revision",
+      })
+      .upgrade(async (tx) => {
+        const now = new Date().toISOString();
+
+        // Helper para gerar uuid
+        const generateUuid = () =>
+          `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+
+        // Atualizar todas as tabelas syncáveis
+        const tables = [
+          tx.table("games"),
+          tx.table("libraryEntries"),
+          tx.table("stores"),
+          tx.table("libraryEntryStores"),
+          tx.table("platforms"),
+          tx.table("gamePlatforms"),
+          tx.table("playSessions"),
+          tx.table("reviews"),
+          tx.table("lists"),
+          tx.table("libraryEntryLists"),
+          tx.table("tags"),
+          tx.table("gameTags"),
+          tx.table("goals"),
+          tx.table("savedViews"),
+          tx.table("importJobs"),
+        ];
+
+        for (const table of tables) {
+          const records = await table.toArray();
+          for (const record of records) {
+            if (!record.uuid) {
+              await table.update(record.id, {
+                uuid: generateUuid(),
+                version: 1,
+                deletedAt: null,
+                updatedAt: record.updatedAt || now,
+              });
+            }
+          }
+        }
+
+        // Inicializar localRevision
+        const existingRevision = await tx.table("localRevision").get({ key: "localRevision" });
+        if (!existingRevision) {
+          await tx.table("localRevision").add({
+            key: "localRevision",
+            revision: 0,
+            lastMutationAt: now,
+            updatedAt: now,
+          });
+        }
+      });
+
+    this.version(8)
+      .stores({
+        pendingMutations: "++id, uuid, [uuid+entityType], syncedAt, createdAt, retryCount",
       });
   }
 }

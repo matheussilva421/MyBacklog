@@ -32,19 +32,14 @@ export type Priority = "low" | "medium" | "high";
 export type GameFormat = "digital" | "physical" | "subscription" | "emulated";
 export type SavedViewScope = "library";
 export type LibrarySavedStatusFilter = "all" | "backlog" | "playing" | "paused" | "completed" | "wishlist";
-export type LibraryViewSortBy =
-  | "updatedAt"
-  | "title"
-  | "progress"
-  | "hours"
-  | "priority"
-  | "year"
-  | "completionDate";
+export type LibraryViewSortBy = "updatedAt" | "title" | "progress" | "hours" | "priority" | "year" | "completionDate";
 export type LibraryViewSortDirection = "asc" | "desc";
 export type LibraryViewGroupBy = "none" | "status" | "priority" | "platform" | "sourceStore" | "ownership";
 
 export interface Game {
   id?: number;
+  uuid: string;
+  version: number;
   title: string;
   normalizedTitle: string;
   slug?: string;
@@ -60,10 +55,14 @@ export interface Game {
   publisher?: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface LibraryEntry {
   id?: number;
+  uuid: string;
+  version: number;
   gameId: number;
   platform: string;
   sourceStore: string;
@@ -89,10 +88,14 @@ export interface LibraryEntry {
   completionDate?: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface PlaySession {
   id?: number;
+  uuid: string;
+  version: number;
   libraryEntryId: number;
   date: string;
   platform: string;
@@ -101,10 +104,16 @@ export interface PlaySession {
   completionPercent?: number;
   mood?: string;
   note?: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface Review {
   id?: number;
+  uuid: string;
+  version: number;
   libraryEntryId: number;
   score?: number;
   shortReview?: string;
@@ -113,51 +122,88 @@ export interface Review {
   cons?: string;
   recommend?: "yes" | "no";
   hasSpoiler?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface List {
   id?: number;
+  uuid: string;
+  version: number;
   name: string;
   createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface Store {
   id?: number;
+  uuid: string;
+  version: number;
   name: string;
   normalizedName: string;
   sourceKey?: AccessSource;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface LibraryEntryStore {
   id?: number;
+  uuid: string;
+  version: number;
   libraryEntryId: number;
   storeId: number;
   isPrimary: boolean;
   createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface LibraryEntryList {
   id?: number;
+  uuid: string;
+  version: number;
   libraryEntryId: number;
   listId: number;
   createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface Tag {
   id?: number;
+  uuid: string;
+  version: number;
   name: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface GameTag {
   id?: number;
+  uuid: string;
+  version: number;
   libraryEntryId: number;
   tagId: number;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface Platform {
   id?: number;
+  uuid: string;
+  version: number;
   name: string;
   normalizedName: string;
   iconUrl?: string;
@@ -166,21 +212,34 @@ export interface Platform {
   hexColor?: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface GamePlatform {
   id?: number;
+  uuid: string;
+  version: number;
   gameId: number;
   platformId: number;
   createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface Goal {
   id?: number;
+  uuid: string;
+  version: number;
   type: GoalType;
   target: number;
   current: number;
   period: Period;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface Setting {
@@ -192,6 +251,8 @@ export interface Setting {
 
 export interface SavedView {
   id?: number;
+  uuid: string;
+  version: number;
   scope: SavedViewScope;
   name: string;
   statusFilter: LibrarySavedStatusFilter;
@@ -202,10 +263,14 @@ export interface SavedView {
   groupBy: LibraryViewGroupBy;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface ImportJob {
   id?: number;
+  uuid: string;
+  version: number;
   source: string;
   status: "pending" | "preview" | "completed" | "failed";
   totalItems?: number;
@@ -214,6 +279,8 @@ export interface ImportJob {
   changes?: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
 
 export interface LegacyGameRecord {
@@ -252,4 +319,47 @@ export interface LocalRevision {
   revision: number;
   lastMutationAt: string;
   updatedAt: string;
+}
+
+/**
+ * Tipos para fila de mutações pendentes (sync incremental).
+ */
+export type MutationType = "create" | "update" | "delete";
+export type EntityType =
+  | "game"
+  | "libraryEntry"
+  | "playSession"
+  | "review"
+  | "list"
+  | "tag"
+  | "store"
+  | "platform"
+  | "goal"
+  | "savedView"
+  | "importJob"
+  | "libraryEntryStore"
+  | "libraryEntryList"
+  | "gameTag"
+  | "gamePlatform";
+
+export interface PendingMutation {
+  id?: number;
+  uuid: string;
+  entityType: EntityType;
+  mutationType: MutationType;
+  payload: string; // JSON.stringify do dado
+  syncedAt?: string | null;
+  createdAt: string;
+  retryCount: number;
+}
+
+/**
+ * Metadados para sincronizacao entre dispositivos.
+ * Todas as entidades syncáveis devem incluir estes campos.
+ */
+export interface SyncMetadata {
+  uuid: string;
+  version: number;
+  deletedAt?: string | null;
+  updatedByDeviceId?: string;
 }
