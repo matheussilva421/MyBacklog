@@ -133,3 +133,51 @@ export async function getNextPendingMutation(): Promise<PendingMutation | undefi
   const mutations = await getPendingMutations();
   return mutations[0];
 }
+
+/**
+ * Obtém todas as mutações com falha permanente (retryCount >= MAX_RETRY_COUNT).
+ */
+export async function getPermanentFailures(): Promise<PendingMutation[]> {
+  const allMutations = await db.pendingMutations.toArray();
+  return allMutations.filter((m) => !m.syncedAt && m.retryCount >= MAX_RETRY_COUNT);
+}
+
+/**
+ * Obtém todas as mutações com falha temporária (0 < retryCount < MAX_RETRY_COUNT).
+ */
+export async function getTemporaryFailures(): Promise<PendingMutation[]> {
+  const allMutations = await db.pendingMutations.toArray();
+  return allMutations.filter((m) => !m.syncedAt && m.retryCount > 0 && m.retryCount < MAX_RETRY_COUNT);
+}
+
+/**
+ * Reseta contador de retry de uma mutação.
+ */
+export async function resetMutationRetry(id: number): Promise<void> {
+  await db.pendingMutations.update(id, {
+    retryCount: 0,
+  });
+}
+
+/**
+ * Remove uma mutação pendente.
+ */
+export async function deletePendingMutation(id: number): Promise<void> {
+  await db.pendingMutations.delete(id);
+}
+
+/**
+ * Reseta contador de retry de múltiplas mutações.
+ */
+export async function bulkResetMutationRetry(ids: number[]): Promise<void> {
+  for (const id of ids) {
+    await resetMutationRetry(id);
+  }
+}
+
+/**
+ * Remove múltiplas mutações pendentes.
+ */
+export async function bulkDeletePendingMutations(ids: number[]): Promise<void> {
+  await db.pendingMutations.bulkDelete(ids);
+}
