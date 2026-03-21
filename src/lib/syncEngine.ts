@@ -1,5 +1,6 @@
 import { getPendingMutations, markMutationsSynced, incrementMutationRetry, MAX_RETRY_COUNT } from "./mutationQueue";
 import { pushEntityToCloud, deleteEntityInCloud } from "./incrementalSync";
+import { logSyncFailure, resolveSyncFailure } from "./syncTelemetry";
 import { auth } from "./firebase";
 import type { EntityType } from "../core/types";
 
@@ -97,6 +98,7 @@ async function processMutation(mutation: {
     return true;
   } catch (error) {
     console.error(`[SyncEngine] Erro ao processar mutação ${mutation.id}:`, error);
+    await logSyncFailure(mutation.id, mutation.entityType, mutation.mutationType, error, mutation.retryCount);
     return false;
   }
 }
@@ -166,6 +168,10 @@ export async function processMutationQueue(): Promise<{
 
     if (successIds.length > 0) {
       await markMutationsSynced(successIds);
+      // Resolver falhas de sync para mutações bem-sucedidas
+      for (const id of successIds) {
+        await resolveSyncFailure(id, "success");
+      }
     }
 
     // Incrementar retry para falhas temporárias
