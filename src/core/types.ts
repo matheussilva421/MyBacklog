@@ -246,3 +246,10 @@ export interface LegacyGameRecord {
   updatedAt: string;
   createdAt: string;
 }
+
+export interface LocalRevision {
+  id?: number;
+  revision: number;
+  lastMutationAt: string;
+  updatedAt: string;
+}
