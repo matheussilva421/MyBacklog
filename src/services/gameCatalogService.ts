@@ -97,9 +97,7 @@ export async function saveGameFromForm(args: {
   }
 
   let entryId = payload.libraryEntry.id;
-  await db.transaction(
-    "rw",
-    [db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
+  await db.transaction("rw", [db.pendingMutations, db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
     async () => {
       let gameId = payload.game.id;
       let persistedGame = payload.game;

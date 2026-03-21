@@ -20,6 +20,7 @@ export function useBacklogDataState() {
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       refreshRequestRef.current += 1;

@@ -11,7 +11,8 @@ import { db } from "../core/db";
 // Mock do db.settings
 vi.mock("../core/db", () => ({
   db: {
-    transaction: vi.fn(async (_mode, _tables, fn) => {
+    transaction: vi.fn(async (...args: any[]) => {
+      const fn = args[args.length - 1];
       return await fn();
     }),
     settings: {

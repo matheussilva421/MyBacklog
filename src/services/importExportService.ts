@@ -209,9 +209,7 @@ export async function applyImportPreview(args: {
   let updated = 0;
   let ignored = 0;
 
-  await db.transaction(
-    "rw",
-    [db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
+  await db.transaction("rw", [db.pendingMutations, db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
     async () => {
       for (const previewEntry of args.importPreview) {
         if (previewEntry.action === "ignore") {
@@ -383,9 +381,7 @@ export function prepareRestorePreview(args: {
 export async function applyRestorePreview(preview: RestorePreview) {
   const payload = preview.payload;
 
-  await db.transaction(
-    "rw",
-    [
+  await db.transaction("rw", [db.pendingMutations, 
       db.games,
       db.libraryEntries,
       db.stores,

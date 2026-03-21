@@ -82,9 +82,7 @@ function logSyncError(message: string, error: unknown) {
 }
 
 async function replaceLocalTables(tables: SyncTables) {
-  await db.transaction(
-    "rw",
-    [
+  await db.transaction("rw", [db.pendingMutations, 
       db.games,
       db.libraryEntries,
       db.stores,
@@ -212,7 +210,7 @@ export function useCloudSync({
 
   const persistSyncMeta = useCallback(
     async (nextHistory: SyncHistoryEntry[], nextLastSuccessfulSyncAt: string | null) => {
-      await db.transaction("rw", db.settings, async () => {
+      await db.transaction("rw", db.pendingMutations, db.settings, async () => {
         await upsertSettingsRows([
           {
             key: syncSettingsKeys.syncHistory,

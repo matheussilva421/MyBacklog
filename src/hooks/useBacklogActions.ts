@@ -461,7 +461,7 @@ export function useBacklogActions({
     );
 
     const deviceId = await getDeviceId();
-    await db.transaction("rw", db.reviews, db.libraryEntries, async () => {
+    await db.transaction("rw", db.pendingMutations, db.reviews, db.libraryEntries, async () => {
       const existingReview = await db.reviews.where("libraryEntryId").equals(libraryEntryId).first();
       if (hasContent) {
         if (existingReview?.id != null) {
@@ -502,7 +502,7 @@ export function useBacklogActions({
     );
 
     const deviceId = await getDeviceId();
-    await db.transaction("rw", db.tags, db.gameTags, async () => {
+    await db.transaction("rw", db.pendingMutations, db.tags, db.gameTags, async () => {
       const existingTags = await db.tags.toArray();
       const tagsByName = new Map(existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag] as const));
       const currentRelations = await db.gameTags.where("libraryEntryId").equals(libraryEntryId).toArray();
@@ -577,7 +577,7 @@ export function useBacklogActions({
     const nextListIds = Array.from(new Set(listIds)).filter((listId) => validListIds.has(listId));
 
     const deviceId = await getDeviceId();
-    await db.transaction("rw", db.libraryEntryLists, async () => {
+    await db.transaction("rw", db.pendingMutations, db.libraryEntryLists, async () => {
       const currentRelations = await db.libraryEntryLists.where("libraryEntryId").equals(libraryEntryId).toArray();
       const currentListIds = new Set(currentRelations.map((relation) => relation.listId));
       for (const relation of currentRelations) {
@@ -645,9 +645,7 @@ export function useBacklogActions({
     setSubmitting(true);
     try {
       const deviceId = await getDeviceId();
-      await db.transaction(
-        "rw",
-        [
+      await db.transaction("rw", [db.pendingMutations, 
           db.games,
           db.libraryEntries,
           db.stores,
@@ -824,9 +822,7 @@ export function useBacklogActions({
     const deletedEntryId = selectedRecord.libraryEntry.id!;
     const deviceId = await getDeviceId();
 
-    await db.transaction(
-      "rw",
-      [
+    await db.transaction("rw", [db.pendingMutations, 
         db.games,
         db.libraryEntries,
         db.stores,
@@ -1112,7 +1108,7 @@ export function useBacklogActions({
     const confirmed = window.confirm("Excluir esta lista?");
     if (!confirmed) return;
     const deviceId = await getDeviceId();
-    await db.transaction("rw", db.lists, db.libraryEntryLists, async () => {
+    await db.transaction("rw", db.pendingMutations, db.lists, db.libraryEntryLists, async () => {
       const relations = await db.libraryEntryLists.where("listId").equals(listId).toArray();
       for (const relation of relations) {
         if (relation.id != null) {
@@ -1224,7 +1220,7 @@ export function useBacklogActions({
         guidedTourCompleted: preferences.guidedTourCompleted,
       });
       const settingPairs = preferencesToSettingPairs(nextPreferences);
-      await db.transaction("rw", db.settings, async () => {
+      await db.transaction("rw", db.pendingMutations, db.settings, async () => {
         for (const pair of settingPairs) {
           const existing = await db.settings.get({ key: pair.key });
           const now = new Date().toISOString();
@@ -1263,7 +1259,7 @@ export function useBacklogActions({
       const selectedTemplates = onboardingGoalTemplates.filter((template) =>
         payload.goalTemplateIds.includes(template.id),
       );
-      await db.transaction("rw", db.settings, db.lists, db.goals, async () => {
+      await db.transaction("rw", db.pendingMutations, db.settings, db.lists, db.goals, async () => {
         // Settings
         const settingPairs = preferencesToSettingPairs(nextPreferences);
         for (const pair of settingPairs) {
@@ -1362,7 +1358,7 @@ export function useBacklogActions({
 
     setSubmitting(true);
     try {
-      await db.transaction("rw", db.libraryEntries, db.playSessions, async () => {
+      await db.transaction("rw", db.pendingMutations, db.libraryEntries, db.playSessions, async () => {
         const deviceId = await getDeviceId();
         for (const orphanSessionId of orphanSessionIds) {
           const result = await softDelete("playSessions", orphanSessionId, deviceId);
@@ -1405,9 +1401,7 @@ export function useBacklogActions({
     setSubmitting(true);
     try {
       const deviceId = await getDeviceId();
-      await db.transaction(
-        "rw",
-        [
+      await db.transaction("rw", [db.pendingMutations, 
           db.games,
           db.libraryEntries,
           db.stores,
@@ -1617,9 +1611,7 @@ export function useBacklogActions({
   const handleCatalogNormalizeEntry = async (libraryEntryId: number) => {
     setSubmitting(true);
     try {
-      await db.transaction(
-        "rw",
-        [db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
+      await db.transaction("rw", [db.pendingMutations, db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
         async () => {
           await normalizeStructuredEntry(libraryEntryId);
         },
@@ -1647,9 +1639,7 @@ export function useBacklogActions({
         new Set(catalogMaintenanceReport.normalizationQueue.map((item) => item.libraryEntryId)),
       );
 
-      await db.transaction(
-        "rw",
-        [db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
+      await db.transaction("rw", [db.pendingMutations, db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
         async () => {
           for (const entryId of entryIds) {
             await normalizeStructuredEntry(entryId);
@@ -1671,7 +1661,7 @@ export function useBacklogActions({
     try {
       const deviceId = await getDeviceId();
       if (kind === "store") {
-        await db.transaction("rw", [db.stores, db.libraryEntryStores, db.libraryEntries], async () => {
+        await db.transaction("rw", [db.pendingMutations, db.stores, db.libraryEntryStores, db.libraryEntries], async () => {
           const rows = (await db.stores.toArray()).filter(
             (store) => normalizeToken(store.normalizedName || store.name) === normalizedName,
           );
@@ -1739,7 +1729,7 @@ export function useBacklogActions({
           }
         });
       } else {
-        await db.transaction("rw", [db.platforms, db.gamePlatforms, db.games, db.libraryEntries], async () => {
+        await db.transaction("rw", [db.pendingMutations, db.platforms, db.gamePlatforms, db.games, db.libraryEntries], async () => {
           const rows = (await db.platforms.toArray()).filter(
             (platform) => normalizeToken(platform.normalizedName || platform.name) === normalizedName,
           );
