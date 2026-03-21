@@ -79,6 +79,7 @@ export async function softDelete<
     updatedAt: now,
     updatedByDeviceId: deviceId,
     version: (entity.version ?? 0) + 1,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Update payload dinâmico para entidades genéricas
   } as any);
 
   return { success: true, alreadyDeleted: false, notFound: false };

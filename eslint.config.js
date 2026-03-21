@@ -16,4 +16,10 @@ export default tseslint.config(
       "prefer-const": "error",
     },
   },
+  {
+    files: ["src/lib/logger.ts"],
+    rules: {
+      "no-console": "off",
+    },
+  },
 );

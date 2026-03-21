@@ -1,19 +1,14 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useBacklogActions } from "./useBacklogActions";
 import { db } from "../core/db";
-import type { DbLibraryEntry, DbGameMetadata, DbGoal, DbList, DbSavedView } from "../core/types";
+import type { DbLibraryEntry, DbGoal, DbList, DbSavedView } from "../core/types";
 import type {
   LibraryRecord,
   Game,
-  StatusFilter,
   LibraryListFilter,
-  LibraryViewSortBy,
-  LibraryViewSortDirection,
-  LibraryViewGroupBy,
 } from "../backlog/shared";
 import type { AppPreferences } from "../modules/settings/utils/preferences";
-import type { useImportExportState } from "../modules/import-export/hooks/useImportExportState";
 
 // Mocks dos módulos externos
 vi.mock("../core/db", () => ({
@@ -275,7 +270,7 @@ vi.mock("../modules/sessions/utils/sessionMutations", () => ({
     libraryEntryId: payload.libraryEntryId,
     mode: payload.sessionId != null ? "edit" : "create",
   })),
-  deletePlaySession: vi.fn(async (sessionId) => {
+  deletePlaySession: vi.fn(async (_sessionId) => {
     await vi.mocked(db.playSessions.delete).mockResolvedValue(undefined);
     return 1;
   }),
@@ -355,7 +350,7 @@ vi.mock("../core/utils", async (importOriginal) => {
         : [],
     ),
     normalizePreferencesDraft: vi.fn((draft) => draft),
-    preferencesToSettingPairs: vi.fn((prefs) => []),
+    preferencesToSettingPairs: vi.fn((_prefs) => []),
     ...(actualPrefs as object),
   };
 });

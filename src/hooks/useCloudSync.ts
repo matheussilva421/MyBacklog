@@ -498,7 +498,6 @@ export function useCloudSync({
   }, [
     acquireSyncLock,
     autoSyncEnabled,
-    buildSyncComparison,
     finalizeMatchState,
     isAuthEnabled,
     isOnline,

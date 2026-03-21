@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterAll } from "vitest";
+import { describe, it, expect, vi, afterAll } from "vitest";
 import Dexie from "dexie";
 
 // Mock das dependências antes de importar o db
@@ -73,8 +73,7 @@ vi.mock("./utils", async () => {
   };
 });
 
-// Agora importamos o db
-import { db } from "./db";
+// Agora importamos o db para as migrations
 
 describe("Database Migrations", () => {
   const dbName = "mybacklog-test";
