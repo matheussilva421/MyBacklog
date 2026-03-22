@@ -97,6 +97,7 @@ export async function saveGameFromForm(args: {
   }
 
   let entryId = payload.libraryEntry.id;
+  // MED-02: Type casting necessário para transação Dexie com tabelas múltiplas
   await db.transaction(
     "rw",
     [
@@ -108,7 +109,7 @@ export async function saveGameFromForm(args: {
       db.libraryEntryStores,
       db.platforms,
       db.gamePlatforms,
-    ] as any,
+    ] as unknown as (typeof db)["pendingMutations"][],
     async () => {
       let gameId = payload.game.id;
       let persistedGame = payload.game;

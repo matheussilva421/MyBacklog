@@ -224,7 +224,8 @@ export async function applyImportPreview(args: {
       db.libraryEntryStores,
       db.platforms,
       db.gamePlatforms,
-    ] as any,
+    // MED-02: Type casting necessário para transação Dexie com tabelas múltiplas
+    ] as unknown as (typeof db)["pendingMutations"][],
     async () => {
       for (const previewEntry of args.importPreview) {
         if (previewEntry.action === "ignore") {

@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react";
 import { useAuth } from "./contexts/AuthContext";
 import { LoginScreen } from "./components/LoginScreen";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const AppShell = lazy(() => import("./components/AppShell"));
 
@@ -33,8 +34,10 @@ export default function App() {
   }
 
   return (
-    <Suspense fallback={<ModuleFallback message="Carregando Arsenal Gamer..." />}>
-      <AppShell user={user} logout={logout} isAuthEnabled={isAuthEnabled} />
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<ModuleFallback message="Carregando Arsenal Gamer..." />}>
+        <AppShell user={user} logout={logout} isAuthEnabled={isAuthEnabled} />
+      </Suspense>
+    </ErrorBoundary>
   );
 }

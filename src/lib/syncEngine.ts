@@ -98,7 +98,18 @@ async function processMutation(mutation: {
 
     return true;
   } catch (error) {
-    logger.error(`[SyncEngine] Erro ao processar mutação ${mutation.id}:`, error);
+    const errorDetail = error instanceof Error ? { message: error.message, stack: error.stack } : { error };
+    logger.error(
+      `[SyncEngine] Erro ao processar mutação ${mutation.id} (${mutation.entityType}/${mutation.mutationType}):`,
+      {
+        mutationId: mutation.id,
+        uuid: mutation.uuid,
+        entityType: mutation.entityType,
+        mutationType: mutation.mutationType,
+        retryCount: mutation.retryCount,
+        ...errorDetail,
+      },
+    );
     await logSyncFailure(mutation.id, mutation.entityType, mutation.mutationType, error, mutation.retryCount);
     return false;
   }
