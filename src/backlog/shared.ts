@@ -108,7 +108,8 @@ export type ScreenKey =
   | "planner"
   | "stats"
   | "profile"
-  | "game";
+  | "game"
+  | "seed"; // Apenas em desenvolvimento
 
 type NavigationScreenKey = Exclude<ScreenKey, "game">;
 

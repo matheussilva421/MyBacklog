@@ -41,6 +41,7 @@ const PlannerScreen = lazyNamed(() => import("../modules/planner/components/Plan
 const StatsScreen = lazyNamed(() => import("../modules/stats/components/StatsScreen"), "StatsScreen");
 const ProfileScreen = lazyNamed(() => import("../modules/settings/components/ProfileScreen"), "ProfileScreen");
 const GamePageScreen = lazyNamed(() => import("../modules/game-page/components/GamePageScreen"), "GamePageScreen");
+const SeedPage = lazyNamed(() => import("../pages/SeedPage"), "default");
 
 function ModuleFallback({ message = "Carregando módulo..." }: { message?: string }) {
   return (
@@ -168,6 +169,8 @@ export function AppShellScreenContent({
         listOptions={app.listOptions}
       />
     );
+  } else if (app.screen === "seed" && import.meta.env.DEV) {
+    screenContent = <SeedPage />;
   }
 
   return <Suspense fallback={<ModuleFallback />}>{screenContent}</Suspense>;

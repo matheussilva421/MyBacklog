@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { systemRules } from "../backlog/shared";
 import type { List } from "../core/types";
 import { useBacklogActions } from "./useBacklogActions";
@@ -144,18 +144,25 @@ export function useBacklogApp() {
     openGuidedTour("dashboard");
   }, [guidedTourOpen, hasCompletedOnboarding, openGuidedTour, preferences.guidedTourCompleted]);
 
-  useEffect(() => {
-    if (selectedGameId <= 0) return;
-    if (games.some((game) => game.id === selectedGameId)) return;
-    setSelectedGameId(games[0]?.id ?? 0);
-  }, [games, selectedGameId, setSelectedGameId]);
+  // ALTO-05/07: Usar IDs como dependência estável ao invés do array games completo
+  const gameIds = useMemo(() => new Set(games.map((game) => game.id)), [games]);
 
   useEffect(() => {
-    const validIds = new Set(games.map((game) => game.id));
+    if (selectedGameId <= 0) return;
+    if (gameIds.has(selectedGameId)) return;
+    // Evitar loop: só atualizar se games[0] for diferente do selectedGameId atual
+    const firstGameId = games[0]?.id ?? 0;
+    if (firstGameId !== selectedGameId && firstGameId > 0) {
+      setSelectedGameId(firstGameId);
+    }
+  }, [gameIds, selectedGameId, setSelectedGameId, games]);
+
+  useEffect(() => {
+    const validIds = gameIds;
     const nextSelectedIds = selectedLibraryIds.filter((entryId) => validIds.has(entryId));
     if (nextSelectedIds.length === selectedLibraryIds.length) return;
     setSelectedLibraryIds(nextSelectedIds);
-  }, [games, selectedLibraryIds, setSelectedLibraryIds]);
+  }, [gameIds, selectedLibraryIds, setSelectedLibraryIds]);
 
   const closeGuidedTour = async () => {
     const persisted = await actions.handleGuidedTourComplete();

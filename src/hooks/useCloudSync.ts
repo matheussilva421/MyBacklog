@@ -103,6 +103,7 @@ async function replaceLocalTables(tables: SyncTables) {
       db.savedViews,
     ],
     async () => {
+      // Limpar todas as tabelas na ordem correta para evitar conflitos
       await db.savedViews.clear();
       await db.gamePlatforms.clear();
       await db.platforms.clear();
@@ -117,8 +118,10 @@ async function replaceLocalTables(tables: SyncTables) {
       await db.lists.clear();
       await db.libraryEntries.clear();
       await db.games.clear();
+      // Settings devem ser limpas ANTES de inserir novos dados para evitar conflito
       await db.settings.clear();
 
+      // Inserir novos dados em ordem que respeite foreign keys
       if (tables.games.length > 0) await db.games.bulkPut(tables.games);
       if (tables.libraryEntries.length > 0) await db.libraryEntries.bulkPut(tables.libraryEntries);
       if (tables.stores.length > 0) await db.stores.bulkPut(tables.stores);
@@ -136,6 +139,7 @@ async function replaceLocalTables(tables: SyncTables) {
       if (tables.tags.length > 0) await db.tags.bulkPut(tables.tags);
       if (tables.gameTags.length > 0) await db.gameTags.bulkPut(tables.gameTags);
       if (tables.goals.length > 0) await db.goals.bulkPut(tables.goals);
+      // Settings são inseridas por último
       if (tables.settings.length > 0) await db.settings.bulkPut(tables.settings);
       if (tables.savedViews.length > 0) await db.savedViews.bulkPut(tables.savedViews);
     },
@@ -213,20 +217,25 @@ export function useCloudSync({
 
   const persistSyncMeta = useCallback(
     async (nextHistory: SyncHistoryEntry[], nextLastSuccessfulSyncAt: string | null) => {
-      await db.transaction("rw", db.settings, db.pendingMutations, db.settings, async () => {
+      // Usar refs diretamente dentro do callback para evitar dependências desatualizadas
+      const historyToPersist = nextHistory.length > 0 ? nextHistory : historyRef.current;
+      const lastSyncAtToPersist =
+        nextLastSuccessfulSyncAt !== null ? nextLastSuccessfulSyncAt : lastSuccessfulSyncAtRef.current;
+
+      await db.transaction("rw", db.settings, db.pendingMutations, async () => {
         await upsertSettingsRows([
           {
             key: syncSettingsKeys.syncHistory,
-            value: JSON.stringify(normalizeSyncHistory(nextHistory)),
+            value: JSON.stringify(normalizeSyncHistory(historyToPersist)),
           },
           {
             key: syncSettingsKeys.lastSuccessfulSyncAt,
-            value: nextLastSuccessfulSyncAt ?? "",
+            value: lastSyncAtToPersist ?? "",
           },
         ]);
       });
     },
-    [],
+    [], // Intencionalmente vazio - usa refs para acessar valores mais recentes
   );
 
   const commitLastSuccessfulSyncAt = useCallback((value: string | null) => {

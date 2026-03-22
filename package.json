@@ -18,7 +18,11 @@
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
     "cf:deploy": "npm run build && wrangler deploy",
-    "cf:dev": "wrangler dev"
+    "cf:dev": "wrangler dev",
+    "seed:mock": "node scripts/seed-mock.js",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
     "dexie": "^4.0.8",
@@ -29,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@types/react": "^18.3.12",

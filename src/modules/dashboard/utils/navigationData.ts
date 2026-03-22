@@ -8,4 +8,5 @@ export const screenMeta = {
   stats: { before: "Telemetria", accent: "Pessoal" },
   profile: { before: "Camada de", accent: "Perfil" },
   game: { before: "Ficha do", accent: "Jogo" },
+  seed: { before: "Seed de", accent: "Mock Data" }, // Apenas em desenvolvimento
 } as const;

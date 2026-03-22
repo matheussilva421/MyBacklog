@@ -6,6 +6,9 @@ export function generateUuid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 }
 
+// Singleton para evitar criação repetida de TextDecoder
+const textDecoder = new TextDecoder("utf-8");
+
 export function repairLegacyText(value: string | undefined): string | undefined {
   if (typeof value !== "string") return value;
   const trimmed = value.trim();
@@ -13,7 +16,7 @@ export function repairLegacyText(value: string | undefined): string | undefined 
 
   try {
     const bytes = Uint8Array.from(Array.from(trimmed).map((character) => character.charCodeAt(0) & 0xff));
-    const repaired = new TextDecoder("utf-8").decode(bytes).trim();
+    const repaired = textDecoder.decode(bytes).trim();
     return repaired || trimmed;
   } catch {
     return trimmed;

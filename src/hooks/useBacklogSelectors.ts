@@ -61,27 +61,42 @@ export function useBacklogSelectors(context: BacklogContext) {
     return data.listRows.some((list) => list.id === ui.selectedListFilter) ? ui.selectedListFilter : "all";
   }, [data.listRows, ui.selectedListFilter]);
 
+  // Otimização: usar lengths e IDs como dependências para evitar recálculos em cascata
+  const gamesLength = data.gameRows.length;
+  const entriesLength = data.libraryEntryRows.length;
+  const reviewsLength = data.reviewRows.length;
+  const tagsLength = data.tagRows.length;
+  const listsLength = data.listRows.length;
+  const storesLength = data.storeRows.length;
+  const platformsLength = data.platformRows.length;
+
   const records = useMemo(
     () => composeLibraryRecords(data.gameRows, data.libraryEntryRows),
-    [data.gameRows, data.libraryEntryRows],
+    [gamesLength, entriesLength],
   );
   const recordsByEntryId = useMemo(
     () => new Map(records.map((record) => [record.libraryEntry.id, record] as const)),
-    [records],
+    [records.length, ...records.map((r) => r.libraryEntry.id)],
   );
   const reviewByEntryId = useMemo(
     () => new Map(data.reviewRows.map((review) => [review.libraryEntryId, review] as const)),
-    [data.reviewRows],
+    [reviewsLength, ...data.reviewRows.map((r) => r.libraryEntryId)],
   );
-  const tagById = useMemo(() => new Map(data.tagRows.map((tag) => [tag.id, tag] as const)), [data.tagRows]);
-  const listById = useMemo(() => new Map(data.listRows.map((list) => [list.id, list] as const)), [data.listRows]);
+  const tagById = useMemo(
+    () => new Map(data.tagRows.map((tag) => [tag.id, tag] as const)),
+    [tagsLength, ...data.tagRows.map((t) => t.id)],
+  );
+  const listById = useMemo(
+    () => new Map(data.listRows.map((list) => [list.id, list] as const)),
+    [listsLength, ...data.listRows.map((l) => l.id)],
+  );
   const storeNamesByEntryId = useMemo(
     () => buildStoreNamesByEntryId(data.storeRows, data.libraryEntryStoreRows),
-    [data.libraryEntryStoreRows, data.storeRows],
+    [storesLength, data.libraryEntryStoreRows.length],
   );
   const platformNamesByGameId = useMemo(
     () => buildPlatformNamesByGameId(data.platformRows, data.gamePlatformRows),
-    [data.gamePlatformRows, data.platformRows],
+    [platformsLength, data.gamePlatformRows.length],
   );
   const games = useMemo(
     () =>
@@ -91,7 +106,7 @@ export function useBacklogSelectors(context: BacklogContext) {
           platforms: resolveStructuredPlatforms(record.game, record.libraryEntry.platform, platformNamesByGameId),
         }),
       ),
-    [platformNamesByGameId, records, storeNamesByEntryId],
+    [records.length, platformNamesByGameId, storeNamesByEntryId],
   );
   const selectedBatchGames = useMemo(
     () => games.filter((game) => ui.selectedLibraryIds.includes(game.id)),

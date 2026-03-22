@@ -113,61 +113,66 @@ export async function syncLibraryEntryStoreRelations(
 ) {
   if (libraryEntry.id == null) return;
 
+  const libraryEntryId = libraryEntry.id;
   const storeNames = splitCsvTokens([libraryEntry.sourceStore, ...extraStoreNames]);
-  const existingRelations = await db.libraryEntryStores.where("libraryEntryId").equals(libraryEntry.id).toArray();
 
-  if (storeNames.length === 0) {
+  // Envolver toda a operação em transação para evitar race condition
+  await db.transaction("rw", db.libraryEntryStores, db.stores, db.pendingMutations, async () => {
+    const existingRelations = await db.libraryEntryStores.where("libraryEntryId").equals(libraryEntryId).toArray();
+
+    if (storeNames.length === 0) {
+      const deviceId = await getDeviceId();
+      for (const relation of existingRelations) {
+        if (relation.id != null) {
+          const result = await softDelete("libraryEntryStores", relation.id, deviceId);
+          if (result.notFound) {
+            logger.warn("[syncLibraryEntryStoreRelations] libraryEntryStore não encontrada:", relation.id);
+          }
+        }
+      }
+      return;
+    }
+
+    const storeByNormalizedName = await ensureStores(storeNames);
+    const desiredStoreIds = storeNames
+      .map((storeName) => storeByNormalizedName.get(normalizeToken(storeName))?.id)
+      .filter((storeId): storeId is number => typeof storeId === "number");
+    const desiredStoreIdSet = new Set(desiredStoreIds);
+
     const deviceId = await getDeviceId();
     for (const relation of existingRelations) {
-      if (relation.id != null) {
+      if (relation.storeId && !desiredStoreIdSet.has(relation.storeId) && relation.id != null) {
         const result = await softDelete("libraryEntryStores", relation.id, deviceId);
         if (result.notFound) {
           logger.warn("[syncLibraryEntryStoreRelations] libraryEntryStore não encontrada:", relation.id);
         }
       }
     }
-    return;
-  }
 
-  const storeByNormalizedName = await ensureStores(storeNames);
-  const desiredStoreIds = storeNames
-    .map((storeName) => storeByNormalizedName.get(normalizeToken(storeName))?.id)
-    .filter((storeId): storeId is number => typeof storeId === "number");
-  const desiredStoreIdSet = new Set(desiredStoreIds);
+    const existingByStoreId = new Map(existingRelations.map((relation) => [relation.storeId, relation] as const));
+    const now = new Date().toISOString();
 
-  const deviceId = await getDeviceId();
-  for (const relation of existingRelations) {
-    if (relation.storeId && !desiredStoreIdSet.has(relation.storeId) && relation.id != null) {
-      const result = await softDelete("libraryEntryStores", relation.id, deviceId);
-      if (result.notFound) {
-        logger.warn("[syncLibraryEntryStoreRelations] libraryEntryStore não encontrada:", relation.id);
+    for (const [index, storeId] of desiredStoreIds.entries()) {
+      const existing = existingByStoreId.get(storeId);
+      if (existing?.id != null) {
+        if (existing.isPrimary !== (index === 0)) {
+          await db.libraryEntryStores.update(existing.id, { isPrimary: index === 0 });
+        }
+        continue;
       }
+
+      await db.libraryEntryStores.add({
+        uuid: generateUuid(),
+        version: 1,
+        libraryEntryId,
+        storeId,
+        isPrimary: index === 0,
+        createdAt: libraryEntry.createdAt || now,
+        updatedAt: now,
+        deletedAt: null,
+      });
     }
-  }
-
-  const existingByStoreId = new Map(existingRelations.map((relation) => [relation.storeId, relation] as const));
-  const now = new Date().toISOString();
-
-  for (const [index, storeId] of desiredStoreIds.entries()) {
-    const existing = existingByStoreId.get(storeId);
-    if (existing?.id != null) {
-      if (existing.isPrimary !== (index === 0)) {
-        await db.libraryEntryStores.update(existing.id, { isPrimary: index === 0 });
-      }
-      continue;
-    }
-
-    await db.libraryEntryStores.add({
-      uuid: generateUuid(),
-      version: 1,
-      libraryEntryId: libraryEntry.id,
-      storeId,
-      isPrimary: index === 0,
-      createdAt: libraryEntry.createdAt || now,
-      updatedAt: now,
-      deletedAt: null,
-    });
-  }
+  });
 }
 
 export async function syncGamePlatformRelations(
