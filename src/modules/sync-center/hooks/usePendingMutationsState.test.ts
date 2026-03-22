@@ -4,9 +4,7 @@ import { usePendingMutationsState } from "./usePendingMutationsState";
 import type { PendingMutation } from "../../../core/types";
 
 // Factory function para criar PendingMutation
-function createPendingMutation(
-  overrides: Partial<PendingMutation> = {},
-): PendingMutation {
+function createPendingMutation(overrides: Partial<PendingMutation> = {}): PendingMutation {
   return {
     uuid: overrides.uuid ?? "test-uuid",
     entityType: overrides.entityType ?? "game",

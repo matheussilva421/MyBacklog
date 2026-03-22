@@ -3,11 +3,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useBacklogActions } from "./useBacklogActions";
 import { db } from "../core/db";
 import type { DbLibraryEntry, DbGoal, DbList, DbSavedView } from "../core/types";
-import type {
-  LibraryRecord,
-  Game,
-  LibraryListFilter,
-} from "../backlog/shared";
+import type { LibraryRecord, Game, LibraryListFilter } from "../backlog/shared";
 import type { AppPreferences } from "../modules/settings/utils/preferences";
 
 // Mocks dos módulos externos

@@ -18,18 +18,18 @@ function processFile(filePath) {
   
   // Case 1: Array-based args
   content = content.replace(/db\.transaction\(\s*"rw"\s*,\s*\[([\s\S]*?)\]\s*,/g, (match, arrayContent) => {
-    if (arrayContent.includes('db.pendingMutations')) return match;
+    if (arrayContent.includes('db.settings')) return match;
     // se estiver vazio, não acontece se é rw.
-    return `db.transaction("rw", [db.pendingMutations, ${arrayContent}],`;
+    return `db.transaction("rw", [db.settings, ${arrayContent}] as any,`;
   });
 
   // Case 2: Argument-based args (v-args)
   // this is harder because we don't know where the array of arguments ends.
   // But we can just inject it right after "rw", 
   // `db.transaction("rw", db.games, async () => {`
-  content = content.replace(/db\.transaction\(\s*"rw"\s*,\s*(?!\[)([^,]+)/g, (match, firstArg) => {
-    if (match.includes('db.pendingMutations')) return match;
-    return `db.transaction("rw", db.pendingMutations, ${firstArg}`;
+  content = content.replace(/db\.transaction\(\s*"rw"\s*,\s*(?!\[)([^\s,][^,]*)/g, (match, firstArg) => {
+    if (match.includes('db.settings')) return match;
+    return `db.transaction("rw", db.settings, ${firstArg}`;
   });
 
   if (content !== original) {

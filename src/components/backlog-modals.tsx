@@ -1251,7 +1251,10 @@ export function ImportModal(props: {
                         >
                           <option value="">Criar nova LibraryEntry</option>
                           {entry.matchCandidates.map((candidate) => (
-                            <option key={`${candidate.libraryEntryId}-${candidate.platform}`} value={candidate.libraryEntryId}>
+                            <option
+                              key={`${candidate.libraryEntryId}-${candidate.platform}`}
+                              value={candidate.libraryEntryId}
+                            >
                               {candidate.title} • {candidate.platform} • {candidate.sourceStore} • {candidate.score}%
                             </option>
                           ))}

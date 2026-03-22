@@ -24,7 +24,7 @@ export async function logSyncFailure(
   error: unknown,
   retryCount: number,
 ): Promise<void> {
-  await db.transaction("rw", db.pendingMutations, db.settings, async () => {
+  await db.transaction("rw", db.settings, db.pendingMutations, db.settings, async () => {
     const events = await db.settings.get({ key: "syncFailureEvents" });
     const currentEvents: SyncFailureEvent[] = events ? JSON.parse(events.value) : [];
 
@@ -56,7 +56,7 @@ export async function resolveSyncFailure(
   mutationId: number,
   resolution: "success" | "discarded" | "manual-retry",
 ): Promise<void> {
-  await db.transaction("rw", db.pendingMutations, db.settings, async () => {
+  await db.transaction("rw", db.settings, db.pendingMutations, db.settings, async () => {
     const events = await db.settings.get({ key: "syncFailureEvents" });
     if (!events) return;
 

@@ -86,7 +86,18 @@ export function createFreshStartLocalSettings(timestamp = new Date().toISOString
 
 export async function seedDefaultLibrary() {
   try {
-    await db.transaction("rw", [db.pendingMutations, db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms, db.settings],
+    await db.transaction(
+      "rw",
+      [
+        db.pendingMutations,
+        db.games,
+        db.libraryEntries,
+        db.stores,
+        db.libraryEntryStores,
+        db.platforms,
+        db.gamePlatforms,
+        db.settings,
+      ],
       async () => {
         for (const template of defaultGames) {
           const game = defaultGameToDbGame(template);
@@ -177,7 +188,10 @@ export async function readBacklogDataSnapshot(seedIfEmpty = false): Promise<Back
 export async function clearBacklogDataForFreshStart() {
   const freshStartSettings = createFreshStartLocalSettings();
 
-  await db.transaction("rw", [db.pendingMutations, 
+  await db.transaction(
+    "rw",
+    [
+      db.pendingMutations,
       db.games,
       db.libraryEntries,
       db.stores,

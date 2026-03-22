@@ -461,7 +461,7 @@ export function useBacklogActions({
     );
 
     const deviceId = await getDeviceId();
-    await db.transaction("rw", db.pendingMutations, db.reviews, db.libraryEntries, async () => {
+    await db.transaction("rw", db.settings, db.pendingMutations, db.reviews, db.libraryEntries, async () => {
       const existingReview = await db.reviews.where("libraryEntryId").equals(libraryEntryId).first();
       if (hasContent) {
         if (existingReview?.id != null) {
@@ -502,7 +502,7 @@ export function useBacklogActions({
     );
 
     const deviceId = await getDeviceId();
-    await db.transaction("rw", db.pendingMutations, db.tags, db.gameTags, async () => {
+    await db.transaction("rw", db.settings, db.pendingMutations, db.tags, db.gameTags, async () => {
       const existingTags = await db.tags.toArray();
       const tagsByName = new Map(existingTags.map((tag) => [tag.name.trim().toLowerCase(), tag] as const));
       const currentRelations = await db.gameTags.where("libraryEntryId").equals(libraryEntryId).toArray();
@@ -577,7 +577,7 @@ export function useBacklogActions({
     const nextListIds = Array.from(new Set(listIds)).filter((listId) => validListIds.has(listId));
 
     const deviceId = await getDeviceId();
-    await db.transaction("rw", db.pendingMutations, db.libraryEntryLists, async () => {
+    await db.transaction("rw", db.settings, db.pendingMutations, db.libraryEntryLists, async () => {
       const currentRelations = await db.libraryEntryLists.where("libraryEntryId").equals(libraryEntryId).toArray();
       const currentListIds = new Set(currentRelations.map((relation) => relation.listId));
       for (const relation of currentRelations) {
@@ -645,7 +645,11 @@ export function useBacklogActions({
     setSubmitting(true);
     try {
       const deviceId = await getDeviceId();
-      await db.transaction("rw", [db.pendingMutations, 
+      await db.transaction(
+        "rw",
+        [
+          db.settings,
+          db.pendingMutations,
           db.games,
           db.libraryEntries,
           db.stores,
@@ -655,7 +659,7 @@ export function useBacklogActions({
           db.tags,
           db.gameTags,
           db.libraryEntryLists,
-        ],
+        ] as any,
         async () => {
           const entries = (await db.libraryEntries.bulkGet(entryIds)).filter((entry): entry is DbLibraryEntry =>
             Boolean(entry?.id),
@@ -822,7 +826,11 @@ export function useBacklogActions({
     const deletedEntryId = selectedRecord.libraryEntry.id!;
     const deviceId = await getDeviceId();
 
-    await db.transaction("rw", [db.pendingMutations, 
+    await db.transaction(
+      "rw",
+      [
+        db.settings,
+        db.pendingMutations,
         db.games,
         db.libraryEntries,
         db.stores,
@@ -833,7 +841,7 @@ export function useBacklogActions({
         db.reviews,
         db.gameTags,
         db.libraryEntryLists,
-      ],
+      ] as any,
       async () => {
         // Enqueue mutations antes de deletar
         const sessions = await db.playSessions.where("libraryEntryId").equals(deletedEntryId).toArray();
@@ -1108,7 +1116,7 @@ export function useBacklogActions({
     const confirmed = window.confirm("Excluir esta lista?");
     if (!confirmed) return;
     const deviceId = await getDeviceId();
-    await db.transaction("rw", db.pendingMutations, db.lists, db.libraryEntryLists, async () => {
+    await db.transaction("rw", db.settings, db.pendingMutations, db.lists, db.libraryEntryLists, async () => {
       const relations = await db.libraryEntryLists.where("listId").equals(listId).toArray();
       for (const relation of relations) {
         if (relation.id != null) {
@@ -1220,7 +1228,7 @@ export function useBacklogActions({
         guidedTourCompleted: preferences.guidedTourCompleted,
       });
       const settingPairs = preferencesToSettingPairs(nextPreferences);
-      await db.transaction("rw", db.pendingMutations, db.settings, async () => {
+      await db.transaction("rw", db.settings, db.pendingMutations, db.settings, async () => {
         for (const pair of settingPairs) {
           const existing = await db.settings.get({ key: pair.key });
           const now = new Date().toISOString();
@@ -1259,7 +1267,7 @@ export function useBacklogActions({
       const selectedTemplates = onboardingGoalTemplates.filter((template) =>
         payload.goalTemplateIds.includes(template.id),
       );
-      await db.transaction("rw", db.pendingMutations, db.settings, db.lists, db.goals, async () => {
+      await db.transaction("rw", db.settings, db.pendingMutations, db.lists, db.goals, async () => {
         // Settings
         const settingPairs = preferencesToSettingPairs(nextPreferences);
         for (const pair of settingPairs) {
@@ -1358,7 +1366,7 @@ export function useBacklogActions({
 
     setSubmitting(true);
     try {
-      await db.transaction("rw", db.pendingMutations, db.libraryEntries, db.playSessions, async () => {
+      await db.transaction("rw", db.settings, db.pendingMutations, db.libraryEntries, db.playSessions, async () => {
         const deviceId = await getDeviceId();
         for (const orphanSessionId of orphanSessionIds) {
           const result = await softDelete("playSessions", orphanSessionId, deviceId);
@@ -1401,7 +1409,11 @@ export function useBacklogActions({
     setSubmitting(true);
     try {
       const deviceId = await getDeviceId();
-      await db.transaction("rw", [db.pendingMutations, 
+      await db.transaction(
+        "rw",
+        [
+          db.settings,
+          db.pendingMutations,
           db.games,
           db.libraryEntries,
           db.stores,
@@ -1412,7 +1424,7 @@ export function useBacklogActions({
           db.reviews,
           db.gameTags,
           db.libraryEntryLists,
-        ],
+        ] as any,
         async () => {
           const allEntryIds = [primaryEntryId, ...uniqueMergedIds];
           const entries = (await db.libraryEntries.bulkGet(allEntryIds)).filter((entry): entry is DbLibraryEntry =>
@@ -1611,7 +1623,18 @@ export function useBacklogActions({
   const handleCatalogNormalizeEntry = async (libraryEntryId: number) => {
     setSubmitting(true);
     try {
-      await db.transaction("rw", [db.pendingMutations, db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
+      await db.transaction(
+        "rw",
+        [
+          db.settings,
+          db.pendingMutations,
+          db.games,
+          db.libraryEntries,
+          db.stores,
+          db.libraryEntryStores,
+          db.platforms,
+          db.gamePlatforms,
+        ] as any,
         async () => {
           await normalizeStructuredEntry(libraryEntryId);
         },
@@ -1639,7 +1662,18 @@ export function useBacklogActions({
         new Set(catalogMaintenanceReport.normalizationQueue.map((item) => item.libraryEntryId)),
       );
 
-      await db.transaction("rw", [db.pendingMutations, db.games, db.libraryEntries, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms],
+      await db.transaction(
+        "rw",
+        [
+          db.settings,
+          db.pendingMutations,
+          db.games,
+          db.libraryEntries,
+          db.stores,
+          db.libraryEntryStores,
+          db.platforms,
+          db.gamePlatforms,
+        ] as any,
         async () => {
           for (const entryId of entryIds) {
             await normalizeStructuredEntry(entryId);
@@ -1661,153 +1695,161 @@ export function useBacklogActions({
     try {
       const deviceId = await getDeviceId();
       if (kind === "store") {
-        await db.transaction("rw", [db.pendingMutations, db.stores, db.libraryEntryStores, db.libraryEntries], async () => {
-          const rows = (await db.stores.toArray()).filter(
-            (store) => normalizeToken(store.normalizedName || store.name) === normalizedName,
-          );
-          const ids = rows.map((row) => row.id).filter((id): id is number => typeof id === "number");
-          if (ids.length < 2) return;
+        await db.transaction(
+          "rw",
+          [db.settings, db.pendingMutations, db.stores, db.libraryEntryStores, db.libraryEntries] as any,
+          async () => {
+            const rows = (await db.stores.toArray()).filter(
+              (store) => normalizeToken(store.normalizedName || store.name) === normalizedName,
+            );
+            const ids = rows.map((row) => row.id).filter((id): id is number => typeof id === "number");
+            if (ids.length < 2) return;
 
-          const relations = await db.libraryEntryStores.where("storeId").anyOf(ids).toArray();
-          const relationCountByStoreId = new Map<number, number>();
-          for (const relation of relations) {
-            relationCountByStoreId.set(relation.storeId, (relationCountByStoreId.get(relation.storeId) ?? 0) + 1);
-          }
+            const relations = await db.libraryEntryStores.where("storeId").anyOf(ids).toArray();
+            const relationCountByStoreId = new Map<number, number>();
+            for (const relation of relations) {
+              relationCountByStoreId.set(relation.storeId, (relationCountByStoreId.get(relation.storeId) ?? 0) + 1);
+            }
 
-          const canonical = [...rows].sort((left, right) => {
-            const leftCount = relationCountByStoreId.get(left.id ?? 0) ?? 0;
-            const rightCount = relationCountByStoreId.get(right.id ?? 0) ?? 0;
-            return rightCount - leftCount || left.name.localeCompare(right.name, "pt-BR");
-          })[0];
-          if (!canonical?.id) return;
+            const canonical = [...rows].sort((left, right) => {
+              const leftCount = relationCountByStoreId.get(left.id ?? 0) ?? 0;
+              const rightCount = relationCountByStoreId.get(right.id ?? 0) ?? 0;
+              return rightCount - leftCount || left.name.localeCompare(right.name, "pt-BR");
+            })[0];
+            if (!canonical?.id) return;
 
-          const duplicateIds = ids.filter((id) => id !== canonical.id);
-          const canonicalRelationByEntryId = new Map(
-            relations
-              .filter((relation) => relation.storeId === canonical.id)
-              .map((relation) => [relation.libraryEntryId, relation] as const),
-          );
+            const duplicateIds = ids.filter((id) => id !== canonical.id);
+            const canonicalRelationByEntryId = new Map(
+              relations
+                .filter((relation) => relation.storeId === canonical.id)
+                .map((relation) => [relation.libraryEntryId, relation] as const),
+            );
 
-          for (const relation of relations) {
-            if (!duplicateIds.includes(relation.storeId)) continue;
-            const canonicalRelation = canonicalRelationByEntryId.get(relation.libraryEntryId);
-            if (canonicalRelation?.id != null) {
-              if (relation.isPrimary && !canonicalRelation.isPrimary) {
-                await db.libraryEntryStores.update(canonicalRelation.id, { isPrimary: true });
+            for (const relation of relations) {
+              if (!duplicateIds.includes(relation.storeId)) continue;
+              const canonicalRelation = canonicalRelationByEntryId.get(relation.libraryEntryId);
+              if (canonicalRelation?.id != null) {
+                if (relation.isPrimary && !canonicalRelation.isPrimary) {
+                  await db.libraryEntryStores.update(canonicalRelation.id, { isPrimary: true });
+                }
+                if (relation.id != null) {
+                  const result = await softDelete("libraryEntryStores", relation.id, deviceId);
+                  if (result.notFound) {
+                    logger.warn("[handleCatalogConsolidateAliasGroup] libraryEntryStore não encontrada:", relation.id);
+                  }
+                }
+                continue;
               }
               if (relation.id != null) {
-                const result = await softDelete("libraryEntryStores", relation.id, deviceId);
-                if (result.notFound) {
-                  logger.warn("[handleCatalogConsolidateAliasGroup] libraryEntryStore não encontrada:", relation.id);
-                }
+                await db.libraryEntryStores.update(relation.id, { storeId: canonical.id });
+                canonicalRelationByEntryId.set(relation.libraryEntryId, {
+                  ...relation,
+                  storeId: canonical.id,
+                });
               }
-              continue;
             }
-            if (relation.id != null) {
-              await db.libraryEntryStores.update(relation.id, { storeId: canonical.id });
-              canonicalRelationByEntryId.set(relation.libraryEntryId, {
-                ...relation,
-                storeId: canonical.id,
+
+            const entries = await db.libraryEntries.toArray();
+            for (const entry of entries) {
+              if (normalizeToken(entry.sourceStore) !== normalizedName || entry.id == null) continue;
+              await db.libraryEntries.update(entry.id, {
+                sourceStore: canonical.name,
+                updatedAt: new Date().toISOString(),
               });
             }
-          }
 
-          const entries = await db.libraryEntries.toArray();
-          for (const entry of entries) {
-            if (normalizeToken(entry.sourceStore) !== normalizedName || entry.id == null) continue;
-            await db.libraryEntries.update(entry.id, {
-              sourceStore: canonical.name,
-              updatedAt: new Date().toISOString(),
-            });
-          }
-
-          for (const duplicateId of duplicateIds) {
-            const result = await softDelete("stores", duplicateId, deviceId);
-            if (result.notFound) {
-              logger.warn("[handleCatalogConsolidateAliasGroup] store não encontrada:", duplicateId);
+            for (const duplicateId of duplicateIds) {
+              const result = await softDelete("stores", duplicateId, deviceId);
+              if (result.notFound) {
+                logger.warn("[handleCatalogConsolidateAliasGroup] store não encontrada:", duplicateId);
+              }
             }
-          }
-        });
+          },
+        );
       } else {
-        await db.transaction("rw", [db.pendingMutations, db.platforms, db.gamePlatforms, db.games, db.libraryEntries], async () => {
-          const rows = (await db.platforms.toArray()).filter(
-            (platform) => normalizeToken(platform.normalizedName || platform.name) === normalizedName,
-          );
-          const ids = rows.map((row) => row.id).filter((id): id is number => typeof id === "number");
-          if (ids.length < 2) return;
-
-          const relations = await db.gamePlatforms.where("platformId").anyOf(ids).toArray();
-          const relationCountByPlatformId = new Map<number, number>();
-          for (const relation of relations) {
-            relationCountByPlatformId.set(
-              relation.platformId,
-              (relationCountByPlatformId.get(relation.platformId) ?? 0) + 1,
+        await db.transaction(
+          "rw",
+          [db.settings, db.pendingMutations, db.platforms, db.gamePlatforms, db.games, db.libraryEntries] as any,
+          async () => {
+            const rows = (await db.platforms.toArray()).filter(
+              (platform) => normalizeToken(platform.normalizedName || platform.name) === normalizedName,
             );
-          }
+            const ids = rows.map((row) => row.id).filter((id): id is number => typeof id === "number");
+            if (ids.length < 2) return;
 
-          const canonical = [...rows].sort((left, right) => {
-            const leftCount = relationCountByPlatformId.get(left.id ?? 0) ?? 0;
-            const rightCount = relationCountByPlatformId.get(right.id ?? 0) ?? 0;
-            return rightCount - leftCount || left.name.localeCompare(right.name, "pt-BR");
-          })[0];
-          if (!canonical?.id) return;
-
-          const duplicateIds = ids.filter((id) => id !== canonical.id);
-          const canonicalRelationByGameId = new Map(
-            relations
-              .filter((relation) => relation.platformId === canonical.id)
-              .map((relation) => [relation.gameId, relation] as const),
-          );
-
-          for (const relation of relations) {
-            if (!duplicateIds.includes(relation.platformId)) continue;
-            const canonicalRelation = canonicalRelationByGameId.get(relation.gameId);
-            if (canonicalRelation?.id != null) {
-              if (relation.id != null) {
-                const result = await softDelete("gamePlatforms", relation.id, deviceId);
-                if (result.notFound) {
-                  logger.warn("[handleCatalogConsolidateAliasGroup] gamePlatform não encontrada:", relation.id);
-                }
-              }
-              continue;
+            const relations = await db.gamePlatforms.where("platformId").anyOf(ids).toArray();
+            const relationCountByPlatformId = new Map<number, number>();
+            for (const relation of relations) {
+              relationCountByPlatformId.set(
+                relation.platformId,
+                (relationCountByPlatformId.get(relation.platformId) ?? 0) + 1,
+              );
             }
-            if (relation.id != null) {
-              await db.gamePlatforms.update(relation.id, { platformId: canonical.id });
-              canonicalRelationByGameId.set(relation.gameId, {
-                ...relation,
-                platformId: canonical.id,
+
+            const canonical = [...rows].sort((left, right) => {
+              const leftCount = relationCountByPlatformId.get(left.id ?? 0) ?? 0;
+              const rightCount = relationCountByPlatformId.get(right.id ?? 0) ?? 0;
+              return rightCount - leftCount || left.name.localeCompare(right.name, "pt-BR");
+            })[0];
+            if (!canonical?.id) return;
+
+            const duplicateIds = ids.filter((id) => id !== canonical.id);
+            const canonicalRelationByGameId = new Map(
+              relations
+                .filter((relation) => relation.platformId === canonical.id)
+                .map((relation) => [relation.gameId, relation] as const),
+            );
+
+            for (const relation of relations) {
+              if (!duplicateIds.includes(relation.platformId)) continue;
+              const canonicalRelation = canonicalRelationByGameId.get(relation.gameId);
+              if (canonicalRelation?.id != null) {
+                if (relation.id != null) {
+                  const result = await softDelete("gamePlatforms", relation.id, deviceId);
+                  if (result.notFound) {
+                    logger.warn("[handleCatalogConsolidateAliasGroup] gamePlatform não encontrada:", relation.id);
+                  }
+                }
+                continue;
+              }
+              if (relation.id != null) {
+                await db.gamePlatforms.update(relation.id, { platformId: canonical.id });
+                canonicalRelationByGameId.set(relation.gameId, {
+                  ...relation,
+                  platformId: canonical.id,
+                });
+              }
+            }
+
+            const games = await db.games.toArray();
+            for (const game of games) {
+              const nextPlatforms = splitCsvTokens(game.platforms).map((platformName) =>
+                normalizeToken(platformName) === normalizedName ? canonical.name : platformName,
+              );
+              if (nextPlatforms.length === 0 || game.id == null) continue;
+              await db.games.update(game.id, {
+                platforms: splitCsvTokens(nextPlatforms).join(", "),
+                updatedAt: new Date().toISOString(),
               });
             }
-          }
 
-          const games = await db.games.toArray();
-          for (const game of games) {
-            const nextPlatforms = splitCsvTokens(game.platforms).map((platformName) =>
-              normalizeToken(platformName) === normalizedName ? canonical.name : platformName,
-            );
-            if (nextPlatforms.length === 0 || game.id == null) continue;
-            await db.games.update(game.id, {
-              platforms: splitCsvTokens(nextPlatforms).join(", "),
-              updatedAt: new Date().toISOString(),
-            });
-          }
-
-          const entries = await db.libraryEntries.toArray();
-          for (const entry of entries) {
-            if (normalizeToken(entry.platform) !== normalizedName || entry.id == null) continue;
-            await db.libraryEntries.update(entry.id, {
-              platform: canonical.name,
-              updatedAt: new Date().toISOString(),
-            });
-          }
-
-          for (const duplicateId of duplicateIds) {
-            const result = await softDelete("platforms", duplicateId, deviceId);
-            if (result.notFound) {
-              logger.warn("[handleCatalogConsolidateAliasGroup] platform não encontrada:", duplicateId);
+            const entries = await db.libraryEntries.toArray();
+            for (const entry of entries) {
+              if (normalizeToken(entry.platform) !== normalizedName || entry.id == null) continue;
+              await db.libraryEntries.update(entry.id, {
+                platform: canonical.name,
+                updatedAt: new Date().toISOString(),
+              });
             }
-          }
-        });
+
+            for (const duplicateId of duplicateIds) {
+              const result = await softDelete("platforms", duplicateId, deviceId);
+              if (result.notFound) {
+                logger.warn("[handleCatalogConsolidateAliasGroup] platform não encontrada:", duplicateId);
+              }
+            }
+          },
+        );
       }
 
       await refreshData();

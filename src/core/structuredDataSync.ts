@@ -232,10 +232,14 @@ export async function syncStructuredRelationsForRecord(args: {
   extraStoreNames?: string[];
   extraPlatformNames?: string[];
 }) {
-  await db.transaction("rw", [db.pendingMutations, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms, db.settings], async () => {
-    await syncLibraryEntryStoreRelations(args.libraryEntry, args.extraStoreNames);
-    await syncGamePlatformRelations(args.game, args.libraryEntry.platform, args.extraPlatformNames);
-  });
+  await db.transaction(
+    "rw",
+    [db.pendingMutations, db.stores, db.libraryEntryStores, db.platforms, db.gamePlatforms, db.settings],
+    async () => {
+      await syncLibraryEntryStoreRelations(args.libraryEntry, args.extraStoreNames);
+      await syncGamePlatformRelations(args.game, args.libraryEntry.platform, args.extraPlatformNames);
+    },
+  );
 }
 
 export async function replaceStructuredTables(snapshot: StructuredTablesSnapshot) {

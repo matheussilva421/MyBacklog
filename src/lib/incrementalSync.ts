@@ -72,9 +72,10 @@ export async function pushEntityToCloud<
   const entityWithTimestamp = {
     ...entity,
     updatedAt: Timestamp.fromDate(new Date(entity.updatedAt)),
-    createdAt: "createdAt" in entity && typeof entity.createdAt === "string" && entity.createdAt
-      ? Timestamp.fromDate(new Date(entity.createdAt))
-      : Timestamp.now(),
+    createdAt:
+      "createdAt" in entity && typeof entity.createdAt === "string" && entity.createdAt
+        ? Timestamp.fromDate(new Date(entity.createdAt))
+        : Timestamp.now(),
   } as DocumentData;
 
   await setDoc(docRef, entityWithTimestamp, { merge: true });

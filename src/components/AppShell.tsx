@@ -226,61 +226,63 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
             </div>
           </div>
 
-          <Panel className={cx("hero-panel", app.guidedTourTarget === "dashboard" && "tour-focus")}>
-            <div className="hero-panel__layout">
-              <div className="hero-panel__copy">
-                <div className="hero-panel__badges">
-                  <Tag>Backlog OS</Tag>
-                  <Tag tone="cyan">Night City Mode</Tag>
-                  <Tag tone="magenta">Aggressive Premium UI</Tag>
+          {app.screen === "dashboard" && (
+            <Panel className={cx("hero-panel", app.guidedTourTarget === "dashboard" && "tour-focus")}>
+              <div className="hero-panel__layout">
+                <div className="hero-panel__copy">
+                  <div className="hero-panel__badges">
+                    <Tag>Backlog OS</Tag>
+                    <Tag tone="cyan">Night City Mode</Tag>
+                    <Tag tone="magenta">Aggressive Premium UI</Tag>
+                  </div>
+
+                  <div className="hero-panel__headline">
+                    <div className="hero-panel__icon">
+                      <Cpu size={25} />
+                    </div>
+                    <div>
+                      <span className="hero-panel__eyebrow">Neural interface</span>
+                      <h2>
+                        {app.heroCopy.before} <span>{app.heroCopy.accent}</span>
+                      </h2>
+                      <p>
+                        Catálogo, backlog, planner e estatísticas em uma interface cyberpunk com leitura rápida, foco em
+                        decisão e sensação de produto premium.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="hero-panel__headline">
-                  <div className="hero-panel__icon">
-                    <Cpu size={25} />
-                  </div>
-                  <div>
-                    <span className="hero-panel__eyebrow">Neural interface</span>
-                    <h2>
-                      {app.heroCopy.before} <span>{app.heroCopy.accent}</span>
-                    </h2>
-                    <p>
-                      Catálogo, backlog, planner e estatísticas em uma interface cyberpunk com leitura rápida, foco em
-                      decisão e sensação de produto premium.
-                    </p>
+                <div className="hero-panel__actions">
+                  <label className="search-box" htmlFor="global-search">
+                    <Search size={16} />
+                    <input
+                      id="global-search"
+                      type="text"
+                      value={app.query}
+                      onChange={(event) => app.setQuery(event.target.value)}
+                      placeholder="Busca global..."
+                    />
+                  </label>
+                  <div className="hero-panel__action-grid">
+                    <NotchButton variant="primary" onClick={app.openCreateGameModal}>
+                      <Zap size={15} />
+                      Adicionar
+                    </NotchButton>
+                    <NotchButton variant="secondary" onClick={app.openImportFlow}>
+                      Importar
+                    </NotchButton>
+                    <NotchButton variant="secondary" onClick={() => app.setScreen("planner")}>
+                      Planner
+                    </NotchButton>
+                    <NotchButton variant="ghost" onClick={() => app.openLibraryGame()}>
+                      Catálogo
+                    </NotchButton>
                   </div>
                 </div>
               </div>
-
-              <div className="hero-panel__actions">
-                <label className="search-box" htmlFor="global-search">
-                  <Search size={16} />
-                  <input
-                    id="global-search"
-                    type="text"
-                    value={app.query}
-                    onChange={(event) => app.setQuery(event.target.value)}
-                    placeholder="Busca global..."
-                  />
-                </label>
-                <div className="hero-panel__action-grid">
-                  <NotchButton variant="primary" onClick={app.openCreateGameModal}>
-                    <Zap size={15} />
-                    Adicionar
-                  </NotchButton>
-                  <NotchButton variant="secondary" onClick={app.openImportFlow}>
-                    Importar
-                  </NotchButton>
-                  <NotchButton variant="secondary" onClick={() => app.setScreen("planner")}>
-                    Planner
-                  </NotchButton>
-                  <NotchButton variant="ghost" onClick={() => app.openLibraryGame()}>
-                    Catálogo
-                  </NotchButton>
-                </div>
-              </div>
-            </div>
-          </Panel>
+            </Panel>
+          )}
 
           <div
             className={cx(

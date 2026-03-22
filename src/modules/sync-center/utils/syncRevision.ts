@@ -12,7 +12,7 @@ export async function incrementLocalRevision(): Promise<number> {
   const now = new Date().toISOString();
   let next: number;
 
-  await db.transaction("rw", db.pendingMutations, db.settings, async () => {
+  await db.transaction("rw", db.settings, db.pendingMutations, db.settings, async () => {
     const existing = await db.settings.get({ key: REVISION_KEY });
     const current = existing ? parseInt(existing.value, 10) || 0 : 0;
     next = current + 1;

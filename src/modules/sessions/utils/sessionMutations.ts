@@ -43,7 +43,7 @@ export async function savePlaySession(
     }
     const existingSessionId = oldSession.id;
 
-    await db.transaction("rw", db.pendingMutations, db.playSessions, db.libraryEntries, async () => {
+    await db.transaction("rw", db.settings, db.pendingMutations, db.playSessions, db.libraryEntries, async () => {
       await db.playSessions.update(existingSessionId, {
         date: input.date,
         durationMinutes,
@@ -66,7 +66,7 @@ export async function savePlaySession(
       });
     });
   } else {
-    await db.transaction("rw", db.pendingMutations, db.playSessions, db.libraryEntries, async () => {
+    await db.transaction("rw", db.settings, db.pendingMutations, db.playSessions, db.libraryEntries, async () => {
       const now = new Date().toISOString();
       await db.playSessions.add({
         uuid: generateUuid(),
@@ -119,7 +119,7 @@ export async function deletePlaySession(sessionId: number): Promise<number | nul
   }
 
   const deviceId = await getDeviceId();
-  await db.transaction("rw", db.pendingMutations, db.playSessions, db.libraryEntries, async () => {
+  await db.transaction("rw", db.settings, db.pendingMutations, db.playSessions, db.libraryEntries, async () => {
     const result = await softDelete("playSessions", session.id!, deviceId);
     if (result.notFound) {
       logger.warn("[deletePlaySession] Sessão não encontrada durante transação:", session.id);

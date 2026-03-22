@@ -470,8 +470,9 @@ describe("backlogRepository", () => {
       });
 
       const emptyOrderByMock = createDexieOrderByMock();
-      emptyOrderByMock.reverse().toArray
-        .mockResolvedValueOnce([])
+      emptyOrderByMock
+        .reverse()
+        .toArray.mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: 1, gameId: 1, updatedAt: "2024-01-01T00:00:00.000Z" }]);
 
       vi.mocked(db.libraryEntries.orderBy).mockReturnValue(emptyOrderByMock as DexieOrderByChain);
