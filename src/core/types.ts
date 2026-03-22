@@ -316,6 +316,7 @@ export interface LegacyGameRecord {
 
 export interface LocalRevision {
   id?: number;
+  key: string;
   revision: number;
   lastMutationAt: string;
   updatedAt: string;

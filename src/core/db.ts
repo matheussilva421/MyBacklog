@@ -401,7 +401,7 @@ class MyBacklogDB extends Dexie {
         settings: "++id, key, updatedAt",
         savedViews: "++id, &uuid, scope, name, [scope+name], updatedAt, deletedAt",
         importJobs: "++id, &uuid, source, status, createdAt, updatedAt, deletedAt",
-        localRevision: "++id, revision",
+        localRevision: "++id, &key, revision, lastMutationAt, updatedAt",
       })
       .upgrade(async (tx) => {
         const now = new Date().toISOString();
@@ -459,6 +459,17 @@ class MyBacklogDB extends Dexie {
       pendingMutations:
         "++id, uuid, [uuid+entityType], syncedAt, createdAt, retryCount, [syncedAt+createdAt], [retryCount+syncedAt]",
     });
+
+    // Versão 9: Corrige schema da tabela localRevision (adiciona campo key e índices)
+    // Remove a tabela antiga se existir (dados serão recriados pelo sync)
+    this.version(9)
+      .stores({
+        localRevision: "++id, &key, revision, lastMutationAt, updatedAt",
+      })
+      .upgrade(async (tx) => {
+        // Limpar tabela localRevision se existir - será recriada quando necessário
+        await tx.table("localRevision").clear();
+      });
   }
 }
 
