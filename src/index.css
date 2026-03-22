@@ -1756,7 +1756,6 @@ button {
 .badge-card p {
   color: var(--text-soft);
   line-height: 1.32;
-  overflow-wrap: anywhere;
 }
 
 .badge-card__head .cp-pill {
@@ -1888,7 +1887,6 @@ button {
   letter-spacing: 0.16em;
   line-height: 1.45;
   text-transform: uppercase;
-  overflow-wrap: anywhere;
 }
 
 .loading-shell {
@@ -2979,7 +2977,6 @@ button {
 .platform-dashboard__title {
   margin: 0;
   color: var(--platform-accent, var(--yellow));
-  overflow-wrap: anywhere;
 }
 
 .platform-dashboard__eyebrow {
@@ -3407,4 +3404,98 @@ button {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+/* ErrorBoundary - MED-07 */
+.error-boundary-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 42px;
+}
+
+.error-boundary-fallback__content {
+  max-width: 540px;
+  text-align: center;
+}
+
+.error-boundary-fallback__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 24px;
+  border-radius: 50%;
+  background: rgba(255, 87, 201, 0.12);
+  color: var(--magenta);
+}
+
+.error-boundary-fallback__icon svg {
+  width: 42px;
+  height: 42px;
+}
+
+.error-boundary-fallback__title {
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.error-boundary-fallback__message {
+  margin: 0 0 18px;
+  color: var(--text-soft);
+  font-size: 16px;
+}
+
+.error-boundary-fallback__causes {
+  text-align: left;
+  margin: 0 0 24px;
+  padding-left: 20px;
+  color: var(--text-soft);
+}
+
+.error-boundary-fallback__causes li {
+  margin-bottom: 8px;
+}
+
+.error-boundary-fallback__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.error-boundary-fallback__details {
+  text-align: left;
+  margin: 0;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.error-boundary-fallback__details summary {
+  cursor: pointer;
+  color: var(--cyan);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.error-boundary-fallback__stack {
+  margin: 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 12px;
+  font-family: "Consolas", "Monaco", monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-soft);
+  max-height: 320px;
+  overflow-y: auto;
 }

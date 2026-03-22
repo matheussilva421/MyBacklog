@@ -37,4 +37,9 @@ export default defineConfig({
     reuseExistingServer: !process.env["CI"],
     timeout: 60000,
   },
+
+  // TypeScript config
+  typescript: {
+    config: "./tsconfig.playwright.json",
+  },
 });

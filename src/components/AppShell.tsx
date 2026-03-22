@@ -131,6 +131,42 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
   return (
     <div className={cx("app-shell", app.guidedTourOpen && "app-shell--touring")}>
       <div className="app-shell__backdrop" aria-hidden="true" />
+
+      {/* Skip link para acessibilidade */}
+      <a
+        href="#main-content"
+        className="skip-link"
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          top: "auto",
+          width: "1px",
+          height: "1px",
+          overflow: "hidden",
+          zIndex: 9999,
+          padding: "8px 16px",
+          background: "#000",
+          color: "#fff",
+          textDecoration: "none",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.left = "0";
+          e.currentTarget.style.top = "0";
+          e.currentTarget.style.width = "auto";
+          e.currentTarget.style.height = "auto";
+          e.currentTarget.style.overflow = "visible";
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.left = "-9999px";
+          e.currentTarget.style.top = "auto";
+          e.currentTarget.style.width = "1px";
+          e.currentTarget.style.height = "1px";
+          e.currentTarget.style.overflow = "hidden";
+        }}
+      >
+        Pular para o conteúdo principal
+      </a>
+
       <div className="app-layout">
         <aside className="sidebar-column">
           <Panel className="brand-panel">
@@ -199,7 +235,7 @@ export default function AppShell({ user, logout, isAuthEnabled }: AppShellProps)
           </Panel>
         </aside>
 
-        <main className="main-column">
+        <main id="main-content" className="main-column" role="main">
           {app.notice ? (
             <div className="system-banner">
               <span>{app.notice}</span>

@@ -91,24 +91,36 @@ export const Tag = React.memo(function Tag({
   children,
   tone = "yellow",
   className = "",
+  role,
 }: {
   children: ReactNode;
   tone?: "yellow" | "cyan" | "magenta" | "neutral";
   className?: string;
+  role?: string;
 }) {
-  return <span className={cx("cp-tag", `cp-tag--${tone}`, className)}>{children}</span>;
+  return (
+    <span className={cx("cp-tag", `cp-tag--${tone}`, className)} role={role}>
+      {children}
+    </span>
+  );
 });
 
 export const Pill = React.memo(function Pill({
   children,
   tone,
   className = "",
+  role,
 }: {
   children: ReactNode;
   tone: string;
   className?: string;
+  role?: string;
 }) {
-  return <span className={cx("cp-pill", `cp-pill--${tone}`, className)}>{children}</span>;
+  return (
+    <span className={cx("cp-pill", `cp-pill--${tone}`, className)} role={role}>
+      {children}
+    </span>
+  );
 });
 
 export const NotchButton = React.memo(function NotchButton({
@@ -144,8 +156,10 @@ export const SidebarItem = React.memo(function SidebarItem({
       type="button"
       className={cx("sidebar-item", active && "sidebar-item--active", highlighted && "tour-focus")}
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      aria-pressed={active}
     >
-      <Icon className="sidebar-item__icon" />
+      <Icon className="sidebar-item__icon" aria-hidden="true" />
       <span>{label}</span>
     </button>
   );
@@ -155,15 +169,24 @@ export const ProgressBar = React.memo(function ProgressBar({
   value,
   tone = "sunset",
   thin = false,
+  label,
 }: {
   value: number;
   tone?: "sunset" | "cyan" | "yellow" | "violet";
   thin?: boolean;
+  label?: string;
 }) {
   const style = useMemo(() => ({ width: `${Math.max(0, Math.min(100, value))}%` }) as CSSProperties, [value]);
 
   return (
-    <div className={cx("progress-track", `progress-track--${tone}`, thin && "progress-track--thin")}>
+    <div
+      className={cx("progress-track", `progress-track--${tone}`, thin && "progress-track--thin")}
+      role="progressbar"
+      aria-valuenow={value}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label}
+    >
       <span className="progress-track__fill" style={style} />
     </div>
   );
@@ -227,7 +250,7 @@ export const MetricCard = React.memo(function MetricCard({
 
 export const EmptyState = React.memo(function EmptyState({ message }: { message: string }) {
   return (
-    <div className="empty-state">
+    <div className="empty-state" role="status" aria-live="polite">
       <span className="empty-state__eyebrow">Sem dados</span>
       <p>{message}</p>
     </div>

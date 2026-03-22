@@ -700,7 +700,20 @@ describe("useBacklogActions", () => {
       const event = { preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>;
       await result.current.handleGameSubmit(event);
 
-      expect(args.setNotice).toHaveBeenCalledWith("Informe um título para o jogo.");
+      expect(args.setNotice).toHaveBeenCalledWith("Erro: O título do jogo é obrigatório.");
+    });
+
+    it("should show notice if title is too short", async () => {
+      const args = createMockArgs({
+        gameForm: { libraryEntryId: 0, title: "A" },
+        gameModalMode: "create" as const,
+      });
+      const { result } = renderHook(() => useBacklogActions(args));
+
+      const event = { preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>;
+      await result.current.handleGameSubmit(event);
+
+      expect(args.setNotice).toHaveBeenCalledWith("Erro: O título deve ter pelo menos 2 caracteres.");
     });
 
     it("should save game and close modal on success", async () => {
@@ -1170,19 +1183,43 @@ describe("useBacklogActions", () => {
   describe("handleGoalSubmit", () => {
     it("should show notice if target is invalid", async () => {
       const args = createMockArgs({
-        goalForm: { type: "games", target: 0, period: "monthly" },
+        goalForm: { type: "playtime", target: "", period: "monthly" },
       });
       const { result } = renderHook(() => useBacklogActions(args));
 
       const event = { preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>;
       await result.current.handleGoalSubmit(event);
 
-      expect(args.setNotice).toHaveBeenCalledWith("Informe um valor alvo maior que zero.");
+      expect(args.setNotice).toHaveBeenCalledWith("Erro: O valor alvo deve ser maior que zero.");
+    });
+
+    it("should show notice if type is invalid", async () => {
+      const args = createMockArgs({
+        goalForm: { type: "invalid", target: 10, period: "monthly" },
+      });
+      const { result } = renderHook(() => useBacklogActions(args));
+
+      const event = { preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>;
+      await result.current.handleGoalSubmit(event);
+
+      expect(args.setNotice).toHaveBeenCalledWith("Erro: Selecione um tipo de meta válido (playtime, started ou finished).");
+    });
+
+    it("should show notice if period is invalid", async () => {
+      const args = createMockArgs({
+        goalForm: { type: "playtime", target: 10, period: "invalid" },
+      });
+      const { result } = renderHook(() => useBacklogActions(args));
+
+      const event = { preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>;
+      await result.current.handleGoalSubmit(event);
+
+      expect(args.setNotice).toHaveBeenCalledWith("Erro: Selecione um período válido (daily, weekly, monthly, yearly ou lifetime).");
     });
 
     it("should create new goal", async () => {
       const args = createMockArgs({
-        goalForm: { type: "games", target: 10, period: "monthly" },
+        goalForm: { type: "playtime", target: 10, period: "monthly" },
         editingGoalId: null,
       });
       const { result } = renderHook(() => useBacklogActions(args));
@@ -1196,7 +1233,7 @@ describe("useBacklogActions", () => {
 
     it("should update existing goal", async () => {
       const args = createMockArgs({
-        goalForm: { type: "games", target: 15, period: "weekly" },
+        goalForm: { type: "finished", target: 15, period: "weekly" },
         editingGoalId: 1,
       });
       vi.mocked(db.goals.get).mockResolvedValueOnce({

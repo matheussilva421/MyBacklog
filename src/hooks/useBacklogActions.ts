@@ -196,8 +196,51 @@ export function useBacklogActions({
 
   const handleGameSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    // Validação de campos obrigatórios
     if (!gameForm.title.trim()) {
-      setNotice("Informe um título para o jogo.");
+      setNotice("Erro: O título do jogo é obrigatório.");
+      return;
+    }
+    if (gameForm.title.trim().length < 2) {
+      setNotice("Erro: O título deve ter pelo menos 2 caracteres.");
+      return;
+    }
+
+    // Validação de progresso (0-100)
+    if (gameForm.progress < 0 || gameForm.progress > 100) {
+      setNotice("Erro: O progresso deve estar entre 0% e 100%.");
+      return;
+    }
+
+    // Validação de horas (não negativo)
+    if (gameForm.hours < 0) {
+      setNotice("Erro: O número de horas não pode ser negativo.");
+      return;
+    }
+
+    // Validação de score (0-10)
+    const scoreNum = gameForm.score ? Number(gameForm.score) : 0;
+    if (scoreNum < 0 || scoreNum > 10) {
+      setNotice("Erro: A nota deve estar entre 0 e 10.");
+      return;
+    }
+
+    // Validação de ano (1980-2100)
+    if (gameForm.year && (gameForm.year < "1980" || gameForm.year > "2100")) {
+      setNotice("Erro: O ano deve estar entre 1980 e 2100.");
+      return;
+    }
+
+    // Validação de valores monetários (não negativo)
+    const pricePaidNum = gameForm.pricePaid ? Number(gameForm.pricePaid) : 0;
+    const targetPriceNum = gameForm.targetPrice ? Number(gameForm.targetPrice) : 0;
+    if (pricePaidNum < 0) {
+      setNotice("Erro: O valor pago não pode ser negativo.");
+      return;
+    }
+    if (targetPriceNum < 0) {
+      setNotice("Erro: O valor desejado não pode ser negativo.");
       return;
     }
 
@@ -647,6 +690,8 @@ export function useBacklogActions({
       const deviceId = await getDeviceId();
       await db.transaction(
         "rw",
+        // MED-02: Type casting necessário para transação Dexie com tabelas múltiplas
+        // O Dexie não infere tipos de arrays dinâmicos de tabelas
         [
           db.settings,
           db.pendingMutations,
@@ -659,7 +704,7 @@ export function useBacklogActions({
           db.tags,
           db.gameTags,
           db.libraryEntryLists,
-        ] as any,
+        ] as unknown as (typeof db)["pendingMutations"][],
         async () => {
           const entries = (await db.libraryEntries.bulkGet(entryIds)).filter((entry): entry is DbLibraryEntry =>
             Boolean(entry?.id),
@@ -841,7 +886,8 @@ export function useBacklogActions({
         db.reviews,
         db.gameTags,
         db.libraryEntryLists,
-      ] as any,
+      // MED-02: Type casting necessário para transação Dexie com tabelas múltiplas
+      ] as unknown as (typeof db)["pendingMutations"][],
       async () => {
         // Enqueue mutations antes de deletar
         const sessions = await db.playSessions.where("libraryEntryId").equals(deletedEntryId).toArray();
@@ -1029,11 +1075,35 @@ export function useBacklogActions({
 
   const handleGoalSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const target = Number(goalForm.target);
-    if (!target || target <= 0) {
-      setNotice("Informe um valor alvo maior que zero.");
+
+    // Validação de tipo
+    if (!goalForm.type || !["playtime", "started", "finished"].includes(goalForm.type)) {
+      setNotice("Erro: Selecione um tipo de meta válido (playtime, started ou finished).");
       return;
     }
+
+    // Validação de período
+    if (!goalForm.period || !["daily", "weekly", "monthly", "yearly", "lifetime"].includes(goalForm.period)) {
+      setNotice("Erro: Selecione um período válido (daily, weekly, monthly, yearly ou lifetime).");
+      return;
+    }
+
+    const target = Number(goalForm.target);
+    if (!target || target <= 0) {
+      setNotice("Erro: O valor alvo deve ser maior que zero.");
+      return;
+    }
+
+    // Validação específica por tipo
+    if (goalForm.type === "playtime" && target > 100000) {
+      setNotice("Erro: O alvo de playtime deve ser no máximo 100.000 horas.");
+      return;
+    }
+    if ((goalForm.type === "started" || goalForm.type === "finished") && target > 10000) {
+      setNotice("Erro: O alvo de jogos deve ser no máximo 10.000.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const now = new Date().toISOString();
@@ -1424,7 +1494,8 @@ export function useBacklogActions({
           db.reviews,
           db.gameTags,
           db.libraryEntryLists,
-        ] as any,
+        // MED-02: Type casting necessário para transação Dexie com tabelas múltiplas
+      ] as unknown as (typeof db)["pendingMutations"][],
         async () => {
           const allEntryIds = [primaryEntryId, ...uniqueMergedIds];
           const entries = (await db.libraryEntries.bulkGet(allEntryIds)).filter((entry): entry is DbLibraryEntry =>
@@ -1634,7 +1705,8 @@ export function useBacklogActions({
           db.libraryEntryStores,
           db.platforms,
           db.gamePlatforms,
-        ] as any,
+        // MED-02: Type casting necessário para transação Dexie com tabelas múltiplas
+      ] as unknown as (typeof db)["pendingMutations"][],
         async () => {
           await normalizeStructuredEntry(libraryEntryId);
         },
@@ -1673,7 +1745,8 @@ export function useBacklogActions({
           db.libraryEntryStores,
           db.platforms,
           db.gamePlatforms,
-        ] as any,
+        // MED-02: Type casting necessário para transação Dexie com tabelas múltiplas
+      ] as unknown as (typeof db)["pendingMutations"][],
         async () => {
           for (const entryId of entryIds) {
             await normalizeStructuredEntry(entryId);
@@ -1697,7 +1770,7 @@ export function useBacklogActions({
       if (kind === "store") {
         await db.transaction(
           "rw",
-          [db.settings, db.pendingMutations, db.stores, db.libraryEntryStores, db.libraryEntries] as any,
+          [db.settings, db.pendingMutations, db.stores, db.libraryEntryStores, db.libraryEntries] as unknown as (typeof db)["pendingMutations"][],
           async () => {
             const rows = (await db.stores.toArray()).filter(
               (store) => normalizeToken(store.normalizedName || store.name) === normalizedName,
@@ -1769,7 +1842,7 @@ export function useBacklogActions({
       } else {
         await db.transaction(
           "rw",
-          [db.settings, db.pendingMutations, db.platforms, db.gamePlatforms, db.games, db.libraryEntries] as any,
+          [db.settings, db.pendingMutations, db.platforms, db.gamePlatforms, db.games, db.libraryEntries] as unknown as (typeof db)["pendingMutations"][],
           async () => {
             const rows = (await db.platforms.toArray()).filter(
               (platform) => normalizeToken(platform.normalizedName || platform.name) === normalizedName,
